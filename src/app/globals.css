@@ -1,0 +1,94 @@
+@import "tailwindcss";
+@import "@fontsource-variable/fraunces/index.css";
+@import "@fontsource-variable/instrument-sans/index.css";
+
+/* ------------------------------------------------------------
+   Elite Academy – système visuel
+   Encre profonde, papier chaud, or de certification.
+   Fraunces (display à empattements) porte la voix de la marque ;
+   Instrument Sans assure la lecture d'interface.
+   ------------------------------------------------------------ */
+
+@theme {
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces Variable", Georgia, serif;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dce7fd;
+  --color-brand-200: #b9cefb;
+  --color-brand-300: #8fadf7;
+  --color-brand-400: #6189f1;
+  --color-brand-500: #3f66e8;
+  --color-brand-600: #2d4cd0;
+  --color-brand-700: #263ba8;
+  --color-brand-800: #233385;
+  --color-brand-900: #1f2c66;
+  --color-brand-950: #10142e;
+
+  /* Encre : fond des surfaces sombres (héros, pied de page). */
+  --color-ink-900: #0c102b;
+  --color-ink-950: #080b1f;
+
+  /* Papier : chaleur des surfaces claires de la page publique. */
+  --color-sand-50: #faf8f2;
+  --color-sand-100: #f3efe3;
+  --color-sand-200: #e7dfc9;
+
+  /* Or : certification, excellence, accents rares. */
+  --color-gold-300: #f0cf7e;
+  --color-gold-400: #e5b954;
+  --color-gold-500: #d3a032;
+  --color-gold-600: #b3831f;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 font-sans text-slate-900 antialiased;
+}
+
+::selection {
+  background: var(--color-gold-300);
+  color: var(--color-ink-950);
+}
+
+/* Apparition douce des sections de la page publique. */
+@keyframes lever {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lever {
+  animation: lever 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lever {
+    animation: none;
+  }
+}
+
+/* Impression des certificats : ne garder que le contenu utile. */
+@media print {
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

@@ -1,0 +1,18 @@
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environnement – ne jamais committer de secrets
+.env
+.env.local
+.env.*.local
+
+# Divers
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+docs/
