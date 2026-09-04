@@ -118,6 +118,72 @@ describe("validerResultat", () => {
     expect(validerResultat(42).ok).toBe(false);
   });
 
+  it("valide les quiz extraits d'un document (options, bonne réponse)", () => {
+    const avecQuiz = {
+      ...RESULTAT_VALIDE,
+      modules: [
+        {
+          title: "Module",
+          description: "",
+          lessons: [
+            {
+              title: "Leçon",
+              text: "Contenu.",
+              estimated_minutes: 20,
+              quiz: {
+                title: "Quiz",
+                questions: [
+                  {
+                    prompt: "Question valide ?",
+                    options: ["Oui", "Non"],
+                    correct_index: 0,
+                    explanation: "Parce que.",
+                  },
+                  {
+                    prompt: "Index invalide, rejetée",
+                    options: ["A", "B"],
+                    correct_index: 5,
+                  },
+                  { prompt: "Une seule option, rejetée", options: ["A"], correct_index: 0 },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const analyse = validerResultat(avecQuiz);
+    expect(analyse.ok).toBe(true);
+    if (analyse.ok) {
+      const quiz = analyse.resultat.modules[0].lessons[0].quiz;
+      expect(quiz).not.toBeNull();
+      expect(quiz!.questions).toHaveLength(1);
+      expect(quiz!.questions[0].correct_index).toBe(0);
+    }
+  });
+
+  it("ignore un quiz vide ou inexploitable sans rejeter la leçon", () => {
+    const sansVraiQuiz = {
+      ...RESULTAT_VALIDE,
+      modules: [
+        {
+          title: "Module",
+          description: "",
+          lessons: [
+            {
+              title: "Leçon",
+              text: "Contenu.",
+              quiz: { title: "Vide", questions: [] },
+            },
+          ],
+        },
+      ],
+    };
+    const analyse = validerResultat(sansVraiQuiz);
+    expect(analyse.ok).toBe(true);
+    if (analyse.ok) expect(analyse.resultat.modules[0].lessons[0].quiz).toBeNull();
+  });
+
   it("le mode simulation produit un résultat valide et clairement étiqueté", () => {
     const texte = genererSimulation({
       sujet: "Formation gestion des conflits internes pour managers débutants",

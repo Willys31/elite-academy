@@ -10,10 +10,23 @@
 const NIVEAUX = ["fundamentals", "operational", "advanced", "elite"] as const;
 export type NiveauCible = (typeof NIVEAUX)[number];
 
+export interface QuestionGeneree {
+  prompt: string;
+  options: string[];
+  correct_index: number;
+  explanation: string | null;
+}
+
+export interface QuizGenere {
+  title: string;
+  questions: QuestionGeneree[];
+}
+
 export interface LeconGeneree {
   title: string;
   text: string;
   estimated_minutes: number | null;
+  quiz: QuizGenere | null;
 }
 
 export interface ModuleGenere {
@@ -89,6 +102,37 @@ function tableau(v: unknown): unknown[] {
 }
 
 /**
+ * Valide un quiz extrait d'un document : questions avec au moins
+ * deux options et une bonne réponse valide. Retourne null si rien
+ * d'exploitable (le quiz est alors simplement ignoré).
+ */
+function validerQuiz(brut: unknown): QuizGenere | null {
+  if (brut === null || typeof brut !== "object") return null;
+  const q = brut as Record<string, unknown>;
+  const questions: QuestionGeneree[] = tableau(q.questions)
+    .map((item) => {
+      const qq = (item ?? {}) as Record<string, unknown>;
+      const options = tableau(qq.options).map(texteOuVide).filter(Boolean).slice(0, 6);
+      const index = Number(qq.correct_index);
+      return {
+        prompt: texteOuVide(qq.prompt),
+        options,
+        correct_index:
+          Number.isInteger(index) && index >= 0 && index < options.length ? index : -1,
+        explanation: texteOuVide(qq.explanation) || null,
+      };
+    })
+    .filter((x) => x.prompt && x.options.length >= 2 && x.correct_index >= 0)
+    .slice(0, 20);
+
+  if (questions.length === 0) return null;
+  return {
+    title: texteOuVide(q.title) || "Quiz de la leçon",
+    questions,
+  };
+}
+
+/**
  * Valide et normalise le résultat brut du LLM.
  * Rejette si les éléments indispensables manquent (titre, au moins
  * une compétence, au moins un module avec au moins une leçon rédigée).
@@ -135,6 +179,7 @@ export function validerResultat(brut: unknown): Analyse {
             title: texteOuVide(ll.title),
             text: texteOuVide(ll.text),
             estimated_minutes: nombreOuNull(ll.estimated_minutes),
+            quiz: validerQuiz(ll.quiz),
           };
         })
         .filter((l) => l.title.length > 0)

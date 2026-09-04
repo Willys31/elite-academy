@@ -24,6 +24,10 @@ import {
   supprimerLecon,
   supprimerModule,
 } from "@/app/(app)/catalogue/actions";
+import {
+  supprimerSupport,
+  televerserSupport,
+} from "@/app/(app)/catalogue/importer/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import {
   Alert,
@@ -338,40 +342,98 @@ export default async function EditeurFormationPage({
                             </div>
 
                             {/* QCM de la leçon */}
-                            {(l.activities ?? []).length > 0 ? (
+                            {(l.activities ?? []).filter((a) => a.type === "quiz").length > 0 ? (
                               <div className="mt-2 flex flex-wrap gap-2">
-                                {(l.activities ?? []).map((a) => (
-                                  <Link
-                                    key={a.id}
-                                    href={`/catalogue/${formation.id}/qcm/${a.id}`}
-                                    className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
-                                  >
-                                    📝 {a.title}
-                                  </Link>
-                                ))}
+                                {(l.activities ?? [])
+                                  .filter((a) => a.type === "quiz")
+                                  .map((a) => (
+                                    <Link
+                                      key={a.id}
+                                      href={`/catalogue/${formation.id}/qcm/${a.id}`}
+                                      className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                                    >
+                                      📝 {a.title}
+                                    </Link>
+                                  ))}
                               </div>
                             ) : null}
 
+                            {/* Supports de la leçon */}
+                            {(l.activities ?? []).filter((a) => a.type === "file").length > 0 ? (
+                              <ul className="mt-2 space-y-1">
+                                {(l.activities ?? [])
+                                  .filter((a) => a.type === "file")
+                                  .map((a) => (
+                                    <li
+                                      key={a.id}
+                                      className="flex items-center justify-between gap-2 rounded bg-white px-2.5 py-1.5 text-xs"
+                                    >
+                                      <span className="truncate">📎 {a.title}</span>
+                                      {editable ? (
+                                        <AuthForm
+                                          action={supprimerSupport}
+                                          submitLabel="Retirer"
+                                          pendingLabel="…"
+                                        >
+                                          <input type="hidden" name="course_id" value={formation.id} />
+                                          <input type="hidden" name="activity_id" value={a.id} />
+                                        </AuthForm>
+                                      ) : null}
+                                    </li>
+                                  ))}
+                              </ul>
+                            ) : null}
+
                             {editable ? (
-                              <details className="mt-2">
-                                <summary className="cursor-pointer text-xs font-medium text-brand-600">
-                                  Ajouter un QCM à cette leçon
-                                </summary>
-                                <div className="mt-2">
-                                  <AuthForm
-                                    action={creerQcm}
-                                    submitLabel="Créer le QCM"
-                                    pendingLabel="Création…"
-                                  >
-                                    <input type="hidden" name="course_id" value={formation.id} />
-                                    <input type="hidden" name="lesson_id" value={l.id} />
-                                    <div>
-                                      <Label htmlFor={`titre-qcm-${l.id}`}>Titre du QCM</Label>
-                                      <Input id={`titre-qcm-${l.id}`} name="title" required />
-                                    </div>
-                                  </AuthForm>
-                                </div>
-                              </details>
+                              <div className="mt-2 flex flex-wrap gap-4">
+                                <details>
+                                  <summary className="cursor-pointer text-xs font-medium text-brand-600">
+                                    Ajouter un QCM
+                                  </summary>
+                                  <div className="mt-2">
+                                    <AuthForm
+                                      action={creerQcm}
+                                      submitLabel="Créer le QCM"
+                                      pendingLabel="Création…"
+                                    >
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                      <div>
+                                        <Label htmlFor={`titre-qcm-${l.id}`}>Titre du QCM</Label>
+                                        <Input id={`titre-qcm-${l.id}`} name="title" required />
+                                      </div>
+                                    </AuthForm>
+                                  </div>
+                                </details>
+                                <details>
+                                  <summary className="cursor-pointer text-xs font-medium text-brand-600">
+                                    Ajouter un support (PDF, Word, vidéo…)
+                                  </summary>
+                                  <div className="mt-2">
+                                    <AuthForm
+                                      action={televerserSupport}
+                                      submitLabel="Téléverser le support"
+                                      pendingLabel="Téléversement…"
+                                    >
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                      <div>
+                                        <Label htmlFor={`support-${l.id}`}>
+                                          Fichier (20 Mo max)
+                                        </Label>
+                                        <input
+                                          id={`support-${l.id}`}
+                                          name="file"
+                                          type="file"
+                                          required
+                                          accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.mp4,.mp3"
+                                          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
+                                        />
+                                      </div>
+                                    </AuthForm>
+                                  </div>
+                                </details>
+                              </div>
                             ) : null}
                           </li>
                         ))}

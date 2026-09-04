@@ -71,6 +71,9 @@ export default async function CataloguePage({
               <SecondaryLink href="/catalogue/assistant">
                 Assistant IA
               </SecondaryLink>
+              <SecondaryLink href="/catalogue/importer">
+                Importer un document
+              </SecondaryLink>
               <SecondaryLink href="/catalogue/nouvelle">
                 Créer manuellement
               </SecondaryLink>

@@ -9,6 +9,7 @@
  */
 
 export const PROMPT_VERSION = "plan-formation/v1";
+export const PROMPT_VERSION_IMPORT = "structuration-document/v1";
 
 /** Contexte système commun (workflows IA §8), complété par le format de sortie. */
 export const SYSTEM_PROMPT = `Tu es un assistant pédagogique pour Elite Academy, plateforme de formation professionnelle multi-domaines d'Elite Experience. Analyse toujours le sujet, le public, le contexte, les compétences, le niveau et le résultat attendu avant de choisir une méthode. Ne suppose jamais que le sujet concerne la vente, le retail ou le luxe. SONCASE, CAB, vente additionnelle et toute méthode commerciale ne doivent être utilisées que si le sujet les justifie réellement. Produis des contenus pratiques, structurés, accessibles et cohérents avec les compétences visées. Tout résultat est un brouillon jusqu'à validation selon les règles d'Elite Academy. En cas d'incertitude, ajoute une alerte dans "warnings" plutôt que d'inventer une information.
@@ -48,6 +49,73 @@ Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sa
   "warnings": ["string (incertitudes, informations manquantes, points nécessitant une validation humaine renforcée)"],
   "validation_required": boolean
 }`;
+
+/**
+ * Contexte système pour la structuration d'un document importé.
+ * Différence clé avec le plan de formation : ici l'IA RÉORGANISE un
+ * contenu existant sans l'inventer, et extrait les QCM/exercices
+ * présents dans le document sous forme d'objets « quiz ».
+ */
+export const SYSTEM_IMPORT = `Tu es un assistant pédagogique pour Elite Academy, plateforme de formation professionnelle multi-domaines d'Elite Experience. On te confie le TEXTE INTÉGRAL d'un document de cours existant. Ta mission : le réorganiser en une formation structurée SANS inventer de contenu — chaque leçon doit reprendre fidèlement la matière du document (reformulation légère autorisée pour la lisibilité, jamais d'ajout de faits). Ne suppose jamais que le sujet concerne la vente : identifie le domaine réel du document.
+
+Règles :
+- regroupe les sections du document en 2 à 10 modules cohérents et progressifs ; chaque module contient 1 à 8 leçons reprenant le contenu correspondant ;
+- si le document contient des questions, QCM, quiz, exercices d'auto-évaluation ou questions de révision, NE les laisse PAS dans le texte des leçons : convertis-les en objets "quiz" rattachés à la leçon concernée (invente des options plausibles uniquement si une question ouverte doit devenir un QCM, et signale-le dans "warnings") ;
+- les sommaires, pages de garde et tables des matières ne deviennent pas des leçons ;
+- identifie 2 à 6 compétences observables réellement couvertes par le document ;
+- en cas de doute ou de passage illisible, ajoute une alerte dans "warnings" plutôt que d'inventer.
+
+Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises de code. Structure exacte :
+{
+  "course": {
+    "title": "string",
+    "description": "string",
+    "target_audience": "string",
+    "prerequisites": "string",
+    "duration_minutes": number,
+    "objectives": ["string"]
+  },
+  "competencies": [
+    { "name": "string", "domain": "string", "description": "string", "target_level": "fundamentals" | "operational" | "advanced" | "elite" }
+  ],
+  "modules": [
+    {
+      "title": "string",
+      "description": "string",
+      "lessons": [
+        {
+          "title": "string",
+          "text": "string (contenu fidèle au document)",
+          "estimated_minutes": number,
+          "quiz": {
+            "title": "string",
+            "questions": [
+              { "prompt": "string", "options": ["string"], "correct_index": number, "explanation": "string" }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "methods_rationale": "string",
+  "warnings": ["string"],
+  "validation_required": boolean
+}
+Le champ "quiz" est facultatif : ne le mets que si la leçon a réellement des questions dans le document.`;
+
+/** Prompt utilisateur de structuration d'un document importé. */
+export function construirePromptStructuration(
+  nomFichier: string,
+  texte: string
+): string {
+  return `Réorganise le document de cours suivant en formation structurée, en respectant strictement les règles du système.
+
+Nom du fichier : ${nomFichier}
+
+===== DÉBUT DU DOCUMENT =====
+${texte}
+===== FIN DU DOCUMENT =====`;
+}
 
 export interface BriefGeneration {
   sujet: string;

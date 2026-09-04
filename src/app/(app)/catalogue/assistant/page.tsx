@@ -5,6 +5,7 @@ import { isEliteAdmin } from "@/lib/auth/roles";
 import { organizationsForCourseCreation } from "@/lib/courses/statuts";
 import { createClient } from "@/lib/supabase/server";
 import { genererFormation } from "@/app/(app)/catalogue/assistant/actions";
+import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, BackLink, Card, Input, Label, PageTitle, Select, Textarea } from "@/components/ui";
 
@@ -31,8 +32,8 @@ export default async function AssistantPage() {
   }
   if (organisations.length === 0) redirect("/sans-acces");
 
-  const simulation = process.env.ELITE_IA_MODE === "simulation";
-  const cleConfiguree = simulation || Boolean(process.env.ANTHROPIC_API_KEY);
+  const simulation = modeSimulation();
+  const cleConfiguree = simulation || iaConfiguree();
 
   return (
     <div className="max-w-2xl">
@@ -61,10 +62,12 @@ export default async function AssistantPage() {
       {!cleConfiguree ? (
         <div className="mb-6">
           <Alert kind="error">
-            La clé API n&apos;est pas configurée. Ajoutez{" "}
-            <code>ANTHROPIC_API_KEY</code> dans le fichier <code>.env.local</code>{" "}
-            du serveur puis redémarrez l&apos;application — ou activez le mode
-            de test sans coût avec <code>ELITE_IA_MODE=simulation</code>.
+            Aucune IA configurée. Trois options dans <code>.env.local</code>{" "}
+            (voir <code>.env.example</code>) : un fournisseur{" "}
+            <strong>gratuit</strong> (<code>LLM_PROVIDER=gemini</code> +{" "}
+            <code>LLM_API_KEY</code>), une clé <code>ANTHROPIC_API_KEY</code>,
+            ou le mode <code>ELITE_IA_MODE=simulation</code>. Redémarrez
+            ensuite l&apos;application.
           </Alert>
         </div>
       ) : null}

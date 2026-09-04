@@ -63,7 +63,7 @@ export default async function LeconPage({
   const [{ data: activites }, { data: progres }] = await Promise.all([
     supabase
       .from("activities")
-      .select("id, type, title, difficulty")
+      .select("id, type, title, difficulty, content")
       .eq("lesson_id", lecon.id)
       .order("position"),
     supabase
@@ -76,6 +76,32 @@ export default async function LeconPage({
 
   const contenu = (lecon.content ?? {}) as { text?: string };
   const terminee = Boolean(progres);
+
+  // Supports de la leçon : URL signées (1 h), accès contrôlé par
+  // les politiques Storage de l'organisation.
+  const quizzes = (activites ?? []).filter((a) => a.type === "quiz");
+  const fichiers = (activites ?? []).filter((a) => a.type === "file");
+  const supports = await Promise.all(
+    fichiers.map(async (a) => {
+      const c = (a.content ?? {}) as { file_path?: string; mime_type?: string };
+      if (!c.file_path) return null;
+      const { data } = await supabase.storage
+        .from("supports")
+        .createSignedUrl(c.file_path, 3600);
+      if (!data?.signedUrl) return null;
+      return {
+        id: a.id,
+        titre: a.title,
+        url: data.signedUrl,
+        mime: c.mime_type ?? "application/octet-stream",
+      };
+    })
+  ).then((liste) => liste.filter(Boolean) as Array<{
+    id: string;
+    titre: string;
+    url: string;
+    mime: string;
+  }>);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -100,20 +126,57 @@ export default async function LeconPage({
         )}
       </Card>
 
-      {activites && activites.length > 0 ? (
+      {supports.length > 0 ? (
+        <section aria-label="Supports de cours" className="mt-6 space-y-4">
+          <h2 className="text-lg font-semibold">Supports de la leçon</h2>
+          {supports.map((s) => (
+            <Card key={s.id} className="overflow-hidden p-0">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+                <p className="truncate text-sm font-medium">📎 {s.titre}</p>
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-sm text-brand-600 hover:underline"
+                >
+                  Ouvrir / Télécharger
+                </a>
+              </div>
+              {s.mime === "application/pdf" ? (
+                <iframe
+                  src={s.url}
+                  title={s.titre}
+                  className="h-[70vh] w-full"
+                />
+              ) : s.mime.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.url} alt={s.titre} className="w-full" />
+              ) : s.mime.startsWith("video/") ? (
+                <video src={s.url} controls className="w-full" />
+              ) : s.mime.startsWith("audio/") ? (
+                <audio src={s.url} controls className="w-full px-4 py-3" />
+              ) : (
+                <p className="px-4 py-3 text-sm text-slate-500">
+                  Ce format (Word, PowerPoint…) s&apos;ouvre via le bouton
+                  « Ouvrir / Télécharger » ci-dessus.
+                </p>
+              )}
+            </Card>
+          ))}
+        </section>
+      ) : null}
+
+      {quizzes.length > 0 ? (
         <section aria-label="Activités" className="mt-6">
           <h2 className="mb-3 text-lg font-semibold">Activités de la leçon</h2>
           <div className="space-y-2">
-            {activites.map((a) => (
+            {quizzes.map((a) => (
               <Link
                 key={a.id}
                 href={`/formations/${formation.id}/activite/${a.id}`}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm transition hover:border-brand-300"
               >
-                <span>
-                  {a.type === "quiz" ? "📝 QCM — " : ""}
-                  {a.title}
-                </span>
+                <span>📝 QCM — {a.title}</span>
                 <span className="text-xs text-slate-400">
                   Difficulté {a.difficulty}/5
                 </span>

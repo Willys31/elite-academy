@@ -44,9 +44,10 @@ Dans l'éditeur SQL de Supabase, exécuter dans l'ordre :
 5. `supabase/migrations/0005_parcours_apprenant.sql`
 6. `supabase/migrations/0006_sessions_presentielles.sql`
 7. `supabase/migrations/0007_certificats.sql`
-8. Créer votre compte via l'écran d'inscription de l'application
-9. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
-   pour devenir administrateur Elite Experience
+8. `supabase/migrations/0008_supports_import.sql`
+9. Créer votre compte via l'écran d'inscription de l'application
+10. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
+    pour devenir administrateur Elite Experience
 
 ### 4. Lancer
 
@@ -97,3 +98,5 @@ docs/               Documentation des lots livrés
 - [Lot 5 – Sessions présentielles et temps réel](docs/lot-05-sessions.md)
 - [Lot 6 – Certificats vérifiables](docs/lot-06-certificats.md)
 - [Lot 7 – Page d'accueil publique et système visuel](docs/lot-07-accueil-design.md)
+- [Lot 8 – Supports de cours et import automatique de documents](docs/lot-08-import-supports.md)
+- [Lot 9 – Import structuré par IA et fournisseurs IA gratuits](docs/lot-09-import-ia.md)
