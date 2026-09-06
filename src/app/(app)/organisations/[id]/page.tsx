@@ -65,7 +65,7 @@ export default async function OrganisationPage({
         {org.sector ? ` · ${org.sector}` : ""}
       </p>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Membres">
           <h2 className="mb-3 text-lg font-semibold">Membres</h2>
           {!gestionnaire ? (
@@ -79,9 +79,12 @@ export default async function OrganisationPage({
               hint="Ajoutez un premier membre à partir de son adresse e-mail."
             />
           ) : (
-            <Card className="overflow-x-auto p-0">
-              {/* Tableau sur grand écran, cartes empilées sur mobile */}
-              <table className="hidden w-full text-left text-sm sm:table">
+            <Card flush>
+              {/* Tableau sur grand écran, cartes empilées sur mobile.
+                  Entre 640 et 1024 px, une adresse e-mail longue peut
+                  encore dépasser : le tableau défile alors dans sa carte. */}
+              <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Nom</th>
@@ -101,7 +104,7 @@ export default async function OrganisationPage({
                           {profil?.full_name || "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {profil?.email}
+                          <span className="break-all">{profil?.email}</span>
                         </td>
                         <td className="px-4 py-3">
                           <Badge>{ROLE_LABELS[m.role as MemberRole]}</Badge>
@@ -112,6 +115,7 @@ export default async function OrganisationPage({
                   })}
                 </tbody>
               </table>
+              </div>
               <ul className="divide-y divide-slate-100 sm:hidden">
                 {membres.map((m) => {
                   const profil = Array.isArray(m.profile)
@@ -120,7 +124,7 @@ export default async function OrganisationPage({
                   return (
                     <li key={m.id} className="p-4">
                       <p className="font-medium">{profil?.full_name || "—"}</p>
-                      <p className="text-sm text-slate-600">{profil?.email}</p>
+                      <p className="break-all text-sm text-slate-600">{profil?.email}</p>
                       <p className="mt-1">
                         <Badge>{ROLE_LABELS[m.role as MemberRole]}</Badge>
                       </p>

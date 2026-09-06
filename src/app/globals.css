@@ -10,6 +10,11 @@
    ------------------------------------------------------------ */
 
 @theme {
+  /* Point de rupture supplémentaire : beaucoup de téléphones utilisés
+     en atelier font 360 px de large. `xs` sert à distinguer ces écrans
+     très étroits du reste du mobile (Tailwind commence à 640 px). */
+  --breakpoint-xs: 25rem;
+
   --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces Variable", Georgia, serif;
 
@@ -41,13 +46,61 @@
   --color-gold-600: #b3831f;
 }
 
-html,
-body {
+/* ------------------------------------------------------------
+   Socle responsive
+   - la hauteur suit `dvh` : sur mobile, la barre d'URL qui se
+     rétracte ne crée plus de saut ni de bande vide ;
+   - `text-size-adjust` empêche iOS de grossir seul les textes
+     en paysage ;
+   - `overflow-x: clip` coupe tout débordement horizontal
+     accidentel sans casser `position: sticky` (à la différence
+     de `overflow: hidden`).
+   ------------------------------------------------------------ */
+
+html {
   height: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
   @apply bg-slate-50 font-sans text-slate-900 antialiased;
+}
+
+/* Les mots très longs (URL, codes, e-mails) coupent au lieu
+   d'élargir la page sur petit écran. */
+h1,
+h2,
+h3,
+h4,
+p,
+li,
+dd,
+dt,
+td,
+th,
+summary,
+label {
+  overflow-wrap: break-word;
+}
+
+/* Aucun média ne dépasse jamais sa colonne. */
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+
+/* Ancrage des liens internes sous l'en-tête collante. */
+:target {
+  scroll-margin-top: 5rem;
 }
 
 ::selection {
@@ -81,6 +134,7 @@ body {
 @media print {
   aside,
   header,
+  nav,
   .no-print {
     display: none !important;
   }
@@ -90,5 +144,10 @@ body {
   main {
     max-width: none !important;
     padding: 0 !important;
+  }
+  /* Les cartes perdent ombre et bordure grise à l'impression. */
+  .print-plain {
+    border: 0 !important;
+    box-shadow: none !important;
   }
 }

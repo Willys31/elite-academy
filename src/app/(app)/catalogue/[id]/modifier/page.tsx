@@ -199,7 +199,7 @@ export default async function EditeurFormationPage({
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[3fr_2fr]">
         {/* Colonne principale : fiche + modules */}
         <div className="space-y-6">
           <Card>
@@ -293,8 +293,8 @@ export default async function EditeurFormationPage({
             <div className="space-y-4">
               {(modules ?? []).map((m, i) => (
                 <Card key={m.id}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                    <div className="min-w-0">
                       <h3 className="font-medium">
                         Module {i + 1} — {m.title}
                       </h3>
@@ -320,8 +320,8 @@ export default async function EditeurFormationPage({
                         .sort((a, b) => a.position - b.position)
                         .map((l) => (
                           <li key={l.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                            <div className="flex items-center justify-between gap-2">
-                              <span>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                              <span className="min-w-0">
                                 {l.title}
                                 {l.estimated_minutes ? (
                                   <span className="ml-2 text-xs text-slate-400">
@@ -366,9 +366,9 @@ export default async function EditeurFormationPage({
                                   .map((a) => (
                                     <li
                                       key={a.id}
-                                      className="flex items-center justify-between gap-2 rounded bg-white px-2.5 py-1.5 text-xs"
+                                      className="flex flex-col gap-1.5 rounded bg-white px-2.5 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-2"
                                     >
-                                      <span className="truncate">📎 {a.title}</span>
+                                      <span className="min-w-0 break-words sm:truncate">📎 {a.title}</span>
                                       {editable ? (
                                         <AuthForm
                                           action={supprimerSupport}
@@ -521,9 +521,9 @@ export default async function EditeurFormationPage({
                   return (
                     <li
                       key={l.competency_id}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                      className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                     >
-                      <span>
+                      <span className="min-w-0">
                         {comp?.name}{" "}
                         <Badge>{LEVEL_LABELS[l.target_level] ?? l.target_level}</Badge>
                       </span>

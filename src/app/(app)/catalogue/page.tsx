@@ -155,8 +155,8 @@ export default async function CataloguePage({
                 }
               >
                 <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-semibold text-slate-900">{f.title}</h2>
+                  <div className="flex items-start justify-between gap-2 [&>:last-child]:shrink-0">
+                    <h2 className="min-w-0 font-semibold text-slate-900">{f.title}</h2>
                     {estGestionnaire ? (
                       <Badge>{STATUS_LABELS[f.status as CourseStatus]}</Badge>
                     ) : null}

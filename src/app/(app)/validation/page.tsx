@@ -50,7 +50,7 @@ export default async function ValidationPage() {
     <div>
       <PageTitle>Validation</PageTitle>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <section aria-label="Formations en attente de validation">
           <h2 className="mb-3 text-lg font-semibold">
             Formations en attente de validation

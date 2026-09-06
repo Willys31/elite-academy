@@ -47,7 +47,7 @@ export default async function CompetencesPage() {
     <div>
       <PageTitle>Référentiel de compétences</PageTitle>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Liste des compétences">
           {error ? (
             <Alert kind="error">

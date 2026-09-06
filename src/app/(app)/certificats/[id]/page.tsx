@@ -82,16 +82,16 @@ export default async function CertificatPage({
       ) : null}
 
       {/* Certificat imprimable */}
-      <div className="rounded-xl border-4 border-double border-brand-700 bg-white p-8 text-center sm:p-12">
-        <p className="text-sm uppercase tracking-widest text-slate-500">
+      <div className="print-plain rounded-xl border-4 border-double border-brand-700 bg-white px-5 py-8 text-center sm:px-10 sm:py-12">
+        <p className="text-xs uppercase tracking-[0.15em] text-slate-500 sm:text-sm sm:tracking-widest">
           Elite Academy — {organisation?.name}
         </p>
-        <h1 className="mt-4 text-2xl font-bold text-brand-800 sm:text-3xl">
+        <h1 className="mt-4 text-xl font-bold text-brand-800 sm:text-3xl">
           {CERT_TYPE_LABELS[certificat.certificate_type]}
         </h1>
 
         <p className="mt-8 text-sm text-slate-500">décerné à</p>
-        <p className="mt-1 text-2xl font-semibold">{titulaire?.full_name}</p>
+        <p className="mt-1 text-xl font-semibold sm:text-2xl">{titulaire?.full_name}</p>
 
         <p className="mt-6 text-sm text-slate-500">pour la formation</p>
         <p className="mt-1 text-lg font-medium">{course?.title}</p>
@@ -121,12 +121,12 @@ export default async function CertificatPage({
           <img
             src={qrDataUrl}
             alt="QR code de vérification du certificat"
-            className="h-28 w-28"
+            className="h-24 w-24 sm:h-28 sm:w-28"
           />
-          <p className="font-mono text-sm font-semibold tracking-wide">
+          <p className="break-all font-mono text-sm font-semibold tracking-wide">
             {certificat.verification_code}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="break-all text-xs text-slate-400">
             Vérifiable en ligne : {urlVerification}
           </p>
           <p className="text-xs text-slate-400">

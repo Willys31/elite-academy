@@ -53,7 +53,7 @@ export default async function VerifierPage({
   const valide = resultat?.statut === "valid";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sand-50 px-4 py-10">
+    <main className="flex min-h-dvh items-center justify-center bg-sand-50 px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <a href="/" className="font-display text-3xl font-semibold tracking-tight text-brand-800">
@@ -78,11 +78,11 @@ export default async function VerifierPage({
               defaultValue={saisie}
               placeholder="EA-XXXX-XXXX-XXXX"
               autoComplete="off"
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-center font-mono text-sm uppercase shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              className="block min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-center font-mono text-base uppercase tracking-widest sm:text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
             <button
               type="submit"
-              className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700"
+              className="min-h-11 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700"
             >
               Vérifier
             </button>
@@ -121,44 +121,44 @@ export default async function VerifierPage({
                   : "✗ Certificat révoqué — non valide"}
               </p>
               <dl className="mt-3 space-y-1.5 text-slate-700">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Titulaire</dt>
-                  <dd className="font-medium">{resultat.titulaire}</dd>
+                <div className="gap-2 sm:flex sm:justify-between">
+                  <dt className="shrink-0 text-slate-500">Titulaire</dt>
+                  <dd className="min-w-0 font-medium sm:text-right">{resultat.titulaire}</dd>
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Type</dt>
-                  <dd>{CERT_TYPE_LABELS[resultat.type_certificat]}</dd>
+                <div className="gap-2 sm:flex sm:justify-between">
+                  <dt className="shrink-0 text-slate-500">Type</dt>
+                  <dd className="min-w-0 sm:text-right">{CERT_TYPE_LABELS[resultat.type_certificat]}</dd>
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Formation</dt>
-                  <dd className="text-right">{resultat.formation}</dd>
+                <div className="gap-2 sm:flex sm:justify-between">
+                  <dt className="shrink-0 text-slate-500">Formation</dt>
+                  <dd className="min-w-0 sm:text-right">{resultat.formation}</dd>
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Organisation</dt>
-                  <dd>{resultat.organisation}</dd>
+                <div className="gap-2 sm:flex sm:justify-between">
+                  <dt className="shrink-0 text-slate-500">Organisation</dt>
+                  <dd className="min-w-0 sm:text-right">{resultat.organisation}</dd>
                 </div>
                 {resultat.competence ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Compétence</dt>
-                    <dd className="text-right">{resultat.competence}</dd>
+                  <div className="gap-2 sm:flex sm:justify-between">
+                    <dt className="shrink-0 text-slate-500">Compétence</dt>
+                    <dd className="min-w-0 sm:text-right">{resultat.competence}</dd>
                   </div>
                 ) : null}
                 {resultat.niveau ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Niveau</dt>
-                    <dd>{LEVEL_LABELS[resultat.niveau] ?? resultat.niveau}</dd>
+                  <div className="gap-2 sm:flex sm:justify-between">
+                    <dt className="shrink-0 text-slate-500">Niveau</dt>
+                    <dd className="min-w-0 sm:text-right">{LEVEL_LABELS[resultat.niveau] ?? resultat.niveau}</dd>
                   </div>
                 ) : null}
-                <div className="flex justify-between gap-2">
-                  <dt className="text-slate-500">Délivré le</dt>
-                  <dd>
+                <div className="gap-2 sm:flex sm:justify-between">
+                  <dt className="shrink-0 text-slate-500">Délivré le</dt>
+                  <dd className="min-w-0 sm:text-right">
                     {new Date(resultat.delivre_le).toLocaleDateString("fr-FR")}
                   </dd>
                 </div>
                 {resultat.revoque_le ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Révoqué le</dt>
-                    <dd>
+                  <div className="gap-2 sm:flex sm:justify-between">
+                    <dt className="shrink-0 text-slate-500">Révoqué le</dt>
+                    <dd className="min-w-0 sm:text-right">
                       {new Date(resultat.revoque_le).toLocaleDateString("fr-FR")}
                     </dd>
                   </div>

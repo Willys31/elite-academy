@@ -100,3 +100,4 @@ docs/               Documentation des lots livrés
 - [Lot 7 – Page d'accueil publique et système visuel](docs/lot-07-accueil-design.md)
 - [Lot 8 – Supports de cours et import automatique de documents](docs/lot-08-import-supports.md)
 - [Lot 9 – Import structuré par IA et fournisseurs IA gratuits](docs/lot-09-import-ia.md)
+- [Lot 10 – Responsivité et confort tactile](docs/lot-10-responsivite.md)

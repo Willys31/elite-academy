@@ -130,7 +130,7 @@ export default async function LeconPage({
         <section aria-label="Supports de cours" className="mt-6 space-y-4">
           <h2 className="text-lg font-semibold">Supports de la leçon</h2>
           {supports.map((s) => (
-            <Card key={s.id} className="overflow-hidden p-0">
+            <Card key={s.id} flush className="overflow-hidden">
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
                 <p className="truncate text-sm font-medium">📎 {s.titre}</p>
                 <a
@@ -146,7 +146,7 @@ export default async function LeconPage({
                 <iframe
                   src={s.url}
                   title={s.titre}
-                  className="h-[70vh] w-full"
+                  className="h-[60svh] min-h-80 w-full sm:h-[70svh]"
                 />
               ) : s.mime.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element

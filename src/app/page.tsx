@@ -99,16 +99,19 @@ export default async function PageAccueilPublique() {
     <div className="bg-sand-50 text-slate-900">
       {/* ---------- En-tête ---------- */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-ink-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        {/* Sous 400 px, marque + deux actions ne tiennent pas sur une ligne :
+            la rangée passe à la ligne plutôt que de rogner le libellé du
+            bouton principal. */}
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 xs:flex-nowrap xs:justify-between xs:py-3 sm:gap-3 sm:px-6">
           <Link href="/" className="flex shrink-0 items-baseline gap-2">
-            <span className="whitespace-nowrap font-display text-lg font-semibold tracking-tight text-white sm:text-xl">
+            <span className="whitespace-nowrap font-display text-base font-semibold tracking-tight text-white xs:text-lg sm:text-xl">
               Elite Academy
             </span>
             <span className="hidden text-[11px] uppercase tracking-[0.2em] text-white/50 lg:inline">
               par Elite Experience
             </span>
           </Link>
-          <nav className="flex items-center gap-1.5 sm:gap-4">
+          <nav className="flex shrink-0 items-center gap-1.5 sm:gap-4">
             <Link
               href="/verifier"
               className="hidden whitespace-nowrap text-sm text-white/70 transition hover:text-white md:inline"
@@ -117,13 +120,13 @@ export default async function PageAccueilPublique() {
             </Link>
             <Link
               href="/connexion"
-              className="whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium text-white/90 transition hover:bg-white/10 sm:px-3"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium text-white/90 transition hover:bg-white/10 sm:px-3"
             >
               Se connecter
             </Link>
             <Link
               href="/inscription"
-              className="whitespace-nowrap rounded-lg bg-gold-400 px-3 py-2 text-sm font-semibold text-ink-950 transition hover:bg-gold-300 sm:px-4"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg bg-gold-400 px-3 py-2 text-sm font-semibold text-ink-950 transition hover:bg-gold-300 sm:px-4"
             >
               Créer un compte
             </Link>

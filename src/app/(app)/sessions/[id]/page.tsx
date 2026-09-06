@@ -109,18 +109,18 @@ export default async function SessionDirectePage({
         <p className="-mt-4 mb-6 text-sm text-slate-500">Formation : {course.title}</p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
         {/* Code et QR */}
         <Card className="text-center">
           <h2 className="font-semibold">Rejoindre la session</h2>
-          <p className="mt-3 text-3xl font-bold tracking-[0.3em] text-brand-700">
+          <p className="mt-3 break-all font-mono text-2xl font-bold tracking-[0.2em] text-brand-700 sm:text-3xl sm:tracking-[0.3em]">
             {session.session_code}
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={qrDataUrl}
             alt={`QR code pour rejoindre la session ${session.session_code}`}
-            className="mx-auto mt-4 h-48 w-48"
+            className="mx-auto mt-4 h-40 w-40 sm:h-48 sm:w-48"
           />
           <p className="mt-2 break-all text-xs text-slate-400">{urlRejoindre}</p>
         </Card>
@@ -194,7 +194,7 @@ export default async function SessionDirectePage({
       </div>
 
       {/* Animation */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className="mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">
         <Card>
           <h2 className="mb-3 font-semibold">Lancer une activité</h2>
           {!session.course_id ? (

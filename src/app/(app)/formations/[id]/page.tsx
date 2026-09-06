@@ -114,13 +114,13 @@ export default async function LecteurFormationPage({
                         href={`/formations/${formation.id}/lecon/${l.id}`}
                         className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-sm transition hover:bg-brand-50"
                       >
-                        <span className="flex items-center gap-2">
-                          <span aria-hidden>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span aria-hidden className="shrink-0">
                             {terminees.has(l.id) ? "✅" : "⭕"}
                           </span>
                           {l.title}
                         </span>
-                        <span className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
                           {l.estimated_minutes ? `${l.estimated_minutes} min` : ""}
                           {terminees.has(l.id) ? <Badge>Terminée</Badge> : null}
                         </span>

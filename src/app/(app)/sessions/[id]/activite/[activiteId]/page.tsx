@@ -142,13 +142,13 @@ export default async function ActiviteSessionPage({
                     {((q.options as string[]) ?? []).map((opt, j) => (
                       <label
                         key={j}
-                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50"
+                        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50 has-checked:border-brand-400 has-checked:bg-brand-50"
                       >
                         <input
                           type="radio"
                           name={`q_${q.id}`}
                           value={j}
-                          className="h-4 w-4 accent-brand-600"
+                          className="mt-0.5 h-5 w-5 shrink-0 accent-brand-600"
                         />
                         {opt}
                       </label>

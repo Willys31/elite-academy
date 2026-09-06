@@ -117,8 +117,8 @@ export default async function EditeurQcmPage({
               const bonne = Number((q.expected_answer as { index?: number })?.index ?? -1);
               return (
                 <Card key={q.id}>
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                    <p className="min-w-0 font-medium">
                       {i + 1}. {q.prompt}
                     </p>
                     {editable ? (
