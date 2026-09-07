@@ -8,9 +8,14 @@ import {
   agregerResultats,
   SESSION_STATUS_LABELS,
 } from "@/lib/sessions/sessions";
-import { cloturerSession, lancerActivite } from "@/app/(app)/sessions/actions";
+import {
+  cloturerSession,
+  lancerActivite,
+  supprimerSession,
+} from "@/app/(app)/sessions/actions";
 import { SessionRealtimeRefresh } from "@/components/sessions/SessionRealtimeRefresh";
 import { AuthForm } from "@/components/ui/AuthForm";
+import { DangerForm } from "@/components/ui/DangerForm";
 import { Alert, BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Session en direct" };
@@ -261,6 +266,26 @@ export default async function SessionDirectePage({
               Session clôturée — présences et résultats conservés.
             </p>
           )}
+
+          {/* Suppression : après la clôture dans la lecture de la
+              carte, car c'est le geste le plus définitif. */}
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="mb-3 text-sm text-slate-600">
+              Supprimer efface la session, la liste des présents et le
+              journal d&apos;événements. Les réponses aux QCM restent
+              acquises aux apprenants.
+            </p>
+            <DangerForm
+              action={supprimerSession}
+              label="Supprimer la session"
+              confirmLabel="Oui, supprimer définitivement"
+              pendingLabel="Suppression…"
+              question={`Supprimer définitivement « ${session.title} » et ses ${(participants ?? []).length} présence(s) ?`}
+              bloc
+            >
+              <input type="hidden" name="session_id" value={session.id} />
+            </DangerForm>
+          </div>
         </Card>
       </div>
     </div>

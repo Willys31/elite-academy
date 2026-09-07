@@ -165,6 +165,57 @@ export async function cloturerSession(
 }
 
 // ------------------------------------------------------------
+// Suppression définitive d'une session
+// ------------------------------------------------------------
+
+/**
+ * Supprime une session et, en cascade, ses présences
+ * (`session_participants`) et son journal d'événements
+ * (`live_events`).
+ *
+ * Les réponses aux QCM (`attempts`) ne sont pas rattachées à la
+ * session : elles restent acquises à l'apprenant et alimentent
+ * toujours sa progression. Supprimer une session efface donc la trace
+ * de l'animation, pas les résultats pédagogiques.
+ *
+ * Le droit réel est appliqué par la politique RLS `sessions_delete`
+ * (formateur animateur, administrateur de l'organisation, admin Elite).
+ */
+export async function supprimerSession(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const sessionId = String(formData.get("session_id") ?? "");
+  if (!sessionId) return { error: "Session introuvable." };
+
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("live_sessions")
+    .delete({ count: "exact" })
+    .eq("id", sessionId);
+
+  if (error) {
+    loguer("suppression", error);
+    return { error: "La suppression a échoué. Vérifiez vos droits." };
+  }
+  // RLS ne renvoie pas d'erreur quand aucune ligne n'est visible : sans
+  // ce contrôle, un refus de droits passerait pour un succès.
+  if (count === 0) {
+    return {
+      error:
+        "Suppression refusée : seul le formateur animateur ou un " +
+        "administrateur de l'organisation peut supprimer cette session.",
+    };
+  }
+
+  revalidatePath("/sessions");
+  redirect("/sessions?supprimee=1");
+}
+
+// ------------------------------------------------------------
 // Participant : rejoindre par code
 // ------------------------------------------------------------
 

@@ -573,3 +573,137 @@ export async function retirerCompetence(
   revalidatePath(`/catalogue/${courseId}/modifier`);
   return { success: "Compétence retirée." };
 }
+
+// ------------------------------------------------------------
+// Suppression définitive d'une formation
+// ------------------------------------------------------------
+
+interface Blocages {
+  inscriptions: number;
+  certificats: number;
+  sessions: number;
+  supports: number;
+}
+
+/** Accorde le pluriel du décompte à son nom (« 1 inscription », « 3 inscriptions »). */
+function compte(n: number, singulier: string, pluriel: string) {
+  return `${n} ${n > 1 ? pluriel : singulier}`;
+}
+
+/**
+ * Supprime définitivement une formation, ses versions, modules,
+ * leçons, activités et questions (cascade en base).
+ *
+ * La suppression est refusée dès qu'un apprenant a laissé une trace :
+ * une inscription ou un certificat. La clé étrangère est en
+ * `on delete cascade` sur ces deux tables, donc supprimer sans ce
+ * garde-fou détruirait sans un mot des certificats qui doivent rester
+ * vérifiables à vie. L'archivage, déjà présent dans le cycle de
+ * statuts, est la bonne réponse dans ce cas.
+ *
+ * Les fichiers du bucket « supports » et les lignes `sources`
+ * associées ne sont rattachés à la formation par aucune clé étrangère :
+ * ils sont retirés explicitement, sinon ils resteraient orphelins.
+ */
+export async function supprimerFormation(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const courseId = String(formData.get("course_id") ?? "");
+
+  const ctx = await chargerFormationModifiable(courseId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, course } = ctx;
+
+  // Décompte via une fonction `security definer` : un administrateur
+  // d'organisation ne voit pas forcément toutes les inscriptions ni
+  // tous les certificats par RLS, un simple `count` ici remonterait
+  // zéro et le garde-fou ne servirait à rien.
+  const { data, error: erreurBlocages } = await supabase.rpc(
+    "course_deletion_blockers",
+    { cid: courseId }
+  );
+  if (erreurBlocages) {
+    loguerErreur("décompte avant suppression", erreurBlocages);
+    // 42P01 : une table du décompte est absente, donc une migration
+    // n'a pas été appliquée. Le dire explicitement évite de chercher
+    // un problème de droits là où il n'y en a pas.
+    if (erreurBlocages.code === "42P01") {
+      return {
+        error:
+          "Le contrôle de sécurité avant suppression n'a pas pu s'exécuter : " +
+          "une table manque en base. Appliquez les migrations manquantes " +
+          "(voir README §3, notamment 0007_certificats.sql), puis réessayez.",
+      };
+    }
+    // 42883 : la fonction elle-même n'existe pas.
+    if (erreurBlocages.code === "42883" || erreurBlocages.code === "PGRST202") {
+      return {
+        error:
+          "Le contrôle de sécurité avant suppression est introuvable. " +
+          "Appliquez la migration 0009_suppressions.sql, puis réessayez.",
+      };
+    }
+    return { error: ERREUR_GENERIQUE };
+  }
+
+  const blocages = (Array.isArray(data) ? data[0] : data) as Blocages | undefined;
+  if (!blocages) return { error: ERREUR_GENERIQUE };
+
+  const raisons: string[] = [];
+  if (blocages.inscriptions > 0) {
+    raisons.push(compte(blocages.inscriptions, "inscription", "inscriptions"));
+  }
+  if (blocages.certificats > 0) {
+    raisons.push(compte(blocages.certificats, "certificat délivré", "certificats délivrés"));
+  }
+  if (raisons.length > 0) {
+    return {
+      error:
+        `Suppression impossible : cette formation compte ${raisons.join(" et ")}. ` +
+        "Supprimer détruirait ces traces, et un certificat doit rester " +
+        "vérifiable à vie. Archivez-la plutôt : elle disparaît du catalogue " +
+        "actif tout en préservant l'historique.",
+    };
+  }
+
+  // Fichiers de support : retirés du stockage avant la cascade, qui
+  // effacerait les activités et donc l'emplacement des fichiers.
+  if (blocages.supports > 0 && course.current_version_id) {
+    const { data: supports } = await supabase
+      .from("activities")
+      .select("content, lesson:lessons!inner(module:modules!inner(course_version_id))")
+      .eq("type", "file")
+      .eq("lesson.module.course_version_id", course.current_version_id);
+
+    const chemins: string[] = [];
+    const sourceIds: string[] = [];
+    for (const a of supports ?? []) {
+      const contenu = (a.content ?? {}) as { file_path?: string; source_id?: string };
+      if (contenu.file_path) chemins.push(contenu.file_path);
+      if (contenu.source_id) sourceIds.push(contenu.source_id);
+    }
+    if (chemins.length > 0) {
+      const { error } = await supabase.storage.from("supports").remove(chemins);
+      loguerErreur("retrait des fichiers de support", error);
+    }
+    if (sourceIds.length > 0) {
+      const { error } = await supabase.from("sources").delete().in("id", sourceIds);
+      loguerErreur("retrait des sources", error);
+    }
+  }
+
+  const { error } = await supabase.from("courses").delete().eq("id", courseId);
+  if (error) {
+    loguerErreur("suppression de la formation", error);
+    return {
+      error:
+        "La suppression a échoué. Seul un administrateur de l'organisation " +
+        "(ou d'Elite Experience) peut supprimer une formation.",
+    };
+  }
+
+  revalidatePath("/catalogue");
+  revalidatePath("/validation");
+  redirect("/catalogue?supprimee=1");
+}

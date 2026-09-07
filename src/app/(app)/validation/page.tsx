@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
-import { organizationsForCourseCreation } from "@/lib/courses/statuts";
+import { canCreateCourse, organizationsForCourseCreation } from "@/lib/courses/statuts";
 import { Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import { DangerForm } from "@/components/ui/DangerForm";
+import { supprimerGeneration } from "@/app/(app)/validation/actions";
 
 export const metadata: Metadata = { title: "Validation" };
 
@@ -40,7 +42,7 @@ export default async function ValidationPage() {
     supabase
       .from("ai_generations")
       .select(
-        "id, generation_type, brief, status, error_message, created_at, result_course_id, model_name, requester:profiles!ai_generations_requested_by_fkey(full_name)"
+        "id, organization_id, generation_type, brief, status, error_message, created_at, result_course_id, model_name, requester:profiles!ai_generations_requested_by_fkey(full_name)"
       )
       .order("created_at", { ascending: false })
       .limit(20),
@@ -121,6 +123,26 @@ export default async function ValidationPage() {
                       >
                         Ouvrir la formation générée →
                       </Link>
+                    ) : null}
+                    {/* Même jeu de rôles que la politique RLS
+                        `ai_gen_delete` : administrateur ou concepteur
+                        de l'organisation concernée. */}
+                    {canCreateCourse(user.memberships, g.organization_id) ? (
+                      <div className="mt-3 border-t border-slate-100 pt-3">
+                        <DangerForm
+                          action={supprimerGeneration}
+                          label="Supprimer cette trace"
+                          confirmLabel="Confirmer la suppression"
+                          pendingLabel="Suppression…"
+                          question={
+                            g.result_course_id
+                              ? "La formation générée est conservée : seule la trace de l'appel au modèle est effacée."
+                              : "Effacer définitivement cette trace de génération ?"
+                          }
+                        >
+                          <input type="hidden" name="generation_id" value={g.id} />
+                        </DangerForm>
+                      </div>
                     ) : null}
                   </Card>
                 );

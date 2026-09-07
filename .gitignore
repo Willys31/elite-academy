@@ -16,3 +16,6 @@ out/
 next-env.d.ts
 coverage/
 docs/
+
+# Fichiers de configuration
+.claude

@@ -138,6 +138,22 @@ export function canCreateCourse(
   return role === "admin" || role === "designer";
 }
 
+/**
+ * Peut supprimer définitivement une formation.
+ *
+ * Volontairement plus restrictif que la création : un concepteur crée
+ * et modifie, seul un administrateur détruit. Ce test reproduit la
+ * politique RLS `courses_delete` — il ne fait que masquer un bouton,
+ * la base reste seule juge.
+ */
+export function canDeleteCourse(
+  memberships: Membership[],
+  organizationId: string
+): boolean {
+  if (isEliteAdmin(memberships)) return true;
+  return roleInOrg(memberships, organizationId) === "admin";
+}
+
 /** Organisations dans lesquelles l'utilisateur peut créer une formation. */
 export function organizationsForCourseCreation(
   memberships: Membership[]

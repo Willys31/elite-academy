@@ -8,6 +8,7 @@ import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
 import { creerSession } from "@/app/(app)/sessions/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import {
+  Alert,
   Badge,
   Card,
   EmptyState,
@@ -19,9 +20,14 @@ import {
 
 export const metadata: Metadata = { title: "Sessions" };
 
-export default async function SessionsPage() {
+export default async function SessionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ supprimee?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
+  const params = await searchParams;
 
   const actives = activeMemberships(user.memberships);
   const elite = isEliteAdmin(user.memberships);
@@ -57,7 +63,16 @@ export default async function SessionsPage() {
     <div>
       <PageTitle>Sessions</PageTitle>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      {params.supprimee ? (
+        <div className="mb-6">
+          <Alert kind="success">
+            Session supprimée. Les résultats de QCM des apprenants sont
+            conservés.
+          </Alert>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Sessions">
           {!sessions || sessions.length === 0 ? (
             <EmptyState

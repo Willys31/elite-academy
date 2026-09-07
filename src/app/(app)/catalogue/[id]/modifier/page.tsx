@@ -7,6 +7,7 @@ import { isEliteAdmin } from "@/lib/auth/roles";
 import {
   availableTransitions,
   canCreateCourse,
+  canDeleteCourse,
   isContentEditable,
   LEVEL_LABELS,
   STATUS_LABELS,
@@ -21,6 +22,7 @@ import {
   lierCompetence,
   mettreAJourFiche,
   retirerCompetence,
+  supprimerFormation,
   supprimerLecon,
   supprimerModule,
 } from "@/app/(app)/catalogue/actions";
@@ -29,6 +31,7 @@ import {
   televerserSupport,
 } from "@/app/(app)/catalogue/importer/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
+import { DangerForm } from "@/components/ui/DangerForm";
 import {
   Alert,
   BackLink,
@@ -77,6 +80,7 @@ export default async function EditeurFormationPage({
 
   const statut = formation.status as CourseStatus;
   const editable = isContentEditable(statut);
+  const peutSupprimer = canDeleteCourse(user.memberships, formation.organization_id);
   const transitions = availableTransitions(
     user.memberships,
     formation.organization_id,
@@ -585,6 +589,32 @@ export default async function EditeurFormationPage({
               </div>
             ) : null}
           </Card>
+
+          {/* Zone de danger — en dernier, hors du flux de travail
+              habituel, et réservée aux administrateurs. */}
+          {peutSupprimer ? (
+            <Card className="border-red-200">
+              <h2 className="mb-2 font-semibold text-red-800">
+                Supprimer cette formation
+              </h2>
+              <p className="mb-3 text-sm text-slate-600">
+                La formation, ses modules, leçons, QCM et supports seront
+                effacés définitivement. La suppression est refusée si des
+                apprenants sont inscrits ou si des certificats ont été
+                délivrés : dans ce cas, archivez la formation.
+              </p>
+              <DangerForm
+                action={supprimerFormation}
+                label="Supprimer la formation"
+                confirmLabel="Oui, supprimer définitivement"
+                pendingLabel="Suppression…"
+                question={`Supprimer définitivement « ${formation.title} » ?`}
+                bloc
+              >
+                <input type="hidden" name="course_id" value={formation.id} />
+              </DangerForm>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>

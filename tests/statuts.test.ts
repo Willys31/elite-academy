@@ -3,6 +3,7 @@ import type { Membership } from "@/lib/auth/roles";
 import {
   availableTransitions,
   canCreateCourse,
+  canDeleteCourse,
   canManageCompetencies,
   canTransition,
   isContentEditable,
@@ -121,6 +122,36 @@ describe("canCreateCourse / organizationsForCourseCreation", () => {
     const list = organizationsForCourseCreation([designer, membership("learner", ORG_B)]);
     expect(list).toHaveLength(1);
     expect(list[0].organization_id).toBe(ORG_A);
+  });
+});
+
+describe("canDeleteCourse", () => {
+  it("l'administrateur de l'organisation peut supprimer", () => {
+    expect(canDeleteCourse([orgAdmin], ORG_A)).toBe(true);
+  });
+
+  it("le concepteur crée et modifie, mais ne supprime pas", () => {
+    expect(canCreateCourse([designer], ORG_A)).toBe(true);
+    expect(canDeleteCourse([designer], ORG_A)).toBe(false);
+  });
+
+  it("formateur, responsable et apprenant ne peuvent pas supprimer", () => {
+    expect(canDeleteCourse([trainer], ORG_A)).toBe(false);
+    expect(canDeleteCourse([membership("manager")], ORG_A)).toBe(false);
+    expect(canDeleteCourse([learner], ORG_A)).toBe(false);
+  });
+
+  it("l'admin Elite Experience peut supprimer partout", () => {
+    expect(canDeleteCourse([eliteAdmin], ORG_B)).toBe(true);
+  });
+
+  it("une adhésion suspendue ne donne aucun droit de suppression", () => {
+    const suspendu = membership("admin", ORG_A, "invited");
+    expect(canDeleteCourse([suspendu], ORG_A)).toBe(false);
+  });
+
+  it("l'administrateur d'une autre organisation ne peut pas supprimer", () => {
+    expect(canDeleteCourse([orgAdmin], ORG_B)).toBe(false);
   });
 });
 

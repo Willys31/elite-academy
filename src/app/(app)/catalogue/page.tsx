@@ -33,7 +33,7 @@ const STATUTS: CourseStatus[] = ["draft", "review", "approved", "published", "ar
 export default async function CataloguePage({
   searchParams,
 }: {
-  searchParams: Promise<{ statut?: string; q?: string }>;
+  searchParams: Promise<{ statut?: string; q?: string; supprimee?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
@@ -84,6 +84,12 @@ export default async function CataloguePage({
         Catalogue
       </PageTitle>
 
+      {params.supprimee ? (
+        <div className="mb-6">
+          <Alert kind="success">Formation supprimée définitivement.</Alert>
+        </div>
+      ) : null}
+
       {/* Recherche + filtre statut */}
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3">
         <div className="min-w-48 flex-1">
@@ -95,7 +101,7 @@ export default async function CataloguePage({
             name="q"
             defaultValue={params.q ?? ""}
             placeholder="Titre de formation…"
-            className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+            className="block min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 sm:text-sm"
           />
         </div>
         {estGestionnaire ? (
