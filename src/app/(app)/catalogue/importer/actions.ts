@@ -3,8 +3,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import {
@@ -154,6 +152,42 @@ async function creerActiviteSupport(
 }
 
 // ------------------------------------------------------------
+// Analyseurs de documents – chargés à la demande
+//
+// `mammoth` et `pdf-parse` ne servent qu'au moment d'analyser un
+// fichier téléversé. Importés en tête de module, ils étaient évalués au
+// simple rendu des pages qui référencent ce fichier (« Importer un
+// document » et l'éditeur de formation) : en production, leur
+// chargement échouait et renvoyait une 500 avant même le contrôle
+// d'authentification. Chargés ici, une défaillance de l'analyseur
+// devient un message d'erreur au téléversement, jamais une page morte.
+//
+// Ces deux paquets restent déclarés dans `serverExternalPackages`
+// (next.config.ts) : webpack casse le worker pdfjs minifié.
+// ------------------------------------------------------------
+
+async function chargerAnalyseurDocx() {
+  const mammoth = (await import("mammoth")).default;
+  return async (contenu: Buffer) => {
+    const { value: html } = await mammoth.convertToHtml({ buffer: contenu });
+    return { texte: htmlVersTexte(html), decoupage: decouperHtml(html) };
+  };
+}
+
+async function chargerAnalyseurPdf() {
+  const { PDFParse } = await import("pdf-parse");
+  return async (contenu: Buffer) => {
+    const analyseur = new PDFParse({ data: contenu });
+    try {
+      const { text } = await analyseur.getText();
+      return { texte: text, decoupage: decouperTexte(text) };
+    } finally {
+      await analyseur.destroy();
+    }
+  };
+}
+
+// ------------------------------------------------------------
 // Import d'un document de cours → formation en brouillon
 // ------------------------------------------------------------
 
@@ -193,21 +227,27 @@ export async function importerDocument(
   const contenu = Buffer.from(await fichier.arrayBuffer());
   let texteBrut = "";
   let decoupage: Decoupage;
+
+  // Chargement de l'analyseur, séparé de l'analyse elle-même : un
+  // module indisponible et un fichier illisible n'ont ni la même cause
+  // ni le même remède, ils ne doivent pas donner le même message.
+  let analyser: (contenu: Buffer) => Promise<{ texte: string; decoupage: Decoupage }>;
   try {
-    if (ext === ".docx") {
-      const { value: html } = await mammoth.convertToHtml({ buffer: contenu });
-      texteBrut = htmlVersTexte(html);
-      decoupage = decouperHtml(html);
-    } else {
-      const analyseur = new PDFParse({ data: contenu });
-      try {
-        const { text } = await analyseur.getText();
-        texteBrut = text;
-        decoupage = decouperTexte(text);
-      } finally {
-        await analyseur.destroy();
-      }
-    }
+    analyser = ext === ".docx" ? await chargerAnalyseurDocx() : await chargerAnalyseurPdf();
+  } catch (e) {
+    loguer("chargement de l'analyseur de documents", e);
+    return {
+      error:
+        "L'analyseur de documents n'a pas pu être chargé sur le serveur. " +
+        "Créez la formation manuellement et joignez le fichier en support ; " +
+        "signalez l'incident si le problème persiste.",
+    };
+  }
+
+  try {
+    const resultat = await analyser(contenu);
+    texteBrut = resultat.texte;
+    decoupage = resultat.decoupage;
   } catch (e) {
     loguer("analyse du document", e);
     return {
