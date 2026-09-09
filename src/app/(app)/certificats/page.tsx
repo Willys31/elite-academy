@@ -94,11 +94,13 @@ export default async function MesCertificatsPage() {
             return (
               <Link key={c.id} href={`/certificats/${c.id}`}>
                 <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                  <div className="flex items-start justify-between gap-2 [&>:last-child]:shrink-0">
-                    <h2 className="font-semibold">
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className="min-w-0 font-semibold">
                       {CERT_TYPE_LABELS[c.certificate_type]}
                     </h2>
-                    <Badge>{CERT_STATUS_LABELS[c.status]}</Badge>
+                    <span className="shrink-0">
+                      <Badge>{CERT_STATUS_LABELS[c.status]}</Badge>
+                    </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">{course?.title}</p>
                   <p className="mt-2 text-xs text-slate-400">

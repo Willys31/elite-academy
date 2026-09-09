@@ -82,11 +82,13 @@ export default async function MesFormationsPage() {
           {inscriptionsAffichees.map((l) => (
             <Link key={l.id} href={`/formations/${l.course.id}`}>
               <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                <div className="flex items-start justify-between gap-2 [&>:last-child]:shrink-0">
-                  <h2 className="font-semibold">{l.course.title}</h2>
-                  <Badge>
-                    {l.statut === "completed" ? "Terminée" : "En cours"}
-                  </Badge>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="min-w-0 font-semibold">{l.course.title}</h2>
+                  <span className="shrink-0">
+                    <Badge>
+                      {l.statut === "completed" ? "Terminée" : "En cours"}
+                    </Badge>
+                  </span>
                 </div>
                 <div className="mt-3">
                   <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
