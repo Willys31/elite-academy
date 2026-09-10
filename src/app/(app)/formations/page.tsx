@@ -4,13 +4,22 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { calculerCompletion } from "@/lib/courses/progression";
-import { Badge, Card, EmptyState, PageTitle, SecondaryLink } from "@/components/ui";
+import {
+  ENROLLMENT_STATUS_LABELS,
+  STATUTS_AVEC_ACCES,
+} from "@/lib/courses/inscriptions";
+import { Alert, Badge, Card, EmptyState, PageTitle, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Mes formations" };
 
-export default async function MesFormationsPage() {
+export default async function MesFormationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ desinscrit?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
+  const params = await searchParams;
 
   const supabase = await createClient();
   const { data: inscriptions } = await supabase
@@ -19,6 +28,9 @@ export default async function MesFormationsPage() {
       "id, status, started_at, completed_at, course:courses(id, title, description, current_version_id)"
     )
     .eq("user_id", user.id)
+    // Les formations quittées sortent de la liste ; leur ligne reste en
+    // base pour permettre la reprise (voir lib/courses/inscriptions).
+    .in("status", [...STATUTS_AVEC_ACCES])
     .order("created_at", { ascending: false });
 
   // Complétion par formation : leçons terminées / total.
@@ -72,6 +84,16 @@ export default async function MesFormationsPage() {
         Mes formations
       </PageTitle>
 
+      {params.desinscrit ? (
+        <div className="mb-6">
+          <Alert kind="success">
+            Vous êtes désinscrit. Votre progression est conservée : vous
+            pouvez vous réinscrire à tout moment depuis la fiche de la
+            formation.
+          </Alert>
+        </div>
+      ) : null}
+
       {inscriptionsAffichees.length === 0 ? (
         <EmptyState
           title="Aucune formation en cours"
@@ -85,9 +107,7 @@ export default async function MesFormationsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="min-w-0 font-semibold">{l.course.title}</h2>
                   <span className="shrink-0">
-                    <Badge>
-                      {l.statut === "completed" ? "Terminée" : "En cours"}
-                    </Badge>
+                    <Badge>{ENROLLMENT_STATUS_LABELS[l.statut] ?? l.statut}</Badge>
                   </span>
                 </div>
                 <div className="mt-3">

@@ -11,6 +11,7 @@ import {
   niveauDepuisScores,
   type QuestionQcm,
 } from "@/lib/courses/progression";
+import { peutSeDesinscrire } from "@/lib/courses/inscriptions";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 function loguer(contexte: string, error: { message?: string } | null) {
@@ -42,24 +43,137 @@ export async function sInscrireFormation(
     return { error: "Cette formation n'est pas encore publiée." };
   }
 
-  const { error } = await supabase.from("enrollments").insert({
-    course_id: course.id,
-    user_id: user.id,
-    organization_id: course.organization_id,
-    status: "active",
-    started_at: new Date().toISOString(),
-  });
+  // `unique (course_id, user_id)` interdit une seconde inscription : un
+  // apprenant qui revient réactive donc sa ligne retirée, et retrouve
+  // du même coup la progression qui y était restée attachée.
+  const { data: existante } = await supabase
+    .from("enrollments")
+    .select("id, status")
+    .eq("course_id", course.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  if (error) {
-    if (error.code === "23505") {
+  if (existante) {
+    if (existante.status === "suspended") {
+      return {
+        error:
+          "Votre inscription à cette formation a été suspendue par l'encadrement. Contactez votre responsable pour la réactiver.",
+      };
+    }
+    if (existante.status !== "withdrawn") {
       return { error: "Vous êtes déjà inscrit à cette formation." };
     }
-    loguer("inscription", error);
-    return { error: "L'inscription a échoué. Réessayez plus tard." };
+
+    // `started_at` d'origine conservé : c'est une reprise, pas un
+    // nouveau départ.
+    const { error, count } = await supabase
+      .from("enrollments")
+      .update({ status: "active" }, { count: "exact" })
+      .eq("id", existante.id)
+      .eq("user_id", user.id)
+      .eq("status", "withdrawn");
+    if (error) {
+      loguer("réinscription", error);
+      return { error: "La réinscription a échoué. Réessayez plus tard." };
+    }
+    if (count === 0) {
+      return {
+        error:
+          "La réinscription n'a pas pu être enregistrée : votre inscription a peut-être changé entre-temps. Rechargez la page.",
+      };
+    }
+  } else {
+    const { error } = await supabase.from("enrollments").insert({
+      course_id: course.id,
+      user_id: user.id,
+      organization_id: course.organization_id,
+      status: "active",
+      started_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      // Deux envois simultanés : le second heurte la contrainte d'unicité.
+      if (error.code === "23505") {
+        return { error: "Vous êtes déjà inscrit à cette formation." };
+      }
+      loguer("inscription", error);
+      return { error: "L'inscription a échoué. Réessayez plus tard." };
+    }
   }
 
   revalidatePath(`/catalogue/${course.id}`);
+  revalidatePath("/formations");
   redirect(`/formations/${course.id}`);
+}
+
+// ------------------------------------------------------------
+// Désinscription d'une formation en cours
+// ------------------------------------------------------------
+
+/**
+ * Retire l'apprenant d'une formation en cours.
+ *
+ * L'inscription passe au statut `withdrawn`, elle n'est pas supprimée :
+ * les leçons terminées (`progress_records`) et les tentatives de QCM
+ * (`attempts`, non supprimables par conception) restent en place, si
+ * bien qu'une réinscription reprend là où l'apprenant s'était arrêté.
+ * Aucune migration n'est nécessaire : la politique `enrollments_update`
+ * autorise déjà l'apprenant à modifier sa propre inscription.
+ *
+ * Les règles (formations en cours uniquement, pas de retrait d'un
+ * parcours attribué) vivent dans `peutSeDesinscrire`.
+ */
+export async function seDesinscrireFormation(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const courseId = String(formData.get("course_id") ?? "");
+  const supabase = await createClient();
+
+  const { data: inscription } = await supabase
+    .from("enrollments")
+    .select("id, status, assigned_by")
+    .eq("course_id", courseId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!inscription) return { error: "Vous n'êtes pas inscrit à cette formation." };
+
+  const verdict = peutSeDesinscrire({
+    statut: inscription.status,
+    assigneePar: inscription.assigned_by,
+  });
+  if (!verdict.ok) return { error: verdict.raison };
+
+  // Filtre sur `status = active` : si l'inscription a changé entre la
+  // lecture et l'écriture (leçon terminée dans un autre onglet), rien
+  // n'est modifié plutôt que d'écraser un statut `completed`.
+  const { error, count } = await supabase
+    .from("enrollments")
+    .update({ status: "withdrawn" }, { count: "exact" })
+    .eq("id", inscription.id)
+    .eq("user_id", user.id)
+    .eq("status", "active");
+
+  if (error) {
+    loguer("désinscription", error);
+    return { error: "La désinscription a échoué. Réessayez plus tard." };
+  }
+  // RLS ne renvoie pas d'erreur quand aucune ligne n'est visible : sans
+  // ce contrôle, un refus passerait pour un succès.
+  if (count === 0) {
+    return {
+      error:
+        "La désinscription n'a pas pu être enregistrée : votre inscription a peut-être changé entre-temps. Rechargez la page.",
+    };
+  }
+
+  revalidatePath("/formations");
+  revalidatePath(`/formations/${courseId}`);
+  revalidatePath(`/catalogue/${courseId}`);
+  redirect("/formations?desinscrit=1");
 }
 
 // ------------------------------------------------------------

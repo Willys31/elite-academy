@@ -13,6 +13,7 @@ import {
   type CourseStatus,
 } from "@/lib/courses/statuts";
 import { sInscrireFormation } from "@/app/(app)/formations/actions";
+import { donneAcces } from "@/lib/courses/inscriptions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
 
@@ -47,7 +48,7 @@ export default async function FicheFormationPage({
 
   const { data: inscription } = await supabase
     .from("enrollments")
-    .select("id")
+    .select("id, status")
     .eq("course_id", formation.id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -207,7 +208,7 @@ export default async function FicheFormationPage({
 
           <Card>
             <h2 className="mb-2 font-semibold">Inscription</h2>
-            {inscription ? (
+            {inscription && donneAcces(inscription.status) ? (
               <div>
                 <p className="mb-3 text-sm text-slate-600">
                   Vous êtes inscrit à cette formation.
@@ -219,14 +220,33 @@ export default async function FicheFormationPage({
                   Continuer la formation
                 </Link>
               </div>
+            ) : inscription?.status === "suspended" ? (
+              <p className="text-sm text-slate-500">
+                Votre inscription à cette formation a été suspendue par
+                l&apos;encadrement. Contactez votre responsable pour la
+                réactiver.
+              </p>
             ) : formation.status === "published" ? (
-              <AuthForm
-                action={sInscrireFormation}
-                submitLabel="S'inscrire à la formation"
-                pendingLabel="Inscription…"
-              >
-                <input type="hidden" name="course_id" value={formation.id} />
-              </AuthForm>
+              <div>
+                {inscription?.status === "withdrawn" ? (
+                  <p className="mb-3 text-sm text-slate-600">
+                    Vous vous étiez désinscrit de cette formation. Votre
+                    progression est conservée : en vous réinscrivant, vous
+                    reprendrez là où vous vous étiez arrêté.
+                  </p>
+                ) : null}
+                <AuthForm
+                  action={sInscrireFormation}
+                  submitLabel={
+                    inscription?.status === "withdrawn"
+                      ? "Se réinscrire"
+                      : "S'inscrire à la formation"
+                  }
+                  pendingLabel="Inscription…"
+                >
+                  <input type="hidden" name="course_id" value={formation.id} />
+                </AuthForm>
+              </div>
             ) : (
               <p className="text-sm text-slate-500">
                 L&apos;inscription sera possible une fois la formation publiée.

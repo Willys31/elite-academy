@@ -103,3 +103,4 @@ docs/               Documentation des lots livrés
 - [Lot 9 – Import structuré par IA et fournisseurs IA gratuits](docs/lot-09-import-ia.md)
 - [Lot 10 – Responsivité et confort tactile](docs/lot-10-responsivite.md)
 - [Lot 11 – Suppression d'éléments](docs/lot-11-suppressions.md)
+- [Lot 12 – Désinscription d'un apprenant](docs/lot-12-desinscription.md)

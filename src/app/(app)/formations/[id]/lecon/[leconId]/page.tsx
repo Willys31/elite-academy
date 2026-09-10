@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
+import { donneAcces } from "@/lib/courses/inscriptions";
 import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Badge, Card, PageTitle } from "@/components/ui";
@@ -30,13 +31,17 @@ export default async function LeconPage({
     .maybeSingle();
   if (!formation) notFound();
 
+  // Une inscription retirée ou suspendue existe toujours en base :
+  // c'est son statut, pas sa présence, qui ouvre le contenu.
   const { data: inscription } = await supabase
     .from("enrollments")
-    .select("id")
+    .select("id, status")
     .eq("course_id", formation.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!inscription) redirect(`/catalogue/${formation.id}`);
+  if (!inscription || !donneAcces(inscription.status)) {
+    redirect(`/catalogue/${formation.id}`);
+  }
 
   const { data: lecon } = await supabase
     .from("lessons")

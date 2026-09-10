@@ -7,6 +7,7 @@ import {
   CERT_STATUS_LABELS,
   CERT_TYPE_LABELS,
 } from "@/lib/certificats/certificats";
+import { ENROLLMENT_STATUS_LABELS } from "@/lib/courses/inscriptions";
 import {
   delivrerCertificat,
   revoquerCertificat,
@@ -146,7 +147,12 @@ export default async function CertificatsFormationPage({
                       return (
                         <option key={i.user_id} value={i.user_id}>
                           {profil?.full_name || profil?.email}
-                          {i.status === "completed" ? " (formation terminée)" : ""}
+                          {/* Les désinscrits restent sélectionnables : une
+                              attestation de participation peut rester
+                              légitime pour qui a quitté en cours de route. */}
+                          {i.status === "active"
+                            ? ""
+                            : ` (${(ENROLLMENT_STATUS_LABELS[i.status] ?? i.status).toLowerCase()})`}
                         </option>
                       );
                     })}

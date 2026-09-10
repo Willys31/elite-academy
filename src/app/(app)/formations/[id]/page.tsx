@@ -4,6 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { calculerCompletion } from "@/lib/courses/progression";
+import { donneAcces, peutSeDesinscrire } from "@/lib/courses/inscriptions";
+import { seDesinscrireFormation } from "@/app/(app)/formations/actions";
+import { DangerForm } from "@/components/ui/DangerForm";
 import { BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Suivre la formation" };
@@ -29,14 +32,22 @@ export default async function LecteurFormationPage({
     .maybeSingle();
   if (!formation) notFound();
 
-  // Inscription requise pour suivre.
+  // Inscription requise pour suivre. Une inscription retirée ou
+  // suspendue existe toujours en base : c'est son statut, pas sa
+  // présence, qui ouvre le contenu.
   const { data: inscription } = await supabase
     .from("enrollments")
-    .select("id, status")
+    .select("id, status, assigned_by")
     .eq("course_id", formation.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!inscription) redirect(`/catalogue/${formation.id}`);
+  if (!inscription || !donneAcces(inscription.status)) {
+    redirect(`/catalogue/${formation.id}`);
+  }
+  const desinscription = peutSeDesinscrire({
+    statut: inscription.status,
+    assigneePar: inscription.assigned_by,
+  });
 
   const { data: modules } = formation.current_version_id
     ? await supabase
@@ -132,6 +143,30 @@ export default async function LecteurFormationPage({
           ))}
         </div>
       )}
+
+      {/* Désinscription : en dernier, sous le contenu. C'est un geste
+          rare, qui ne doit pas concurrencer « Continuer ». */}
+      {desinscription.ok ? (
+        <Card className="mt-8 border-red-200">
+          <h2 className="mb-2 font-semibold text-red-800">
+            Se désinscrire de cette formation
+          </h2>
+          <p className="mb-3 text-sm text-slate-600">
+            La formation disparaîtra de « Mes formations ». Vos leçons
+            terminées et vos résultats de QCM sont conservés : si vous vous
+            réinscrivez, vous reprendrez là où vous vous êtes arrêté.
+          </p>
+          <DangerForm
+            action={seDesinscrireFormation}
+            label="Se désinscrire"
+            confirmLabel="Oui, me désinscrire"
+            pendingLabel="Désinscription…"
+            question={`Vous désinscrire de « ${formation.title} » ?`}
+          >
+            <input type="hidden" name="course_id" value={formation.id} />
+          </DangerForm>
+        </Card>
+      ) : null}
     </div>
   );
 }
