@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -8,7 +7,17 @@ import {
   ENROLLMENT_STATUS_LABELS,
   STATUTS_AVEC_ACCES,
 } from "@/lib/courses/inscriptions";
-import { Alert, Badge, Card, EmptyState, PageTitle, SecondaryLink } from "@/components/ui";
+import { Alert } from "@/components/ui";
+import {
+  EcranTitre,
+  Etiquette,
+  Jauge,
+  LienOr,
+  LienSobre,
+  PanneauLien,
+  SectionTitre,
+  Vide,
+} from "@/components/app";
 
 export const metadata: Metadata = { title: "Mes formations" };
 
@@ -68,21 +77,28 @@ export default async function MesFormationsPage({
         id: i.id,
         statut: i.status,
         course,
+        faites: faitesParCours.get(course.id) ?? 0,
+        total,
         completion: calculerCompletion(faitesParCours.get(course.id) ?? 0, total),
       };
     })
   );
-  const inscriptionsAffichees = lignes.filter(Boolean) as NonNullable<
+  const affichees = lignes.filter(Boolean) as NonNullable<
     (typeof lignes)[number]
   >[];
 
+  const enCours = affichees.filter((l) => l.statut !== "completed");
+  const terminees = affichees.filter((l) => l.statut === "completed");
+
   return (
     <div>
-      <PageTitle
-        action={<SecondaryLink href="/catalogue">Parcourir le catalogue</SecondaryLink>}
+      <EcranTitre
+        eyebrow="Votre parcours"
+        intro="Une formation est terminée quand toutes ses leçons le sont. Vous gardez l'accès à son contenu ensuite."
+        action={<LienSobre href="/catalogue">Parcourir le catalogue</LienSobre>}
       >
         Mes formations
-      </PageTitle>
+      </EcranTitre>
 
       {params.desinscrit ? (
         <div className="mb-6">
@@ -94,38 +110,79 @@ export default async function MesFormationsPage({
         </div>
       ) : null}
 
-      {inscriptionsAffichees.length === 0 ? (
-        <EmptyState
-          title="Aucune formation en cours"
-          hint="Inscrivez-vous à une formation publiée depuis le catalogue."
+      {affichees.length === 0 ? (
+        <Vide
+          titre="Aucune formation en cours"
+          texte="Inscrivez-vous à une formation publiée depuis le catalogue de votre organisation."
+          action={<LienOr href="/catalogue">Parcourir le catalogue</LienOr>}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {inscriptionsAffichees.map((l) => (
-            <Link key={l.id} href={`/formations/${l.course.id}`}>
-              <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="min-w-0 font-semibold">{l.course.title}</h2>
-                  <span className="shrink-0">
-                    <Badge>{ENROLLMENT_STATUS_LABELS[l.statut] ?? l.statut}</Badge>
-                  </span>
-                </div>
-                <div className="mt-3">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-brand-500"
-                      style={{ width: `${l.completion}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {l.completion} % des leçons terminées
-                  </p>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <>
+          {enCours.length > 0 ? (
+            <section>
+              <SectionTitre compte={enCours.length}>En cours</SectionTitre>
+              <GrilleFormations lignes={enCours} />
+            </section>
+          ) : null}
+
+          {terminees.length > 0 ? (
+            <section className={enCours.length > 0 ? "mt-10" : ""}>
+              <SectionTitre compte={terminees.length}>Terminées</SectionTitre>
+              <GrilleFormations lignes={terminees} />
+            </section>
+          ) : null}
+        </>
       )}
+    </div>
+  );
+}
+
+function GrilleFormations({
+  lignes,
+}: {
+  lignes: Array<{
+    id: string;
+    statut: string;
+    course: { id: string; title: string; description: string | null };
+    faites: number;
+    total: number;
+    completion: number;
+  }>;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {lignes.map((l) => (
+        <PanneauLien key={l.id} href={`/formations/${l.course.id}`} className="flex h-full flex-col">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="min-w-0 font-display text-base font-semibold text-ink-900">
+              {l.course.title}
+            </h3>
+            <Etiquette ton={l.statut === "completed" ? "or" : "neutre"}>
+              {ENROLLMENT_STATUS_LABELS[l.statut] ?? l.statut}
+            </Etiquette>
+          </div>
+
+          {l.course.description ? (
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-500">
+              {l.course.description}
+            </p>
+          ) : null}
+
+          {/* `mt-auto` colle la jauge au bas de la carte : dans une grille,
+              des descriptions de longueurs différentes désalignaient les
+              barres d'une carte à l'autre. */}
+          <div className="mt-auto pt-5">
+            <Jauge
+              pourcent={l.completion}
+              libelle={
+                l.total > 0
+                  ? `${l.faites} / ${l.total} leçons · ${l.completion} %`
+                  : "Contenu en préparation"
+              }
+            />
+          </div>
+        </PanneauLien>
+      ))}
     </div>
   );
 }

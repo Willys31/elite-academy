@@ -23,6 +23,11 @@ import { ROLE_LABELS } from "@/lib/auth/roles";
  * vers le bas, garde la page en place et reste utilisable quand la
  * navigation compte beaucoup d'entrées.
  *
+ * Habillage : encre pour le cadre, papier pour le contenu — le même
+ * couple que la page publique, pour qu'un apprenant qui se connecte
+ * reste dans le même produit. Seules les couleurs et les formes ont
+ * changé ; le comportement du tiroir est identique à l'original.
+ *
  * Ce composant ne contient aucune logique métier : il reçoit la
  * navigation déjà calculée selon le rôle (src/lib/auth/roles.ts).
  */
@@ -80,19 +85,28 @@ export function AppShell({
     pathname === href || pathname.startsWith(`${href}/`);
 
   const liens = (
-    <ul className="space-y-1">
+    <ul className="space-y-0.5">
       {nav.map((item) => (
         <li key={item.href}>
           <Link
             href={item.href}
             onClick={fermer}
             aria-current={estActif(item.href) ? "page" : undefined}
-            className={`flex min-h-11 items-center rounded-lg px-3 py-2.5 text-[15px] font-medium transition lg:text-sm ${
+            /* L'entrée active porte un liseré or à gauche plutôt qu'un
+               aplat plein : le repère reste lisible sans écraser le reste
+               de la liste, et la couleur d'accent garde son sens. */
+            className={`relative flex min-h-11 items-center rounded-lg px-3 py-2.5 text-[15px] font-medium transition duration-200 lg:text-sm ${
               estActif(item.href)
-                ? "bg-brand-600 text-white"
-                : "text-slate-700 hover:bg-slate-100 active:bg-slate-100"
+                ? "bg-white/10 text-white"
+                : "text-white/60 hover:bg-white/5 hover:text-white"
             }`}
           >
+            {estActif(item.href) ? (
+              <span
+                aria-hidden
+                className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-gold-400"
+              />
+            ) : null}
             {item.label}
           </Link>
         </li>
@@ -101,13 +115,13 @@ export function AppShell({
   );
 
   const blocUtilisateur = (
-    <div className="border-t border-slate-200 pt-4">
-      <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
-      <p className="text-xs text-slate-500">{ROLE_LABELS[role]}</p>
+    <div className="border-t border-white/10 pt-4">
+      <p className="truncate text-sm font-medium text-white">{userName}</p>
+      <p className="text-xs text-gold-300/80">{ROLE_LABELS[role]}</p>
       <form action={onSignOut} className="mt-3">
         <button
           type="submit"
-          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          className="min-h-11 w-full rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-white/80 transition duration-200 hover:border-white/30 hover:bg-white/5 hover:text-white"
         >
           Se déconnecter
         </button>
@@ -115,35 +129,37 @@ export function AppShell({
     </div>
   );
 
+  const marque = (
+    <Link
+      href="/accueil"
+      className="flex items-baseline gap-2 font-display text-xl font-semibold tracking-tight text-white transition duration-200 hover:text-gold-300"
+    >
+      Elite Academy
+    </Link>
+  );
+
   return (
-    <div className="min-h-dvh lg:flex">
+    <div className="min-h-dvh bg-sand-50 lg:flex">
       {/* Barre latérale – ordinateur (collante et défilante indépendamment) */}
-      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
-        <div className="px-4 py-5">
-          <Link
-            href="/accueil"
-            className="font-display text-xl font-semibold tracking-tight text-brand-800"
-          >
-            Elite Academy
-          </Link>
-        </div>
+      <aside className="hidden w-64 shrink-0 bg-ink-950 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
+        <div className="px-5 py-5">{marque}</div>
         <nav
           aria-label="Navigation principale"
           className="flex-1 overflow-y-auto px-3"
         >
           {liens}
         </nav>
-        <div className="px-4 pb-5">{blocUtilisateur}</div>
+        <div className="px-5 pb-5">{blocUtilisateur}</div>
       </aside>
 
       {/* Colonne principale – mobile et tablette */}
       {/* `min-w-0` est indispensable : sans lui, un enfant large (tableau,
           bloc de code) élargit la colonne flex au lieu de défiler. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950/95 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
           <Link
             href="/accueil"
-            className="truncate font-display text-lg font-semibold tracking-tight text-brand-800 sm:text-xl"
+            className="truncate font-display text-lg font-semibold tracking-tight text-white sm:text-xl"
           >
             Elite Academy
           </Link>
@@ -154,12 +170,12 @@ export function AppShell({
             aria-expanded={menuOuvert}
             aria-controls="menu-mobile"
             aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"}
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm font-medium text-white/90 transition duration-200 hover:border-white/40 hover:bg-white/5"
           >
             <span aria-hidden className="flex w-4 flex-col gap-[3px]">
-              <span className="h-0.5 w-full rounded bg-slate-700" />
-              <span className="h-0.5 w-full rounded bg-slate-700" />
-              <span className="h-0.5 w-full rounded bg-slate-700" />
+              <span className="h-0.5 w-full rounded bg-gold-400" />
+              <span className="h-0.5 w-full rounded bg-gold-400" />
+              <span className="h-0.5 w-full rounded bg-gold-400" />
             </span>
             Menu
           </button>
@@ -169,10 +185,8 @@ export function AppShell({
         <div
           onClick={fermer}
           aria-hidden
-          className={`fixed inset-0 z-40 bg-slate-900/40 transition-opacity duration-200 lg:hidden ${
-            menuOuvert
-              ? "opacity-100"
-              : "pointer-events-none opacity-0"
+          className={`fixed inset-0 z-40 bg-ink-950/60 transition-opacity duration-200 lg:hidden ${
+            menuOuvert ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         />
 
@@ -185,12 +199,12 @@ export function AppShell({
           aria-label="Navigation principale"
           tabIndex={-1}
           inert={menuOuvert ? undefined : true}
-          className={`fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] flex-col border-r border-slate-200 bg-white shadow-xl outline-none transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] flex-col bg-ink-950 shadow-2xl outline-none transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden ${
             menuOuvert ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between gap-2 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <span className="font-display text-lg font-semibold tracking-tight text-brand-800">
+          <div className="flex items-center justify-between gap-2 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <span className="font-display text-lg font-semibold tracking-tight text-white">
               Elite Academy
             </span>
             <button
@@ -199,7 +213,7 @@ export function AppShell({
                 fermer();
                 boutonRef.current?.focus();
               }}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-white/20 text-white/80 transition duration-200 hover:border-white/40 hover:bg-white/5"
               aria-label="Fermer le menu"
             >
               <span aria-hidden className="text-lg leading-none">
@@ -213,12 +227,12 @@ export function AppShell({
           >
             {liens}
           </nav>
-          <div className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             {blocUtilisateur}
           </div>
         </div>
 
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-8">
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-10">
           {children}
         </main>
       </div>

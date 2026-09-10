@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -9,7 +8,15 @@ import {
 } from "@/lib/certificats/certificats";
 import { reclamerCompletion } from "@/app/(app)/certificats/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import {
+  EcranTitre,
+  Etiquette,
+  LienOr,
+  Panneau,
+  PanneauLien,
+  SectionTitre,
+  Vide,
+} from "@/components/app";
 
 export const metadata: Metadata = { title: "Mes certificats" };
 
@@ -49,14 +56,22 @@ export default async function MesCertificatsPage() {
 
   return (
     <div>
-      <PageTitle>Mes certificats</PageTitle>
+      <EcranTitre
+        eyebrow="Vos preuves"
+        intro="Chaque certificat porte un code unique. Toute personne à qui vous le communiquez peut en vérifier l'authenticité en ligne, sans compte."
+      >
+        Mes certificats
+      </EcranTitre>
 
+      {/* ---------- À réclamer ---------- */}
       {reclamables.length > 0 ? (
-        <Card className="mb-6 border-brand-200 bg-brand-50/50">
-          <h2 className="mb-2 font-semibold">Attestations disponibles</h2>
-          <p className="mb-3 text-sm text-slate-600">
-            Vous avez terminé ces formations : générez votre attestation de
-            complétion.
+        <Panneau ton="or" className="mb-8">
+          <SectionTitre compte={reclamables.length}>
+            Attestations disponibles
+          </SectionTitre>
+          <p className="mb-4 text-sm leading-relaxed text-slate-600">
+            Vous avez terminé ces formations. Générez votre attestation de
+            complétion : elle recevra son propre code de vérification.
           </p>
           <div className="space-y-3">
             {reclamables.map((r) => {
@@ -65,50 +80,81 @@ export default async function MesCertificatsPage() {
               return (
                 <div
                   key={r.course_id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border border-sand-200 bg-white px-4 py-3"
                 >
-                  <span className="text-sm font-medium">{course.title}</span>
-                  <AuthForm
-                    action={reclamerCompletion}
-                    submitLabel="Générer mon attestation"
-                    pendingLabel="Génération…"
-                  >
-                    <input type="hidden" name="course_id" value={r.course_id} />
-                  </AuthForm>
+                  <span className="min-w-0 text-sm font-medium text-ink-900">
+                    {course.title}
+                  </span>
+                  {/* `sm:w-auto` : sur téléphone le bouton prend toute la
+                      largeur de la ligne, sinon il se retrouve seul et
+                      minuscule sous le titre de la formation. */}
+                  <div className="w-full sm:w-auto">
+                    <AuthForm
+                      action={reclamerCompletion}
+                      submitLabel="Générer mon attestation"
+                      pendingLabel="Génération…"
+                    >
+                      <input type="hidden" name="course_id" value={r.course_id} />
+                    </AuthForm>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </Card>
+        </Panneau>
       ) : null}
 
+      {/* ---------- Certificats obtenus ---------- */}
       {!certificats || certificats.length === 0 ? (
-        <EmptyState
-          title="Aucun certificat pour le moment"
-          hint="Terminez une formation pour obtenir votre attestation de complétion ; les certificats de réussite sont délivrés par vos formateurs."
+        <Vide
+          titre="Aucun certificat pour le moment"
+          texte="Terminez une formation pour obtenir votre attestation de complétion. Les certificats de réussite, eux, sont délivrés par vos formateurs."
+          action={<LienOr href="/formations">Voir mes formations</LienOr>}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {certificats.map((c) => {
             const course = Array.isArray(c.course) ? c.course[0] : c.course;
+            const revoque = c.status !== "valid";
             return (
-              <Link key={c.id} href={`/certificats/${c.id}`}>
-                <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="min-w-0 font-semibold">
-                      {CERT_TYPE_LABELS[c.certificate_type]}
-                    </h2>
-                    <span className="shrink-0">
-                      <Badge>{CERT_STATUS_LABELS[c.status]}</Badge>
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">{course?.title}</p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Délivré le {new Date(c.issued_at).toLocaleDateString("fr-FR")} ·
-                    code {c.verification_code}
+              <PanneauLien
+                key={c.id}
+                href={`/certificats/${c.id}`}
+                className={`flex h-full flex-col ${
+                  revoque ? "opacity-70" : ""
+                }`}
+              >
+                {/* Filet or en tête : la carte doit se lire comme un
+                    document, pas comme une ligne de liste. */}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    Elite Academy
                   </p>
-                </Card>
-              </Link>
+                  <Etiquette ton={revoque ? "alerte" : "succes"}>
+                    {CERT_STATUS_LABELS[c.status] ?? c.status}
+                  </Etiquette>
+                </div>
+
+                <h3 className="mt-3 font-display text-base font-semibold text-brand-800">
+                  {CERT_TYPE_LABELS[c.certificate_type] ?? c.certificate_type}
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">{course?.title}</p>
+
+                <div className="mt-auto pt-5">
+                  <div className="h-px w-full bg-gradient-to-r from-gold-400/60 to-transparent" />
+                  <p className="mt-3 font-mono text-xs font-semibold tracking-[0.1em] text-slate-600">
+                    {c.verification_code}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Délivré le{" "}
+                    {new Date(c.issued_at).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </PanneauLien>
             );
           })}
         </div>
