@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
 import { reinitialiserMotDePasse } from "@/app/(auth)/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Card, Input, Label } from "@/components/ui";
+import {
+  PaperCard,
+  PublicHeading,
+  PublicInput,
+  PublicLabel,
+} from "@/components/public";
 
 export const metadata: Metadata = { title: "Nouveau mot de passe" };
 
 export default function ReinitialisationPage() {
   return (
-    <Card>
-      <h1 className="mb-2 text-lg font-semibold">Définir un nouveau mot de passe</h1>
-      <p className="mb-4 text-sm text-slate-600">
-        Choisissez un nouveau mot de passe d&apos;au moins 8 caractères.
-      </p>
+    <PaperCard crowned>
+      <PublicHeading
+        eyebrow="Sécurité"
+        intro="Choisissez un nouveau mot de passe d'au moins 8 caractères."
+      >
+        Définir un nouveau mot de passe
+      </PublicHeading>
 
       <AuthForm
         action={reinitialiserMotDePasse}
@@ -19,8 +26,10 @@ export default function ReinitialisationPage() {
         pendingLabel="Enregistrement…"
       >
         <div>
-          <Label htmlFor="password">Nouveau mot de passe</Label>
-          <Input
+          <PublicLabel htmlFor="password" hint="8 caractères minimum">
+            Nouveau mot de passe
+          </PublicLabel>
+          <PublicInput
             id="password"
             name="password"
             type="password"
@@ -30,8 +39,8 @@ export default function ReinitialisationPage() {
           />
         </div>
         <div>
-          <Label htmlFor="confirm">Confirmer le mot de passe</Label>
-          <Input
+          <PublicLabel htmlFor="confirm">Confirmer le mot de passe</PublicLabel>
+          <PublicInput
             id="confirm"
             name="confirm"
             type="password"
@@ -41,6 +50,6 @@ export default function ReinitialisationPage() {
           />
         </div>
       </AuthForm>
-    </Card>
+    </PaperCard>
   );
 }

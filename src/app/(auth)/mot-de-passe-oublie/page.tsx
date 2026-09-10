@@ -1,19 +1,25 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { demanderReinitialisation } from "@/app/(auth)/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Card, Input, Label } from "@/components/ui";
+import {
+  PaperCard,
+  PublicHeading,
+  PublicInput,
+  PublicLabel,
+  QuietLink,
+} from "@/components/public";
 
 export const metadata: Metadata = { title: "Mot de passe oublié" };
 
 export default function MotDePasseOubliePage() {
   return (
-    <Card>
-      <h1 className="mb-2 text-lg font-semibold">Mot de passe oublié</h1>
-      <p className="mb-4 text-sm text-slate-600">
-        Saisissez votre adresse e-mail : nous vous enverrons un lien pour
-        définir un nouveau mot de passe.
-      </p>
+    <PaperCard crowned>
+      <PublicHeading
+        eyebrow="Récupération"
+        intro="Saisissez votre adresse e-mail : nous vous enverrons un lien pour définir un nouveau mot de passe."
+      >
+        Mot de passe oublié
+      </PublicHeading>
 
       <AuthForm
         action={demanderReinitialisation}
@@ -21,8 +27,8 @@ export default function MotDePasseOubliePage() {
         pendingLabel="Envoi en cours…"
       >
         <div>
-          <Label htmlFor="email">Adresse e-mail</Label>
-          <Input
+          <PublicLabel htmlFor="email">Adresse e-mail</PublicLabel>
+          <PublicInput
             id="email"
             name="email"
             type="email"
@@ -33,11 +39,10 @@ export default function MotDePasseOubliePage() {
         </div>
       </AuthForm>
 
-      <p className="mt-4 text-sm text-slate-600">
-        <Link href="/connexion" className="text-brand-600 hover:underline">
-          Retour à la connexion
-        </Link>
+      <p className="mt-6 border-t border-sand-200 pt-5 text-sm text-slate-600">
+        Vous vous en souvenez ?{" "}
+        <QuietLink href="/connexion">Retour à la connexion</QuietLink>
       </p>
-    </Card>
+    </PaperCard>
   );
 }

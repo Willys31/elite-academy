@@ -60,6 +60,7 @@
 html {
   height: 100%;
   overflow-x: clip;
+  scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -108,7 +109,31 @@ iframe {
   color: var(--color-ink-950);
 }
 
-/* Apparition douce des sections de la page publique. */
+/* ------------------------------------------------------------
+   Mise au point clavier
+   Un anneau or unique sur tout le site : la navigation au clavier
+   doit être aussi lisible que la navigation à la souris, et la
+   couleur d'accent suffit à la signaler sans ajouter de bordure.
+   ------------------------------------------------------------ */
+
+:focus-visible {
+  outline: 2px solid var(--color-gold-400);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------
+   Mouvement
+   Deux mécanismes complémentaires :
+   - `lever` se déclenche au chargement (héros, panneaux d'accueil) ;
+   - `reveal` se déclenche à l'entrée dans le champ de vision, via
+     `animation-timeline: view()` — donc sans JavaScript.
+   `reveal` est enfermé dans un `@supports` : sur un navigateur qui
+   ne connaît pas les timelines de défilement, la règle entière est
+   ignorée et le contenu reste simplement visible et immobile. Aucun
+   texte ne peut donc rester masqué à cause d'une animation qui ne
+   part pas — le défaut classique des révélations pilotées en JS.
+   ------------------------------------------------------------ */
+
 @keyframes lever {
   from {
     opacity: 0;
@@ -124,14 +149,55 @@ iframe {
   animation: lever 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@supports (animation-timeline: view()) {
+  @media screen and (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: lever linear both;
+      animation-timeline: view();
+      /* La révélation s'achève dès que l'élément est entré à 45 % : elle
+         accompagne le défilement au lieu de le retenir. Une plage qui se
+         terminerait plus tard laisserait un bloc plus haut que l'écran
+         encore pâle alors qu'il est déjà entièrement lu. */
+      animation-range: entry 0% entry 45%;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .lever {
     animation: none;
   }
 }
 
+/* ------------------------------------------------------------
+   Grain de papier
+   Une trame très légère posée sur les sections sable : elle casse
+   l'aplat numérique et donne la matière que le nom « papier »
+   promet. Générée en SVG inline — aucune image à charger.
+   ------------------------------------------------------------ */
+
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
 /* Impression des certificats : ne garder que le contenu utile. */
 @media print {
+  /* Une section révélée au défilement n'est jamais « entrée » sur une
+     page imprimée : sans cette remise à zéro, elle sortirait blanche. */
+  .lever,
+  .reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
   aside,
   header,
   nav,

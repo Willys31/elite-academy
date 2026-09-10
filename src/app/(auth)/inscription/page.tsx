@@ -1,15 +1,25 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { sInscrire } from "@/app/(auth)/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Card, Input, Label } from "@/components/ui";
+import {
+  PaperCard,
+  PublicHeading,
+  PublicInput,
+  PublicLabel,
+  QuietLink,
+} from "@/components/public";
 
 export const metadata: Metadata = { title: "Créer un compte" };
 
 export default function InscriptionPage() {
   return (
-    <Card>
-      <h1 className="mb-4 text-lg font-semibold">Créer un compte</h1>
+    <PaperCard crowned>
+      <PublicHeading
+        eyebrow="Gratuit"
+        intro="Quelques secondes suffisent. Vous décrirez votre premier besoin de formation juste après."
+      >
+        Créer un compte
+      </PublicHeading>
 
       <AuthForm
         action={sInscrire}
@@ -17,8 +27,8 @@ export default function InscriptionPage() {
         pendingLabel="Création en cours…"
       >
         <div>
-          <Label htmlFor="full_name">Nom complet</Label>
-          <Input
+          <PublicLabel htmlFor="full_name">Nom complet</PublicLabel>
+          <PublicInput
             id="full_name"
             name="full_name"
             type="text"
@@ -28,8 +38,8 @@ export default function InscriptionPage() {
           />
         </div>
         <div>
-          <Label htmlFor="email">Adresse e-mail</Label>
-          <Input
+          <PublicLabel htmlFor="email">Adresse e-mail</PublicLabel>
+          <PublicInput
             id="email"
             name="email"
             type="email"
@@ -39,8 +49,13 @@ export default function InscriptionPage() {
           />
         </div>
         <div>
-          <Label htmlFor="password">Mot de passe (8 caractères minimum)</Label>
-          <Input
+          {/* La contrainte passe en indication à droite du libellé : elle
+              reste lue par les lecteurs d'écran (elle est dans le <label>)
+              sans allonger le libellé lui-même. */}
+          <PublicLabel htmlFor="password" hint="8 caractères minimum">
+            Mot de passe
+          </PublicLabel>
+          <PublicInput
             id="password"
             name="password"
             type="password"
@@ -50,8 +65,8 @@ export default function InscriptionPage() {
           />
         </div>
         <div>
-          <Label htmlFor="confirm">Confirmer le mot de passe</Label>
-          <Input
+          <PublicLabel htmlFor="confirm">Confirmer le mot de passe</PublicLabel>
+          <PublicInput
             id="confirm"
             name="confirm"
             type="password"
@@ -62,12 +77,9 @@ export default function InscriptionPage() {
         </div>
       </AuthForm>
 
-      <p className="mt-4 text-sm text-slate-600">
-        Déjà un compte ?{" "}
-        <Link href="/connexion" className="text-brand-600 hover:underline">
-          Se connecter
-        </Link>
+      <p className="mt-6 border-t border-sand-200 pt-5 text-sm text-slate-600">
+        Déjà un compte ? <QuietLink href="/connexion">Se connecter</QuietLink>
       </p>
-    </Card>
+    </PaperCard>
   );
 }

@@ -1,8 +1,14 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { seConnecter } from "@/app/(auth)/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Alert, Card, Input, Label } from "@/components/ui";
+import { Alert } from "@/components/ui";
+import {
+  PaperCard,
+  PublicHeading,
+  PublicInput,
+  PublicLabel,
+  QuietLink,
+} from "@/components/public";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -14,8 +20,8 @@ export default async function ConnexionPage({
   const params = await searchParams;
 
   return (
-    <Card>
-      <h1 className="mb-4 text-lg font-semibold">Connexion</h1>
+    <PaperCard crowned>
+      <PublicHeading eyebrow="Votre espace">Se connecter</PublicHeading>
 
       {params.erreur === "lien-invalide" ? (
         <div className="mb-4">
@@ -33,8 +39,8 @@ export default async function ConnexionPage({
       >
         <input type="hidden" name="suivant" value={params.suivant ?? ""} />
         <div>
-          <Label htmlFor="email">Adresse e-mail</Label>
-          <Input
+          <PublicLabel htmlFor="email">Adresse e-mail</PublicLabel>
+          <PublicInput
             id="email"
             name="email"
             type="email"
@@ -44,25 +50,27 @@ export default async function ConnexionPage({
           />
         </div>
         <div>
-          <Label htmlFor="password">Mot de passe</Label>
-          <Input
+          {/* Le lien d'oubli vit dans le libellé du champ : c'est là que
+              l'utilisateur bloqué le cherche, pas en bas de la carte. */}
+          <PublicLabel htmlFor="password">Mot de passe</PublicLabel>
+          <PublicInput
             id="password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
           />
+          <p className="mt-1.5 text-right">
+            <QuietLink href="/mot-de-passe-oublie" className="text-xs">
+              Mot de passe oublié ?
+            </QuietLink>
+          </p>
         </div>
       </AuthForm>
 
-      <div className="mt-4 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:justify-between">
-        <Link href="/mot-de-passe-oublie" className="text-brand-600 hover:underline">
-          Mot de passe oublié ?
-        </Link>
-        <Link href="/inscription" className="text-brand-600 hover:underline">
-          Créer un compte
-        </Link>
-      </div>
-    </Card>
+      <p className="mt-6 border-t border-sand-200 pt-5 text-sm text-slate-600">
+        Pas encore de compte ? <QuietLink href="/inscription">En créer un</QuietLink>
+      </p>
+    </PaperCard>
   );
 }

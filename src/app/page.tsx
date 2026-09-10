@@ -24,6 +24,17 @@ const DOMAINES = [
   "Administration publique",
 ];
 
+/**
+ * Aperçu affiché dans le héros. Trois compétences d'un même parcours,
+ * à trois niveaux différents : c'est la démonstration visuelle de
+ * l'argument « pas de moyenne générale », posée dès le premier écran.
+ */
+const APERCU_COMPETENCES = [
+  { nom: "Communication en situation tendue", niveau: 3, palier: "Avancé" },
+  { nom: "Cadrage d'un désaccord", niveau: 2, palier: "Opérationnel" },
+  { nom: "Transmission des acquis", niveau: 4, palier: "Elite" },
+];
+
 const ACTES = [
   {
     numero: "01",
@@ -91,6 +102,26 @@ const PUBLICS = [
   },
 ];
 
+/**
+ * Jauge de maîtrise à quatre crans. Les crans atteints sont en or,
+ * les autres restent en creux : la lecture se fait d'un coup d'œil,
+ * sans pourcentage ni légende.
+ */
+function JaugeNiveau({ niveau }: { niveau: number }) {
+  return (
+    <span aria-hidden className="flex shrink-0 gap-1">
+      {[1, 2, 3, 4].map((cran) => (
+        <span
+          key={cran}
+          className={`h-1.5 w-5 rounded-full ${
+            cran <= niveau ? "bg-gold-400" : "bg-white/15"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
 export default async function PageAccueilPublique() {
   const user = await getCurrentUser();
   if (user) redirect("/accueil");
@@ -99,36 +130,47 @@ export default async function PageAccueilPublique() {
     <div className="bg-sand-50 text-slate-900">
       {/* ---------- En-tête ---------- */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-ink-950/90 backdrop-blur">
-        {/* Sous 400 px, marque + deux actions ne tiennent pas sur une ligne :
-            la rangée passe à la ligne plutôt que de rogner le libellé du
-            bouton principal. */}
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 xs:flex-nowrap xs:justify-between xs:py-3 sm:gap-3 sm:px-6">
-          <Link href="/" className="flex shrink-0 items-baseline gap-2">
-            <span className="whitespace-nowrap font-display text-base font-semibold tracking-tight text-white xs:text-lg sm:text-xl">
+        {/* Marque + trois actions ne tiennent sur une seule ligne qu'à partir
+            de 640 px. En dessous, l'en-tête tient deux rangées centrées : la
+            marque, puis les actions. C'est la seule mise en page qui garde le
+            bouton « Créer un compte » entier — auparavant il sortait de
+            l'écran entre 400 et 480 px. */}
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 sm:flex-nowrap sm:justify-between sm:gap-3 sm:px-6 sm:py-3">
+          <Link
+            href="/"
+            className="flex w-full shrink-0 items-baseline justify-center gap-2 sm:w-auto sm:justify-start"
+          >
+            <span className="whitespace-nowrap font-display text-lg font-semibold tracking-tight text-white transition duration-200 hover:text-gold-300 sm:text-xl">
               Elite Academy
             </span>
             <span className="hidden text-[11px] uppercase tracking-[0.2em] text-white/50 lg:inline">
               par Elite Experience
             </span>
           </Link>
-          <nav className="flex shrink-0 items-center gap-1.5 sm:gap-4">
+          <nav className="flex w-full shrink-0 items-center justify-center gap-1 pb-1 sm:w-auto sm:gap-3 sm:pb-0">
+            {/* La vérification reste accessible sur téléphone : c'est
+                justement là qu'un recruteur ouvre un lien de certificat.
+                Seuls les libellés se raccourcissent. */}
             <Link
               href="/verifier"
-              className="hidden whitespace-nowrap text-sm text-white/70 transition hover:text-white md:inline"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 py-2 text-sm text-white/70 transition duration-200 hover:bg-white/5 hover:text-white sm:px-3"
             >
-              Vérifier un certificat
+              <span className="lg:hidden">Vérifier</span>
+              <span className="hidden lg:inline">Vérifier un certificat</span>
             </Link>
             <Link
               href="/connexion"
-              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium text-white/90 transition hover:bg-white/10 sm:px-3"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium text-white/90 transition duration-200 hover:bg-white/10 sm:px-3"
             >
-              Se connecter
+              <span className="sm:hidden">Connexion</span>
+              <span className="hidden sm:inline">Se connecter</span>
             </Link>
             <Link
               href="/inscription"
-              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg bg-gold-400 px-3 py-2 text-sm font-semibold text-ink-950 transition hover:bg-gold-300 sm:px-4"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg bg-gold-400 px-3 py-2 text-sm font-semibold text-ink-950 transition duration-200 hover:bg-gold-300 hover:shadow-[0_8px_20px_-8px_rgba(211,160,50,0.8)] active:translate-y-px sm:px-4"
             >
-              Créer un compte
+              <span className="sm:hidden">S&apos;inscrire</span>
+              <span className="hidden sm:inline">Créer un compte</span>
             </Link>
           </nav>
         </div>
@@ -147,56 +189,132 @@ export default async function PageAccueilPublique() {
             className="pointer-events-none absolute bottom-[-30%] left-[-10%] h-[420px] w-[420px] rounded-full bg-gold-500/10 blur-3xl"
           />
 
-          <div className="relative mx-auto max-w-6xl px-4 pb-20 pt-16 sm:px-6 sm:pb-28 sm:pt-24">
-            <p
-              className="lever text-xs font-medium uppercase tracking-[0.28em] text-gold-300"
-              style={{ animationDelay: "0.05s" }}
-            >
-              Formation professionnelle · Abidjan → Afrique
-            </p>
+          <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-20">
+            <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
+              {/* Colonne de gauche : la promesse */}
+              <div>
+                <p
+                  className="lever text-xs font-medium uppercase tracking-[0.28em] text-gold-300"
+                  style={{ animationDelay: "0.05s" }}
+                >
+                  Formation professionnelle · Abidjan → Afrique
+                </p>
 
-            <h1
-              className="lever mt-6 max-w-3xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl"
-              style={{ animationDelay: "0.15s" }}
-            >
-              Le savoir se transmet.
-              <br />
-              La compétence,{" "}
-              <em className="font-display italic text-gold-300">elle se prouve.</em>
-            </h1>
+                <h1
+                  /* Trois tailles, choisies pour que « Le savoir se transmet. »
+                     tienne toujours sur une ligne dans la colonne de gauche :
+                     48 px suffisent tant que l'aperçu occupe la droite, 52 px
+                     seulement à partir de 1280 px où la colonne s'élargit. */
+                  className="lever mt-5 font-display text-[2.15rem] font-semibold leading-[1.08] tracking-tight sm:mt-6 sm:text-5xl xl:text-[3.25rem]"
+                  style={{ animationDelay: "0.15s" }}
+                >
+                  Le savoir se transmet.
+                  <br />
+                  La compétence,{" "}
+                  <em className="font-display italic text-gold-300">
+                    elle se prouve.
+                  </em>
+                </h1>
 
-            <p
-              className="lever mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg"
-              style={{ animationDelay: "0.25s" }}
-            >
-              Elite Academy transforme un besoin exprimé en une phrase en un
-              parcours de formation structuré, pratiqué en ligne comme en
-              salle, mesuré compétence par compétence — et conclu par un
-              certificat que chacun peut vérifier.
-            </p>
+                <p
+                  className="lever mt-5 max-w-xl text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg"
+                  style={{ animationDelay: "0.25s" }}
+                >
+                  Elite Academy transforme un besoin exprimé en une phrase en un
+                  parcours de formation structuré, pratiqué en ligne comme en
+                  salle, mesuré compétence par compétence — et conclu par un
+                  certificat que chacun peut vérifier.
+                </p>
 
-            <div
-              className="lever mt-9 flex flex-wrap items-center gap-3"
-              style={{ animationDelay: "0.35s" }}
-            >
-              <Link
-                href="/inscription"
-                className="inline-flex min-h-12 items-center rounded-lg bg-gold-400 px-6 py-3 text-sm font-semibold text-ink-950 shadow-lg shadow-gold-500/20 transition hover:bg-gold-300"
+                <div
+                  className="lever mt-8 flex flex-wrap items-center gap-3"
+                  style={{ animationDelay: "0.35s" }}
+                >
+                  <Link
+                    href="/inscription"
+                    className="inline-flex min-h-12 items-center rounded-xl bg-gold-400 px-6 py-3 text-sm font-semibold text-ink-950 shadow-[0_10px_30px_-10px_rgba(211,160,50,0.8)] transition duration-200 hover:bg-gold-300 hover:shadow-[0_14px_36px_-10px_rgba(211,160,50,0.9)] active:translate-y-px"
+                  >
+                    Créer un compte gratuitement
+                  </Link>
+                  <Link
+                    href="/verifier"
+                    className="inline-flex min-h-12 items-center rounded-xl border border-white/25 px-6 py-3 text-sm font-medium text-white transition duration-200 hover:border-white/50 hover:bg-white/5"
+                  >
+                    Vérifier un certificat
+                  </Link>
+                </div>
+              </div>
+
+              {/* Colonne de droite : l'aperçu du produit.
+                  `aria-hidden` : c'est une illustration composée de données
+                  d'exemple, elle n'apporte rien à un lecteur d'écran et
+                  reprendrait mot pour mot l'argument déjà écrit à gauche. */}
+              {/* Le bas de la colonne est réservé à la vignette du certificat,
+                  qui déborde sous la carte : sans cette réserve, elle
+                  recouvrirait la dernière ligne de la carte. */}
+              {/* Masqué sous `lg` : là, l'aperçu ne tient plus à côté du texte,
+                  il s'empile dessous et repousse le bouton d'inscription hors
+                  de l'écran. Sur téléphone, la promesse et l'action priment. */}
+              <div
+                aria-hidden
+                className="lever relative hidden pb-28 lg:block"
+                style={{ animationDelay: "0.45s" }}
               >
-                Créer un compte gratuitement
-              </Link>
-              <Link
-                href="/verifier"
-                className="inline-flex min-h-12 items-center rounded-lg border border-white/25 px-6 py-3 text-sm font-medium text-white transition hover:border-white/50 hover:bg-white/5"
-              >
-                Vérifier un certificat
-              </Link>
+                {/* Carte de progression, au premier plan */}
+                <div className="relative rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-2xl backdrop-blur-sm sm:p-6">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40">
+                      Progression
+                    </p>
+                    <p className="truncate text-xs text-white/50">
+                      Gestion des conflits
+                    </p>
+                  </div>
+
+                  <ul className="mt-5 space-y-4">
+                    {APERCU_COMPETENCES.map((c) => (
+                      <li key={c.nom}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="min-w-0 truncate text-sm text-white/85">
+                            {c.nom}
+                          </p>
+                          <JaugeNiveau niveau={c.niveau} />
+                        </div>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-gold-300/70">
+                          {c.palier}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+
+                </div>
+
+                {/* Certificat en second plan, débordant sous la carte */}
+                <div className="absolute bottom-0 right-2 w-48 rotate-6 rounded-lg border-[3px] border-double border-gold-400/70 bg-sand-50 p-4 text-center shadow-2xl sm:right-4 sm:w-56">
+                  <p className="text-[8px] uppercase tracking-[0.28em] text-slate-400">
+                    Elite Academy
+                  </p>
+                  <p className="mt-1.5 font-display text-sm font-semibold text-brand-800">
+                    Certificat de réussite
+                  </p>
+                  <div className="mx-auto mt-2.5 h-px w-14 bg-sand-200" />
+                  {/* Code d'exemple conforme à l'alphabet réel des codes de
+                      vérification : ni 0, ni 1, ni I, L ou O — ces caractères
+                      sont exclus parce qu'ils se confondent à la lecture. */}
+                  <p className="mt-2.5 font-mono text-[11px] font-semibold tracking-[0.12em] text-slate-600">
+                    EA-7K2M-4XQ9-VB3D
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Bandeau factuel */}
             <dl
-              className="lever mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4"
-              style={{ animationDelay: "0.45s" }}
+              /* Deux colonnes jusqu'à 1024 px : sur tablette, quatre colonnes
+                 cassaient « 12 domaines » et « 100 % vérifiables » en deux
+                 lignes chacun, ce qui rendait le bandeau illisible. */
+              className="lever mt-14 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 lg:grid-cols-4"
+              style={{ animationDelay: "0.55s" }}
             >
               {[
                 ["4 niveaux", "de maîtrise, par compétence"],
@@ -216,9 +334,9 @@ export default async function PageAccueilPublique() {
         </section>
 
         {/* ---------- Domaines ---------- */}
-        <section className="border-b border-sand-200 bg-sand-50">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-            <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.4fr]">
+        <section className="relative border-b border-sand-200 bg-sand-50 grain">
+          <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+            <div className="reveal grid items-start gap-10 lg:grid-cols-[1fr_1.4fr]">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700">
                   Multi-domaines par conception
@@ -234,15 +352,14 @@ export default async function PageAccueilPublique() {
                   métier qui n&apos;en veut pas.
                 </p>
               </div>
+              {/* Tous les domaines ont le même poids : en souligner
+                  arbitrairement quelques-uns laissait croire à une
+                  hiérarchie qui n'existe pas. */}
               <ul className="flex flex-wrap gap-2.5 pt-2">
-                {DOMAINES.map((d, i) => (
+                {DOMAINES.map((d) => (
                   <li
                     key={d}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                      i % 5 === 0
-                        ? "border-brand-200 bg-brand-50 text-brand-800"
-                        : "border-sand-200 bg-white text-slate-700"
-                    }`}
+                    className="rounded-full border border-sand-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition duration-200 hover:-translate-y-0.5 hover:border-gold-400 hover:text-ink-900 hover:shadow-[0_6px_16px_-8px_rgba(12,16,43,0.35)]"
                   >
                     {d}
                   </li>
@@ -257,17 +374,21 @@ export default async function PageAccueilPublique() {
 
         {/* ---------- Le parcours en quatre actes ---------- */}
         <section className="bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700">
-              Du besoin à la preuve
-            </p>
-            <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              Quatre actes, une méthode.
-            </h2>
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
+            <div className="reveal">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700">
+                Du besoin à la preuve
+              </p>
+              <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+                Quatre actes, une méthode.
+              </h2>
+            </div>
 
-            <ol className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2">
+            {/* Deux colonnes seulement à partir de 768 px : à 640, chaque acte
+                n'avait plus que ~250 px utiles une fois le numéro déduit. */}
+            <ol className="mt-10 grid gap-x-10 gap-y-10 sm:mt-12 md:grid-cols-2 md:gap-y-12">
               {ACTES.map((acte) => (
-                <li key={acte.numero} className="relative pl-16">
+                <li key={acte.numero} className="reveal relative pl-16">
                   <span
                     aria-hidden
                     className="absolute left-0 top-0 font-display text-4xl font-semibold text-sand-200"
@@ -284,7 +405,7 @@ export default async function PageAccueilPublique() {
               ))}
             </ol>
 
-            <p className="mt-12 border-l-2 border-gold-400 pl-4 text-sm text-slate-500">
+            <p className="reveal mt-10 border-l-2 border-gold-400 pl-4 text-sm text-slate-500 sm:mt-12">
               L&apos;intelligence artificielle propose. Vos experts disposent.
               Aucun contenu ne se publie sans validation humaine — c&apos;est
               une règle de la plateforme, pas une option.
@@ -293,18 +414,18 @@ export default async function PageAccueilPublique() {
         </section>
 
         {/* ---------- Trois publics ---------- */}
-        <section className="border-y border-sand-200 bg-sand-50">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <h2 className="max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+        <section className="relative border-y border-sand-200 bg-sand-50 grain">
+          <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
+            <h2 className="reveal max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
               Chacun son écran,
               <br />
               tous la même exigence.
             </h2>
-            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            <div className="mt-10 grid gap-6 sm:mt-12 sm:grid-cols-2 lg:grid-cols-3">
               {PUBLICS.map((p) => (
                 <article
                   key={p.titre}
-                  className="rounded-2xl border border-sand-200 bg-white p-6 shadow-sm"
+                  className="reveal rounded-2xl border border-sand-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-gold-400/60 hover:shadow-[0_18px_40px_-20px_rgba(12,16,43,0.45)]"
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">
                     {p.titre}
@@ -330,8 +451,8 @@ export default async function PageAccueilPublique() {
 
         {/* ---------- Niveaux ---------- */}
         <section className="bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.2fr]">
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
+            <div className="reveal grid items-center gap-10 lg:grid-cols-[1fr_1.2fr]">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700">
                   Niveaux de maîtrise
@@ -352,7 +473,7 @@ export default async function PageAccueilPublique() {
                 {NIVEAUX.map((n, i) => (
                   <li
                     key={n.nom}
-                    className={`flex items-center gap-4 rounded-xl border p-4 ${
+                    className={`flex items-center gap-4 rounded-xl border p-4 transition duration-200 hover:translate-x-1 ${
                       i === 3
                         ? "border-gold-400 bg-gold-300/10"
                         : "border-sand-200 bg-sand-50"
@@ -387,8 +508,8 @@ export default async function PageAccueilPublique() {
             aria-hidden
             className="pointer-events-none absolute -bottom-32 right-[-8%] h-[380px] w-[380px] rounded-full bg-gold-500/10 blur-3xl"
           />
-          <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
+          <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
+            <div className="reveal grid items-center gap-12 lg:grid-cols-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gold-300">
                   Certificats vérifiables
@@ -406,14 +527,23 @@ export default async function PageAccueilPublique() {
                 </p>
                 <Link
                   href="/verifier"
-                  className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-gold-300 transition hover:text-gold-400"
+                  className="group mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-gold-300 transition duration-200 hover:text-gold-400"
                 >
-                  Essayer la page de vérification →
+                  Essayer la page de vérification
+                  <span
+                    aria-hidden
+                    className="transition-transform duration-200 group-hover:translate-x-1"
+                  >
+                    →
+                  </span>
                 </Link>
               </div>
 
               {/* Maquette de certificat */}
-              <div aria-hidden className="mx-auto w-full max-w-sm rotate-1 transition hover:rotate-0">
+              <div
+                aria-hidden
+                className="mx-auto w-full max-w-sm rotate-1 transition duration-500 hover:rotate-0 hover:scale-[1.02]"
+              >
                 <div className="rounded-xl border-4 border-double border-gold-400/70 bg-sand-50 p-8 text-center text-slate-900 shadow-2xl">
                   <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400">
                     Elite Academy
@@ -437,29 +567,34 @@ export default async function PageAccueilPublique() {
         </section>
 
         {/* ---------- Appel final ---------- */}
-        <section className="bg-sand-50">
-          <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-24">
-            <h2 className="mx-auto max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-              Prêt à former{" "}
-              <em className="italic text-brand-700">autrement</em> ?
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-slate-600">
-              Créez votre compte, décrivez votre premier besoin de formation,
-              et jugez sur pièce.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/inscription"
-                className="inline-flex min-h-12 items-center rounded-lg bg-ink-950 px-7 py-3 text-sm font-semibold text-white transition hover:bg-brand-900"
-              >
-                Créer un compte
-              </Link>
-              <Link
-                href="/connexion"
-                className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-7 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Se connecter
-              </Link>
+        <section className="relative bg-sand-50 grain">
+          <div className="relative mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-24">
+            <div className="reveal">
+              <h2 className="mx-auto max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+                Prêt à former{" "}
+                <em className="italic text-brand-700">autrement</em> ?
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-slate-600">
+                Créez votre compte, décrivez votre premier besoin de formation,
+                et jugez sur pièce.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                {/* L'action principale porte la même couleur qu'en haut de
+                    page : l'or est la couleur d'action du site, l'encre
+                    celle des surfaces. */}
+                <Link
+                  href="/inscription"
+                  className="inline-flex min-h-12 items-center rounded-xl bg-gold-400 px-7 py-3 text-sm font-semibold text-ink-950 shadow-[0_10px_30px_-10px_rgba(211,160,50,0.8)] transition duration-200 hover:bg-gold-300 hover:shadow-[0_14px_36px_-10px_rgba(211,160,50,0.9)] active:translate-y-px"
+                >
+                  Créer un compte
+                </Link>
+                <Link
+                  href="/connexion"
+                  className="inline-flex min-h-12 items-center rounded-xl border border-sand-200 bg-white px-7 py-3 text-sm font-medium text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-white"
+                >
+                  Se connecter
+                </Link>
+              </div>
             </div>
           </div>
         </section>
@@ -467,26 +602,53 @@ export default async function PageAccueilPublique() {
 
       {/* ---------- Pied de page ---------- */}
       <footer className="border-t border-white/10 bg-ink-950 text-white/60">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-10 sm:flex-row sm:items-center sm:px-6">
-          <div>
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+          <div className="lg:col-span-2">
             <p className="font-display text-lg font-semibold text-white">
               Elite Academy
             </p>
-            <p className="mt-1 text-sm">
-              La plateforme éducative d&apos;Elite Experience.
+            <p className="mt-2 max-w-xs text-sm leading-relaxed">
+              La plateforme éducative d&apos;Elite Experience : concevoir,
+              diffuser et certifier des formations professionnelles
+              multi-domaines.
             </p>
           </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <Link href="/connexion" className="transition hover:text-white">
-              Connexion
-            </Link>
-            <Link href="/inscription" className="transition hover:text-white">
-              Créer un compte
-            </Link>
-            <Link href="/verifier" className="transition hover:text-white">
-              Vérifier un certificat
-            </Link>
+
+          <nav aria-label="Plateforme">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              Plateforme
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li>
+                <Link href="/inscription" className="transition duration-200 hover:text-white">
+                  Créer un compte
+                </Link>
+              </li>
+              <li>
+                <Link href="/connexion" className="transition duration-200 hover:text-white">
+                  Connexion
+                </Link>
+              </li>
+              <li>
+                <Link href="/verifier" className="transition duration-200 hover:text-white">
+                  Vérifier un certificat
+                </Link>
+              </li>
+            </ul>
           </nav>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              Elite Experience
+            </p>
+            <p className="mt-3 text-sm leading-relaxed">
+              Abidjan, Côte d&apos;Ivoire
+              <br />
+              Formation professionnelle
+              <br />
+              multi-domaines
+            </p>
+          </div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-white/40">
           © {new Date().getFullYear()} Elite Experience — Abidjan, Côte d&apos;Ivoire
