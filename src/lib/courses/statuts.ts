@@ -56,7 +56,12 @@ export const FORMAT_LABELS: Record<string, string> = {
  * « un administrateur peut valider ou rejeter le brouillon »).
  */
 const TRANSITIONS: Record<string, MemberRole[]> = {
-  "draft->review": ["admin", "designer"],
+  /* Le formateur peut soumettre à validation depuis la migration 0010,
+     puisqu'il peut désormais concevoir. Sans cette ouverture, une
+     formation créée par un formateur resterait bloquée en brouillon,
+     faute de pouvoir la présenter à qui que ce soit. La suite du cycle
+     ne bouge pas : approuver et publier restent à l'administrateur. */
+  "draft->review": ["admin", "designer", "trainer"],
   "review->approved": ["admin"],
   "review->draft": ["admin"], // demande de corrections
   "approved->published": ["admin"],
@@ -128,14 +133,22 @@ export function isContentEditable(status: CourseStatus): boolean {
   return status === "draft";
 }
 
-/** Peut créer une formation dans une organisation donnée. */
+/**
+ * Peut créer une formation dans une organisation donnée.
+ *
+ * Le formateur a rejoint la liste (migration 0010) : chez Elite
+ * Experience, il conçoit souvent lui-même ce qu'il anime. Il devient
+ * propriétaire de ce qu'il crée, donc `can_edit_course` l'autorise à le
+ * modifier. Créer n'est pas publier : la publication reste à
+ * l'administrateur, via les transitions de statut.
+ */
 export function canCreateCourse(
   memberships: Membership[],
   organizationId: string
 ): boolean {
   if (isEliteAdmin(memberships)) return true;
   const role = roleInOrg(memberships, organizationId);
-  return role === "admin" || role === "designer";
+  return role === "admin" || role === "designer" || role === "trainer";
 }
 
 /**
@@ -154,12 +167,16 @@ export function canDeleteCourse(
   return roleInOrg(memberships, organizationId) === "admin";
 }
 
-/** Organisations dans lesquelles l'utilisateur peut créer une formation. */
+/**
+ * Organisations dans lesquelles l'utilisateur peut créer une formation.
+ * Même liste de rôles que `canCreateCourse` — les deux doivent rester
+ * alignées, sinon l'interface propose un bouton que la base refuse.
+ */
 export function organizationsForCourseCreation(
   memberships: Membership[]
 ): Membership[] {
   return activeMemberships(memberships).filter(
-    (m) => m.role === "admin" || m.role === "designer"
+    (m) => m.role === "admin" || m.role === "designer" || m.role === "trainer"
   );
 }
 

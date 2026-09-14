@@ -126,12 +126,23 @@ export default async function EditeurFormationPage({
       <BackLink href="/catalogue">Catalogue</BackLink>
       <PageTitle
         action={
-          <Link
-            href={`/catalogue/${formation.id}`}
-            className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Voir la fiche
-          </Link>
+          <>
+            {/* Affectation des formateurs (migration 0010) : l'écran est
+                accessible à tous, mais seuls l'admin et le responsable
+                peuvent y modifier la liste. */}
+            <Link
+              href={`/catalogue/${formation.id}/formateurs`}
+              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Formateurs
+            </Link>
+            <Link
+              href={`/catalogue/${formation.id}`}
+              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Voir la fiche
+            </Link>
+          </>
         }
       >
         Éditeur — {formation.title}

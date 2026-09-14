@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -12,6 +13,7 @@ import {
 import { calculerCompletion } from "@/lib/courses/progression";
 import { lireTentative, questionsARevoir } from "@/lib/courses/revision";
 import { STATUTS_AVEC_ACCES } from "@/lib/courses/inscriptions";
+import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
 import {
   Chiffre,
   EcranTitre,
@@ -35,11 +37,11 @@ function compteLecons(n: number): string {
 /**
  * Écran d'accueil.
  *
- * Pour l'apprenant, c'est un vrai tableau de bord : il répond d'abord à
- * « où en suis-je et que dois-je faire maintenant ? », avant de donner
- * les chiffres. Les autres rôles gardent une vue de situation sobre en
- * attendant que leurs écrans soient repris à leur tour — mieux vaut un
- * écran honnête qu'un tableau de bord qui simule des données.
+ * Apprenant et formateur ont chacun un vrai tableau de bord : chacun
+ * répond d'abord à « que dois-je faire maintenant ? » avant de donner
+ * les chiffres. Les rôles dont les écrans ne sont pas encore repris
+ * gardent une vue de situation sobre — mieux vaut un écran honnête
+ * qu'un tableau de bord qui simule des données.
  */
 export default async function AccueilPage() {
   const user = await getCurrentUser();
@@ -48,6 +50,10 @@ export default async function AccueilPage() {
   const memberships = activeMemberships(user.memberships);
   const role = primaryRole(user.memberships);
   const prenom = user.fullName ? user.fullName.split(" ")[0] : "";
+
+  if (role === "trainer") {
+    return <VueFormateur userId={user.id} prenom={prenom} />;
+  }
 
   if (role !== "learner") {
     return (
@@ -316,6 +322,214 @@ export default async function AccueilPage() {
               </PanneauLien>
             ))}
           </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   Tableau de bord du formateur
+   ------------------------------------------------------------------ */
+
+/**
+ * Ce qu'un formateur veut savoir en arrivant : ai-je une session
+ * ouverte en ce moment (et quel est son code, puisqu'il doit
+ * l'annoncer en salle), et qu'est-ce qui est remonté depuis.
+ */
+async function VueFormateur({
+  userId,
+  prenom,
+}: {
+  userId: string;
+  prenom: string;
+}) {
+  const supabase = await createClient();
+
+  const { data: sessions } = await supabase
+    .from("live_sessions")
+    .select(
+      "id, title, session_code, status, starts_at, created_at, course:courses(title)"
+    )
+    .eq("trainer_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  const liste = (sessions ?? []).map((s) => {
+    const course = Array.isArray(s.course) ? s.course[0] : s.course;
+    return {
+      id: s.id as string,
+      titre: s.title as string,
+      code: s.session_code as string,
+      statut: s.status as string,
+      formation: course?.title ?? null,
+      date: (s.starts_at as string) ?? (s.created_at as string),
+    };
+  });
+
+  const ouvertes = liste.filter((s) => s.statut === "open");
+  const idsSessions = liste.map((s) => s.id);
+
+  const { data: participations } =
+    idsSessions.length > 0
+      ? await supabase
+          .from("session_participants")
+          .select("session_id, user_id")
+          .in("session_id", idsSessions)
+      : { data: [] as Array<Record<string, unknown>> };
+
+  const apprenantsDistincts = new Set(
+    (participations ?? []).map((p) => p.user_id as string)
+  ).size;
+
+  const enCours = ouvertes[0] ?? null;
+
+  return (
+    <div>
+      <EcranTitre
+        eyebrow="Espace formateur"
+        intro="Ouvrez une session, affichez son code en salle, et suivez les réponses en direct."
+      >
+        Bonjour{prenom ? ` ${prenom}` : ""}
+      </EcranTitre>
+
+      {/* Session ouverte : le code est l'information la plus urgente,
+          il est donc en très grand et en monospace — un formateur le
+          lit à voix haute depuis le fond de la salle. */}
+      {enCours ? (
+        <Panneau ton="encre" className="relative overflow-hidden !p-0">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl"
+          />
+          <div className="relative flex flex-col gap-6 p-6 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-300">
+                Session ouverte
+              </p>
+              <h2 className="mt-2 font-display text-xl font-semibold text-white sm:text-2xl">
+                {enCours.titre}
+              </h2>
+              {enCours.formation ? (
+                <p className="mt-1 text-sm text-white/50">{enCours.formation}</p>
+              ) : null}
+              <p className="mt-5 font-mono text-3xl font-semibold tracking-[0.25em] text-gold-300 sm:text-4xl">
+                {enCours.code}
+              </p>
+              <p className="mt-1.5 text-xs text-white/40">
+                Code à annoncer ou à afficher en salle
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <LienOr href={`/sessions/${enCours.id}`}>Piloter la session</LienOr>
+              <LienSobre
+                href="/sessions"
+                className="!border-white/20 !bg-transparent !text-white hover:!border-white/40 hover:!bg-white/5"
+              >
+                Toutes mes sessions
+              </LienSobre>
+            </div>
+          </div>
+        </Panneau>
+      ) : (
+        <Vide
+          titre="Aucune session ouverte"
+          texte="Créez une session : les participants la rejoignent avec un code ou un QR code, et vous voyez leurs réponses arriver en direct."
+          action={<LienOr href="/sessions">Créer une session</LienOr>}
+        />
+      )}
+
+      <dl className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Chiffre
+          valeur={ouvertes.length}
+          libelle="Ouvertes"
+          detail="en ce moment"
+          href="/sessions"
+        />
+        <Chiffre
+          valeur={liste.length}
+          libelle="Sessions"
+          detail="animées à ce jour"
+          href="/sessions"
+        />
+        <Chiffre
+          valeur={apprenantsDistincts}
+          libelle="Apprenants"
+          detail="rencontrés, sans doublon"
+          href="/groupes"
+        />
+        <Chiffre
+          valeur={liste.filter((s) => s.statut === "closed").length}
+          libelle="Clôturées"
+          detail="résultats consultables"
+          href="/resultats"
+        />
+      </dl>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        <Panneau>
+          <SectionTitre>Résultats</SectionTitre>
+          <p className="text-sm leading-relaxed text-slate-600">
+            Où le groupe bute, qui décroche, et quelles compétences restent
+            fragiles — formation par formation.
+          </p>
+          <div className="mt-4">
+            <LienSobre href="/resultats">Analyser une formation</LienSobre>
+          </div>
+        </Panneau>
+        <Panneau>
+          <SectionTitre>Mes groupes</SectionTitre>
+          <p className="text-sm leading-relaxed text-slate-600">
+            Les apprenants rencontrés en session, et ceux qui reviennent
+            d&apos;une séance à l&apos;autre.
+          </p>
+          <div className="mt-4">
+            <LienSobre href="/groupes">Voir mes groupes</LienSobre>
+          </div>
+        </Panneau>
+      </div>
+
+      {liste.length > 0 ? (
+        <section className="mt-10">
+          <SectionTitre
+            compte={liste.length}
+            action={<LienSobre href="/sessions">Toutes les sessions</LienSobre>}
+          >
+            Sessions récentes
+          </SectionTitre>
+          <Panneau flush>
+            <ul className="divide-y divide-sand-200">
+              {liste.slice(0, 6).map((s) => (
+                <li key={s.id}>
+                  <Link
+                    href={`/sessions/${s.id}`}
+                    className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink-900">{s.titre}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {[
+                          s.formation,
+                          `code ${s.code}`,
+                          s.date
+                            ? new Date(s.date).toLocaleDateString("fr-FR", {
+                                day: "numeric",
+                                month: "long",
+                              })
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <Etiquette ton={s.statut === "open" ? "succes" : "neutre"}>
+                      {SESSION_STATUS_LABELS[s.statut] ?? s.statut}
+                    </Etiquette>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Panneau>
         </section>
       ) : null}
     </div>

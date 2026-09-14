@@ -61,9 +61,18 @@ describe("canTransition", () => {
     expect(canTransition([eliteAdmin], ORG_B, "approved", "published")).toBe(true);
   });
 
-  it("formateur et apprenant ne peuvent effectuer aucune transition", () => {
-    expect(canTransition([trainer], ORG_A, "draft", "review")).toBe(false);
+  it("le formateur peut soumettre à validation mais pas approuver ni publier", () => {
+    // Depuis la migration 0010 : il conçoit, donc il présente son
+    // brouillon. La validation reste à l'administrateur.
+    expect(canTransition([trainer], ORG_A, "draft", "review")).toBe(true);
+    expect(canTransition([trainer], ORG_A, "review", "approved")).toBe(false);
+    expect(canTransition([trainer], ORG_A, "approved", "published")).toBe(false);
+    expect(canTransition([trainer], ORG_A, "published", "archived")).toBe(false);
+  });
+
+  it("l'apprenant ne peut effectuer aucune transition", () => {
     expect(canTransition([learner], ORG_A, "draft", "review")).toBe(false);
+    expect(canTransition([learner], ORG_A, "review", "approved")).toBe(false);
   });
 
   it("les transitions inexistantes sont refusées", () => {
@@ -103,15 +112,21 @@ describe("isContentEditable", () => {
 });
 
 describe("canCreateCourse / organizationsForCourseCreation", () => {
-  it("admin et concepteur de l'organisation peuvent créer", () => {
+  it("admin, concepteur et formateur de l'organisation peuvent créer", () => {
     expect(canCreateCourse([orgAdmin], ORG_A)).toBe(true);
     expect(canCreateCourse([designer], ORG_A)).toBe(true);
+    // Ouvert au formateur par la migration 0010 : chez Elite Experience,
+    // il conçoit souvent ce qu'il anime.
+    expect(canCreateCourse([trainer], ORG_A)).toBe(true);
   });
 
-  it("formateur, responsable et apprenant ne peuvent pas créer", () => {
-    expect(canCreateCourse([trainer], ORG_A)).toBe(false);
+  it("responsable et apprenant ne peuvent pas créer", () => {
     expect(canCreateCourse([membership("manager")], ORG_A)).toBe(false);
     expect(canCreateCourse([learner], ORG_A)).toBe(false);
+  });
+
+  it("le formateur d'une autre organisation ne peut pas créer ici", () => {
+    expect(canCreateCourse([membership("trainer", ORG_B)], ORG_A)).toBe(false);
   });
 
   it("l'admin Elite Experience peut créer partout", () => {
