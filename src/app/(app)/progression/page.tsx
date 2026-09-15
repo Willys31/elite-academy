@@ -4,16 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { NIVEAU_CALCULE_LABELS } from "@/lib/courses/progression";
-import {
-  Chiffre,
-  CransMaitrise,
-  EcranTitre,
-  Etiquette,
-  LienOr,
-  Panneau,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { Chiffre, CransMaitrise, EcranTitre, Etiquette, LienOr, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Ma progression" };
 
@@ -82,6 +73,7 @@ export default async function ProgressionPage() {
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EcranTitre
         eyebrow="Compétence par compétence"
         intro="Votre maîtrise est construite à partir de vos meilleurs résultats, jamais d'une moyenne générale. Le niveau Elite n'est attribué que par un formateur ou un administrateur."

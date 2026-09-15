@@ -180,6 +180,61 @@ export function organizationsForCourseCreation(
   );
 }
 
+/**
+ * Peut administrer le travail de conception d'une organisation :
+ * bibliothèque de sources, file de validation, traces de génération IA.
+ *
+ * ATTENTION — c'est volontairement PLUS restreint que `canCreateCourse`.
+ * Ces deux tests ont longtemps été confondus, `canCreateCourse` servant
+ * de passe-droit un peu partout. Quand le formateur a rejoint la liste
+ * des créateurs (migration 0010), il a hérité du même coup du droit de
+ * supprimer des sources et des traces IA — droits que les politiques
+ * `sources_delete` et `ai_gen_delete` refusent en base. L'interface
+ * aurait affiché des boutons voués à l'échec.
+ *
+ * Créer sa propre formation et administrer le patrimoine pédagogique de
+ * l'organisation sont deux choses différentes.
+ */
+export function canDesignForOrganization(
+  memberships: Membership[],
+  organizationId: string
+): boolean {
+  if (isEliteAdmin(memberships)) return true;
+  const role = roleInOrg(memberships, organizationId);
+  return role === "admin" || role === "designer";
+}
+
+/** Forme « liste » de `canDesignForOrganization`, pour les gardes d'écran. */
+export function organizationsForDesign(memberships: Membership[]): Membership[] {
+  return activeMemberships(memberships).filter(
+    (m) => m.role === "admin" || m.role === "designer"
+  );
+}
+
+/**
+ * Peut modifier le CONTENU d'une formation précise.
+ *
+ * Reproduit la fonction SQL `can_edit_course` (migration 0002) :
+ * l'admin Elite Experience, le propriétaire de la formation, ou un
+ * administrateur / concepteur de son organisation.
+ *
+ * Le propriétaire compte : c'est ce qui permet à un formateur de
+ * retoucher ce qu'il a lui-même conçu. Mais un formateur n'est PAS
+ * autorisé sur la formation d'un concepteur — décision validée avec
+ * Elite Experience : on n'écrit pas par-dessus le travail d'un autre.
+ */
+export function canEditCourse(
+  memberships: Membership[],
+  organizationId: string,
+  ownerId: string | null,
+  userId: string
+): boolean {
+  if (isEliteAdmin(memberships)) return true;
+  if (ownerId !== null && ownerId === userId) return true;
+  const role = roleInOrg(memberships, organizationId);
+  return role === "admin" || role === "designer";
+}
+
 /** Peut gérer le référentiel de compétences d'une organisation. */
 export function canManageCompetencies(
   memberships: Membership[],

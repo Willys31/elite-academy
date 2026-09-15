@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { MemberRole, NavItem } from "@/lib/auth/roles";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { useSuiviNavigation } from "@/lib/nav/historique";
 
 /**
  * Shell applicatif responsive.
@@ -50,6 +51,11 @@ export function AppShell({
   const boutonRef = useRef<HTMLButtonElement>(null);
 
   const fermer = useCallback(() => setMenuOuvert(false), []);
+
+  // Compte les pages vues dans l'onglet : c'est ce qui permet au bouton
+  // « Retour » de ramener là d'où l'on vient plutôt que vers un parent
+  // théorique, sans risquer de faire sortir du site.
+  useSuiviNavigation();
 
   // Le changement de page ferme le tiroir : le lien cliqué n'a pas à
   // s'en charger lui-même, et un retour navigateur ne le laisse pas ouvert.

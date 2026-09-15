@@ -4,10 +4,13 @@ import {
   availableTransitions,
   canCreateCourse,
   canDeleteCourse,
+  canDesignForOrganization,
+  canEditCourse,
   canManageCompetencies,
   canTransition,
   isContentEditable,
   organizationsForCourseCreation,
+  organizationsForDesign,
   slugify,
   transitionLabel,
 } from "@/lib/courses/statuts";
@@ -133,10 +136,53 @@ describe("canCreateCourse / organizationsForCourseCreation", () => {
     expect(canCreateCourse([eliteAdmin], ORG_B)).toBe(true);
   });
 
+  it("créer une formation n'est pas administrer la conception de l'organisation", () => {
+    // Le formateur crée, mais ne touche ni aux sources ni aux traces IA :
+    // `sources_delete` et `ai_gen_delete` le refusent en base.
+    expect(canCreateCourse([trainer], ORG_A)).toBe(true);
+    expect(canDesignForOrganization([trainer], ORG_A)).toBe(false);
+    expect(canDesignForOrganization([designer], ORG_A)).toBe(true);
+    expect(canDesignForOrganization([orgAdmin], ORG_A)).toBe(true);
+    expect(canDesignForOrganization([eliteAdmin], ORG_B)).toBe(true);
+    expect(organizationsForDesign([trainer, designer])).toHaveLength(1);
+  });
+
   it("liste les organisations où la création est possible", () => {
     const list = organizationsForCourseCreation([designer, membership("learner", ORG_B)]);
     expect(list).toHaveLength(1);
     expect(list[0].organization_id).toBe(ORG_A);
+  });
+});
+
+describe("canEditCourse", () => {
+  const MOI = "moi";
+  const AUTRE = "autre";
+
+  it("le propriétaire modifie sa formation, quel que soit son rôle", () => {
+    expect(canEditCourse([trainer], ORG_A, MOI, MOI)).toBe(true);
+  });
+
+  it("le formateur ne modifie pas la formation d'un autre", () => {
+    // C'est la décision validée : il l'anime, il ne la réécrit pas.
+    expect(canEditCourse([trainer], ORG_A, AUTRE, MOI)).toBe(false);
+  });
+
+  it("admin et concepteur modifient les formations de leur organisation", () => {
+    expect(canEditCourse([orgAdmin], ORG_A, AUTRE, MOI)).toBe(true);
+    expect(canEditCourse([designer], ORG_A, AUTRE, MOI)).toBe(true);
+  });
+
+  it("l'admin Elite Experience modifie partout", () => {
+    expect(canEditCourse([eliteAdmin], ORG_B, AUTRE, MOI)).toBe(true);
+  });
+
+  it("l'apprenant ne modifie rien, même sans propriétaire connu", () => {
+    expect(canEditCourse([learner], ORG_A, null, MOI)).toBe(false);
+  });
+
+  it("une formation sans propriétaire n'appartient à personne", () => {
+    // `ownerId` nul ne doit jamais coïncider avec un identifiant absent.
+    expect(canEditCourse([trainer], ORG_A, null, MOI)).toBe(false);
   });
 });
 

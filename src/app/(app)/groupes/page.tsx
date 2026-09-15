@@ -9,16 +9,7 @@ import {
   resumerApprenants,
   type ParticipationBrute,
 } from "@/lib/resultats/resultats";
-import {
-  Chiffre,
-  EcranTitre,
-  Etiquette,
-  LienOr,
-  LienSobre,
-  Panneau,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { Chiffre, EcranTitre, Etiquette, LienOr, LienSobre, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Mes groupes" };
 
@@ -135,6 +126,7 @@ export default async function GroupesPage() {
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EnTeteGroupes />
 
       {sessionsListe.length === 0 ? (

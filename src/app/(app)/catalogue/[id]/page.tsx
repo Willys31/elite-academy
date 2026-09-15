@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
 import {
-  canCreateCourse,
+  canEditCourse,
   CONTEXT_LABELS,
   FORMAT_LABELS,
   LEVEL_LABELS,
@@ -15,7 +15,7 @@ import {
 import { sInscrireFormation } from "@/app/(app)/formations/actions";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Fiche formation" };
 
@@ -39,7 +39,7 @@ export default async function FicheFormationPage({
     .select(
       `id, title, description, status, sector, format, duration_minutes,
        context_type, target_audience, prerequisites, organization_id,
-       current_version_id, organization:organizations(name)`
+       current_version_id, owner_id, organization:organizations(name)`
     )
     .eq("id", id)
     .maybeSingle();
@@ -70,9 +70,12 @@ export default async function FicheFormationPage({
   const org = Array.isArray(formation.organization)
     ? formation.organization[0]
     : formation.organization;
-  const peutModifier =
-    isEliteAdmin(user.memberships) ||
-    canCreateCourse(user.memberships, formation.organization_id);
+  const peutModifier = canEditCourse(
+    user.memberships,
+    formation.organization_id,
+    formation.owner_id,
+    user.id
+  );
   const encadre =
     peutModifier ||
     user.memberships.some(
@@ -84,7 +87,7 @@ export default async function FicheFormationPage({
 
   return (
     <div>
-      <BackLink href="/catalogue">Catalogue</BackLink>
+      <Retour href="/catalogue" ton="sobre" />
       <PageTitle
         action={
           encadre ? (

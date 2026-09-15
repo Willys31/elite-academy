@@ -5,18 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
 import {
-  canCreateCourse,
-  organizationsForCourseCreation,
+  canDesignForOrganization,
+  organizationsForDesign,
 } from "@/lib/courses/statuts";
 import { supprimerSource } from "@/app/(app)/sources/actions";
 import { DangerForm } from "@/components/ui/DangerForm";
-import {
-  Badge,
-  Card,
-  EmptyState,
-  PageTitle,
-  SecondaryLink,
-} from "@/components/ui";
+import { Badge, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Sources" };
 
@@ -51,9 +45,14 @@ export default async function SourcesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
 
+  /* La bibliothèque de sources appartient à la conception, pas à la
+     création : un formateur crée ses formations depuis la migration
+     0010, mais `sources_delete` en base ne connaît qu'admin et
+     concepteur. Utiliser ici le test de création afficherait des
+     boutons que la base refuse. */
   const gestionnaire =
     isEliteAdmin(user.memberships) ||
-    organizationsForCourseCreation(user.memberships).length > 0;
+    organizationsForDesign(user.memberships).length > 0;
   if (!gestionnaire) redirect("/sans-acces");
 
   const supabase = await createClient();
@@ -83,6 +82,7 @@ export default async function SourcesPage() {
 
   return (
     <div>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle
         action={
           <SecondaryLink href="/catalogue/importer">
@@ -113,7 +113,7 @@ export default async function SourcesPage() {
               ? s.organization[0]
               : s.organization;
             const estUtilisee = utilisees.has(s.id);
-            const peutSupprimer = canCreateCourse(user.memberships, s.organization_id);
+            const peutSupprimer = canDesignForOrganization(user.memberships, s.organization_id);
 
             return (
               <Card key={s.id}>

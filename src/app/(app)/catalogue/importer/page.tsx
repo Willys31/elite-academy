@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { importerDocument } from "@/app/(app)/catalogue/importer/actions";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Alert, BackLink, Card, Input, Label, PageTitle, Select } from "@/components/ui";
+import { Alert, Card, Input, Label, PageTitle, Retour, Select } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Importer un document" };
 
@@ -34,7 +34,7 @@ export default async function ImporterPage() {
 
   return (
     <div className="max-w-2xl">
-      <BackLink href="/catalogue">Catalogue</BackLink>
+      <Retour href="/catalogue" ton="sobre" />
       <PageTitle>Importer un document de cours</PageTitle>
       <p className="-mt-4 mb-6 text-sm text-slate-500">
         Votre document devient une formation structurée en modules et

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -13,15 +12,7 @@ import {
   revoquerCertificat,
 } from "@/app/(app)/certificats/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  Badge,
-  Card,
-  EmptyState,
-  Label,
-  PageTitle,
-  Select,
-  Textarea,
-} from "@/components/ui";
+import { Badge, Card, EmptyState, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Certificats de la formation" };
 
@@ -68,11 +59,7 @@ export default async function CertificatsFormationPage({
 
   return (
     <div>
-      <p className="mb-2 text-sm">
-        <Link href={`/catalogue/${formation.id}`} className="text-brand-600 hover:underline">
-          ← {formation.title}
-        </Link>
-      </p>
+      <Retour href={`/catalogue/${formation.id}`} ton="sobre" />
       <PageTitle>Certificats — {formation.title}</PageTitle>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">

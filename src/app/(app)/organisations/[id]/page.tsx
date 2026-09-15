@@ -11,16 +11,7 @@ import {
 } from "@/lib/auth/roles";
 import { ajouterMembre } from "@/app/(app)/organisations/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  BackLink,
-  Badge,
-  Card,
-  EmptyState,
-  Input,
-  Label,
-  PageTitle,
-  Select,
-} from "@/components/ui";
+import { Badge, Card, EmptyState, Input, Label, PageTitle, Retour, Select } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Organisation" };
 
@@ -58,7 +49,7 @@ export default async function OrganisationPage({
 
   return (
     <div>
-      <BackLink href="/organisations">Organisations</BackLink>
+      <Retour href="/organisations" ton="sobre" />
       <PageTitle>{org.name}</PageTitle>
       <p className="-mt-4 mb-6 text-sm text-slate-500">
         {ORG_TYPE_LABELS[org.type as OrgType] ?? org.type}

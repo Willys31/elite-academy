@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { rejoindreParCode } from "@/app/(app)/sessions/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { BackLink, Card, Input, Label, PageTitle } from "@/components/ui";
+import { Card, Input, Label, PageTitle, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Rejoindre une session" };
 
@@ -22,7 +22,7 @@ export default async function RejoindrePage({
 
   return (
     <div className="mx-auto max-w-md">
-      <BackLink href="/accueil">Accueil</BackLink>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle>Rejoindre une session</PageTitle>
       <Card>
         <p className="mb-4 text-sm text-slate-600">

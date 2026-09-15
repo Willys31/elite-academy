@@ -6,7 +6,7 @@ import { organizationsForCourseCreation } from "@/lib/courses/statuts";
 import { creerFormation } from "@/app/(app)/catalogue/actions";
 import { createClient } from "@/lib/supabase/server";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { BackLink, Card, Input, Label, PageTitle, Select, Textarea } from "@/components/ui";
+import { Card, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Créer une formation" };
 
@@ -34,7 +34,7 @@ export default async function NouvelleFormationPage() {
 
   return (
     <div className="max-w-2xl">
-      <BackLink href="/catalogue">Catalogue</BackLink>
+      <Retour href="/catalogue" ton="sobre" />
       <PageTitle>Créer une formation</PageTitle>
       <p className="-mt-4 mb-6 text-sm text-slate-500">
         La formation est créée en <strong>brouillon</strong> : vous pourrez

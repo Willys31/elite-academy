@@ -14,20 +14,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
- * Lien de retour standard : présent en tête de chaque écran de détail
- * pour que l'utilisateur sache toujours d'où il vient et comment revenir.
+ * Bouton de retour standard : présent en tête de chaque écran, y compris
+ * les écrans de premier niveau, pour qu'on puisse toujours revenir sans
+ * passer par la navigation latérale.
+ *
+ * L'implémentation est commune aux deux chartes (voir
+ * `@/components/nav/Retour`) ; seul le ton diffère. Ici, le ton sobre.
  */
-export function BackLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="mb-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-600 transition hover:text-brand-800"
-    >
-      <span aria-hidden>←</span>
-      {children}
-    </Link>
-  );
-}
+export { Retour } from "@/components/nav/Retour";
 
 /**
  * Carte de contenu. `flush` supprime la marge intérieure pour les cartes

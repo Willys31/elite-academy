@@ -8,15 +8,7 @@ import {
 } from "@/lib/certificats/certificats";
 import { reclamerCompletion } from "@/app/(app)/certificats/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  EcranTitre,
-  Etiquette,
-  LienOr,
-  Panneau,
-  PanneauLien,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { EcranTitre, Etiquette, LienOr, Panneau, PanneauLien, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Mes certificats" };
 
@@ -56,6 +48,7 @@ export default async function MesCertificatsPage() {
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EcranTitre
         eyebrow="Vos preuves"
         intro="Chaque certificat porte un code unique. Toute personne à qui vous le communiquez peut en vérifier l'authenticité en ligne, sans compte."

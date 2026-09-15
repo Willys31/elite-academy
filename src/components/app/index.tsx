@@ -20,6 +20,14 @@ import type { ReactNode } from "react";
    ------------------------------------------------------------------ */
 
 /**
+ * Bouton de retour, commun aux deux chartes : le comportement est
+ * défini une seule fois (voir `@/components/nav/Retour`), seul le ton
+ * change. Réexporté ici pour qu'un écran sur la charte or n'ait pas à
+ * puiser dans `@/components/ui`.
+ */
+export { Retour } from "@/components/nav/Retour";
+
+/**
  * En-tête d'écran : sur-titre discret, titre en Fraunces, phrase de
  * cadrage, actions à droite. La phrase n'est pas décorative — elle dit
  * ce que l'écran mesure ou permet, ce qui évite une page d'aide.

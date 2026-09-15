@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -11,7 +10,7 @@ import {
 } from "@/lib/certificats/certificats";
 import { LEVEL_LABELS } from "@/lib/courses/statuts";
 import { PrintButton } from "@/components/ui/PrintButton";
-import { Alert } from "@/components/ui";
+import { Alert, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Certificat" };
 
@@ -63,9 +62,7 @@ export default async function CertificatPage({
   return (
     <div className="mx-auto max-w-2xl">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/certificats" className="text-sm text-brand-600 hover:underline">
-          ← Mes certificats
-        </Link>
+        <Retour href="/certificats" ton="sobre" />
         <PrintButton />
       </div>
 

@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
 import {
   availableTransitions,
-  canCreateCourse,
+  canEditCourse,
   canDeleteCourse,
   isContentEditable,
   LEVEL_LABELS,
@@ -32,17 +32,7 @@ import {
 } from "@/app/(app)/catalogue/importer/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
-import {
-  Alert,
-  BackLink,
-  Badge,
-  Card,
-  Input,
-  Label,
-  PageTitle,
-  Select,
-  Textarea,
-} from "@/components/ui";
+import { Alert, Badge, Card, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Éditeur de formation" };
 
@@ -66,16 +56,23 @@ export default async function EditeurFormationPage({
     .select(
       `id, organization_id, title, description, status, sector, format,
        duration_minutes, context_type, target_audience, prerequisites,
-       current_version_id`
+       current_version_id, owner_id`
     )
     .eq("id", id)
     .maybeSingle();
 
   if (!formation) notFound();
 
-  const peutModifier =
-    isEliteAdmin(user.memberships) ||
-    canCreateCourse(user.memberships, formation.organization_id);
+  /* Le droit de modifier se juge formation par formation, pas au rôle :
+     un formateur retouche ce qu'il a conçu, jamais le travail d'un
+     concepteur. `canEditCourse` reproduit la fonction SQL
+     `can_edit_course`, seule juge en dernier ressort. */
+  const peutModifier = canEditCourse(
+    user.memberships,
+    formation.organization_id,
+    formation.owner_id,
+    user.id
+  );
   if (!peutModifier) redirect(`/catalogue/${formation.id}`);
 
   const statut = formation.status as CourseStatus;
@@ -123,7 +120,7 @@ export default async function EditeurFormationPage({
 
   return (
     <div>
-      <BackLink href="/catalogue">Catalogue</BackLink>
+      <Retour href="/catalogue" ton="sobre" />
       <PageTitle
         action={
           <>

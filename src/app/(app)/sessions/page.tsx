@@ -8,16 +8,7 @@ import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
 import { creerSession } from "@/app/(app)/sessions/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert } from "@/components/ui";
-import {
-  Champ,
-  EcranTitre,
-  Etiquette,
-  LienSobre,
-  Panneau,
-  Saisie,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { Champ, EcranTitre, Etiquette, LienSobre, Panneau, Retour, Saisie, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Sessions" };
 
@@ -72,6 +63,7 @@ export default async function SessionsPage({
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EcranTitre
         eyebrow={animateur ? "Vue formateur" : "Sessions présentielles"}
         intro={

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { genererFormation } from "@/app/(app)/catalogue/assistant/actions";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Alert, BackLink, Card, Input, Label, PageTitle, Select, Textarea } from "@/components/ui";
+import { Alert, Card, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Assistant de création IA" };
 
@@ -37,7 +37,7 @@ export default async function AssistantPage() {
 
   return (
     <div className="max-w-2xl">
-      <BackLink href="/catalogue">Catalogue</BackLink>
+      <Retour href="/catalogue" ton="sobre" />
       <PageTitle>Assistant de création IA</PageTitle>
       <p className="-mt-4 mb-6 text-sm text-slate-500">
         Décrivez votre besoin : l&apos;IA analyse le sujet et le public,

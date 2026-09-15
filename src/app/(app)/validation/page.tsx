@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
-import { canCreateCourse, organizationsForCourseCreation } from "@/lib/courses/statuts";
-import { Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import { canDesignForOrganization, organizationsForDesign } from "@/lib/courses/statuts";
+import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
 import { DangerForm } from "@/components/ui/DangerForm";
 import { supprimerGeneration } from "@/app/(app)/validation/actions";
 
@@ -27,9 +27,11 @@ export default async function ValidationPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
 
+  /* Voir la note de l'écran Sources : relire la file de validation
+     relève de la conception, pas de la création. */
   const gestionnaire =
     isEliteAdmin(user.memberships) ||
-    organizationsForCourseCreation(user.memberships).length > 0;
+    organizationsForDesign(user.memberships).length > 0;
   if (!gestionnaire) redirect("/sans-acces");
 
   const supabase = await createClient();
@@ -50,6 +52,7 @@ export default async function ValidationPage() {
 
   return (
     <div>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle>Validation</PageTitle>
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
@@ -127,7 +130,7 @@ export default async function ValidationPage() {
                     {/* Même jeu de rôles que la politique RLS
                         `ai_gen_delete` : administrateur ou concepteur
                         de l'organisation concernée. */}
-                    {canCreateCourse(user.memberships, g.organization_id) ? (
+                    {canDesignForOrganization(user.memberships, g.organization_id) ? (
                       <div className="mt-3 border-t border-slate-100 pt-3">
                         <DangerForm
                           action={supprimerGeneration}

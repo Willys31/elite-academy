@@ -21,17 +21,7 @@ import {
   type OrigineAnimation,
 } from "@/lib/courses/affectations";
 import { Alert } from "@/components/ui";
-import {
-  EcranTitre,
-  Etiquette,
-  Jauge,
-  LienOr,
-  LienSobre,
-  Panneau,
-  PanneauLien,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { EcranTitre, Etiquette, Jauge, LienOr, LienSobre, Panneau, PanneauLien, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Mes formations" };
 
@@ -207,6 +197,7 @@ async function VueEncadrant({
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EnTeteEncadrant role={role} />
 
       {lignes.length === 0 ? (

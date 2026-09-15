@@ -6,17 +6,7 @@ import { isEliteAdmin } from "@/lib/auth/roles";
 import { canManageCompetencies } from "@/lib/courses/statuts";
 import { creerCompetence } from "@/app/(app)/competences/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  Alert,
-  Badge,
-  Card,
-  EmptyState,
-  Input,
-  Label,
-  PageTitle,
-  Select,
-  Textarea,
-} from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Compétences" };
 
@@ -45,6 +35,7 @@ export default async function CompetencesPage() {
 
   return (
     <div>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle>Référentiel de compétences</PageTitle>
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">

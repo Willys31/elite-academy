@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/profile";
 import { canCreateOrganization } from "@/lib/auth/roles";
 import { creerOrganisation } from "@/app/(app)/organisations/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { BackLink, Card, Input, Label, PageTitle, Select } from "@/components/ui";
+import { Card, Input, Label, PageTitle, Retour, Select } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Créer une organisation" };
 
@@ -15,7 +15,7 @@ export default async function NouvelleOrganisationPage() {
 
   return (
     <div className="max-w-xl">
-      <BackLink href="/organisations">Organisations</BackLink>
+      <Retour href="/organisations" ton="sobre" />
       <PageTitle>Créer une organisation</PageTitle>
       <Card>
         <AuthForm

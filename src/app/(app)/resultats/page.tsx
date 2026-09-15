@@ -11,15 +11,7 @@ import {
   type LigneTentative,
 } from "@/lib/resultats/resultats";
 import { TableScroll } from "@/components/ui";
-import {
-  Chiffre,
-  EcranTitre,
-  Etiquette,
-  LienSobre,
-  Panneau,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { Chiffre, EcranTitre, Etiquette, LienSobre, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Résultats" };
 
@@ -202,6 +194,7 @@ export default async function ResultatsPage({
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EnTeteResultats />
 
       {/* ---------- Choix de la formation ---------- */}

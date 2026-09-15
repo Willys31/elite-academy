@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -14,15 +13,7 @@ import {
   retirerFormateur,
 } from "@/app/(app)/catalogue/[id]/formateurs/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  Champ,
-  EcranTitre,
-  Etiquette,
-  LienSobre,
-  Panneau,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { Champ, EcranTitre, Etiquette, LienSobre, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Formateurs de la formation" };
 
@@ -129,14 +120,7 @@ export default async function FormateursFormationPage({
 
   return (
     <div>
-      <p className="mb-3">
-        <Link
-          href={`/catalogue/${id}/modifier`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 transition duration-200 hover:text-gold-600 hover:underline"
-        >
-          <span aria-hidden>←</span> Retour à l&apos;éditeur
-        </Link>
-      </p>
+      <Retour href={`/catalogue/${id}`} />
 
       <EcranTitre
         eyebrow={[org?.name, STATUS_LABELS[formation.status as CourseStatus]]

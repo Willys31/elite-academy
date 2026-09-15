@@ -7,7 +7,7 @@ import { calculerCompletion } from "@/lib/courses/progression";
 import { donneAcces, peutSeDesinscrire } from "@/lib/courses/inscriptions";
 import { seDesinscrireFormation } from "@/app/(app)/formations/actions";
 import { DangerForm } from "@/components/ui/DangerForm";
-import { BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Suivre la formation" };
 
@@ -76,7 +76,7 @@ export default async function LecteurFormationPage({
 
   return (
     <div>
-      <BackLink href="/formations">Mes formations</BackLink>
+      <Retour href="/formations" ton="sobre" />
       <PageTitle>{formation.title}</PageTitle>
 
       <Card className="mb-6">

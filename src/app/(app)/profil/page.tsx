@@ -9,16 +9,7 @@ import {
   mettreAJourIdentite,
 } from "@/app/(app)/profil/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import {
-  Champ,
-  Chiffre,
-  EcranTitre,
-  Etiquette,
-  LienSobre,
-  Panneau,
-  Saisie,
-  SectionTitre,
-} from "@/components/app";
+import { Champ, Chiffre, EcranTitre, Etiquette, LienSobre, Panneau, Retour, Saisie, SectionTitre } from "@/components/app";
 
 export const metadata: Metadata = { title: "Mon profil" };
 
@@ -72,6 +63,7 @@ export default async function ProfilPage() {
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EcranTitre
         eyebrow="Votre compte"
         intro="Votre nom apparaît sur vos certificats : c'est celui qu'un recruteur verra en vérifiant un code."

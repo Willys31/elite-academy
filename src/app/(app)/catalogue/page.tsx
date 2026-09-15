@@ -4,20 +4,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import {
+  canEditCourse,
   organizationsForCourseCreation,
   STATUS_LABELS,
   FORMAT_LABELS,
   type CourseStatus,
 } from "@/lib/courses/statuts";
 import { isEliteAdmin } from "@/lib/auth/roles";
-import {
-  Alert,
-  Badge,
-  Card,
-  EmptyState,
-  PageTitle,
-  SecondaryLink,
-} from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Catalogue" };
 
@@ -39,7 +33,15 @@ export default async function CataloguePage({
   if (!user) redirect("/connexion");
   const params = await searchParams;
 
-  const estGestionnaire =
+  /* Deux droits distincts, longtemps confondus dans un seul
+     « estGestionnaire » :
+     - CRÉER : ouvert au formateur depuis la migration 0010, c'est lui
+       qui commande les boutons Assistant IA / Importer / Créer ;
+     - MODIFIER : se juge formation par formation (propriétaire, ou
+       admin/concepteur de l'organisation), donc plus bas, carte par
+       carte. Les confondre envoyait un formateur vers l'éditeur d'une
+       formation qu'il n'a pas le droit de toucher. */
+  const peutCreer =
     isEliteAdmin(user.memberships) ||
     organizationsForCourseCreation(user.memberships).length > 0;
 
@@ -47,11 +49,11 @@ export default async function CataloguePage({
   let requete = supabase
     .from("courses")
     .select(
-      "id, title, description, status, sector, format, duration_minutes, organization:organizations(name)"
+      "id, title, description, status, sector, format, duration_minutes, organization_id, owner_id, organization:organizations(name)"
     )
     .order("updated_at", { ascending: false });
 
-  if (!estGestionnaire) {
+  if (!peutCreer) {
     requete = requete.eq("status", "published");
   } else if (params.statut && STATUTS.includes(params.statut as CourseStatus)) {
     requete = requete.eq("status", params.statut);
@@ -64,9 +66,10 @@ export default async function CataloguePage({
 
   return (
     <div>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle
         action={
-          estGestionnaire ? (
+          peutCreer ? (
             <div className="flex flex-wrap gap-2">
               <SecondaryLink href="/catalogue/assistant">
                 Assistant IA
@@ -104,7 +107,7 @@ export default async function CataloguePage({
             className="block min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 sm:text-sm"
           />
         </div>
-        {estGestionnaire ? (
+        {peutCreer ? (
           <div>
             <label htmlFor="statut" className="mb-1 block text-sm font-medium text-slate-700">
               Statut
@@ -140,7 +143,7 @@ export default async function CataloguePage({
         <EmptyState
           title="Aucune formation trouvée"
           hint={
-            estGestionnaire
+            peutCreer
               ? "Créez votre première formation ou modifiez les filtres."
               : "Aucune formation publiée ne correspond à votre recherche pour le moment."
           }
@@ -151,11 +154,19 @@ export default async function CataloguePage({
             const org = Array.isArray(f.organization)
               ? f.organization[0]
               : f.organization;
+            // Éditeur si cette formation précise m'appartient ou relève
+            // de mon rôle ; sinon la fiche en consultation.
+            const peutEditer = canEditCourse(
+              user.memberships,
+              f.organization_id as string,
+              (f.owner_id as string) ?? null,
+              user.id
+            );
             return (
               <Link
                 key={f.id}
                 href={
-                  estGestionnaire
+                  peutEditer
                     ? `/catalogue/${f.id}/modifier`
                     : `/catalogue/${f.id}`
                 }
@@ -163,7 +174,7 @@ export default async function CataloguePage({
                 <Card className="h-full transition hover:border-brand-300 hover:shadow">
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="min-w-0 font-semibold text-slate-900">{f.title}</h2>
-                    {estGestionnaire ? (
+                    {peutCreer ? (
                       <span className="shrink-0">
                         <Badge>{STATUS_LABELS[f.status as CourseStatus]}</Badge>
                       </span>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { canCreateOrganization, ORG_TYPE_LABELS, type OrgType } from "@/lib/auth/roles";
-import { Alert, Card, EmptyState, PageTitle, SecondaryLink } from "@/components/ui";
+import { Alert, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Organisations" };
 
@@ -20,6 +20,7 @@ export default async function OrganisationsPage() {
 
   return (
     <div>
+      <Retour href="/accueil" ton="sobre" />
       <PageTitle
         action={
           canCreateOrganization(user.memberships) ? (

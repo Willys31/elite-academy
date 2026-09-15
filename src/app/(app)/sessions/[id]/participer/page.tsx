@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
 import { SessionRealtimeRefresh } from "@/components/sessions/SessionRealtimeRefresh";
-import { Alert, Badge, Card, PageTitle } from "@/components/ui";
+import { Alert, Badge, Card, PageTitle, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Session" };
 
@@ -53,6 +53,7 @@ export default async function ParticiperPage({
 
   return (
     <div className="mx-auto max-w-md">
+      <Retour href={`/sessions/${session.id}`} ton="sobre" />
       <SessionRealtimeRefresh sessionId={session.id} />
 
       <PageTitle action={<Badge>{SESSION_STATUS_LABELS[session.status]}</Badge>}>

@@ -4,16 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { NIVEAU_CALCULE_LABELS } from "@/lib/courses/progression";
 import { lireTentative, questionsARevoir } from "@/lib/courses/revision";
-import {
-  CransMaitrise,
-  EcranTitre,
-  Etiquette,
-  LienOr,
-  LienSobre,
-  Panneau,
-  SectionTitre,
-  Vide,
-} from "@/components/app";
+import { CransMaitrise, EcranTitre, Etiquette, LienOr, LienSobre, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Ma révision" };
 
@@ -183,6 +174,7 @@ export default async function RevisionPage() {
 
   return (
     <div>
+      <Retour href="/accueil" />
       <EnTeteRevision nbQuestions={nbQuestions} />
 
       <div className="space-y-6">

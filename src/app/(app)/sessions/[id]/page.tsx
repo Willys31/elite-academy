@@ -16,7 +16,7 @@ import {
 import { SessionRealtimeRefresh } from "@/components/sessions/SessionRealtimeRefresh";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
-import { Alert, BackLink, Badge, Card, EmptyState, PageTitle } from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Session en direct" };
 
@@ -106,7 +106,7 @@ export default async function SessionDirectePage({
     <div>
       <SessionRealtimeRefresh sessionId={session.id} />
 
-      <BackLink href="/sessions">Sessions</BackLink>
+      <Retour href="/sessions" ton="sobre" />
       <PageTitle action={<Badge>{SESSION_STATUS_LABELS[session.status]}</Badge>}>
         {session.title}
       </PageTitle>
