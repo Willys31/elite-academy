@@ -86,7 +86,7 @@ export default async function OrganisationPage({
                   encore dépasser : le tableau défile alors dans sa carte. */}
               <div className="hidden overflow-x-auto sm:block">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                <thead className="border-b border-slate-200 text-xs font-medium text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Nom</th>
                     <th className="px-4 py-3">E-mail</th>

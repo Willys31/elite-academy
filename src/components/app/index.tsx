@@ -1,12 +1,9 @@
 /**
- * Composants des écrans CONNECTÉS, sur la charte encre / papier / or.
+ * Composants des écrans CONNECTÉS.
  *
- * Comme `@/components/public`, ce jeu est distinct de `@/components/ui` :
- * les primitives partagées habillent encore les écrans concepteur,
- * formateur et administrateur, qui n'ont pas été relus. Les écrans de
- * l'apprenant utilisent les composants ci-dessous ; les autres suivront
- * quand leur tour viendra, sans rupture pour l'utilisateur puisque le
- * cadre (barre latérale, tiroir) est déjà commun.
+ * Vocabulaire plus riche que `@/components/ui` (chiffres, jauges,
+ * panneaux, états vides), sur la même matière : surfaces blanches à
+ * bordure fine, vert d'action, ambre des réussites.
  *
  * Règles conservées : cible tactile d'au moins 44 px, champs à 16 px sous
  * `sm` (pas de zoom iOS), rangées qui se replient plutôt que de comprimer.
@@ -14,21 +11,22 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import {
+  BASE_BOUTON,
+  BOUTON_PRINCIPAL,
+  BOUTON_SOBRE,
+  CLASSES_CHAMP,
+  TONS_PASTILLE,
+} from "@/components/ui";
 
 /* ------------------------------------------------------------------
    En-têtes
    ------------------------------------------------------------------ */
 
-/**
- * Bouton de retour, commun aux deux chartes : le comportement est
- * défini une seule fois (voir `@/components/nav/Retour`), seul le ton
- * change. Réexporté ici pour qu'un écran sur la charte or n'ait pas à
- * puiser dans `@/components/ui`.
- */
 export { Retour } from "@/components/nav/Retour";
 
 /**
- * En-tête d'écran : sur-titre discret, titre en Fraunces, phrase de
+ * En-tête d'écran : contexte discret au-dessus, titre, phrase de
  * cadrage, actions à droite. La phrase n'est pas décorative — elle dit
  * ce que l'écran mesure ou permet, ce qui évite une page d'aide.
  */
@@ -44,18 +42,16 @@ export function EcranTitre({
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-600">
-            {eyebrow}
-          </p>
+          <p className="text-sm font-medium text-slate-500">{eyebrow}</p>
         ) : null}
-        <h1 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-[1.75rem]">
+        <h1 className="mt-1 text-[1.75rem] font-semibold leading-tight tracking-[-0.03em] text-ink-950 sm:text-[2rem]">
           {children}
         </h1>
         {intro ? (
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-600">
             {intro}
           </p>
         ) : null}
@@ -76,11 +72,13 @@ export function SectionTitre({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-      <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <h2 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
         {children}
         {compte !== undefined ? (
-          <span className="ml-2 text-sm font-normal text-slate-400">{compte}</span>
+          <span className="rounded-md bg-sand-100 px-1.5 py-0.5 text-xs font-medium tabular-nums text-slate-600">
+            {compte}
+          </span>
         ) : null}
       </h2>
       {action}
@@ -101,20 +99,19 @@ export function Panneau({
   children: ReactNode;
   className?: string;
   flush?: boolean;
-  /** `or` marque les surfaces de réussite (certificats, maîtrise atteinte). */
+  /**
+   * `or` marque les surfaces de réussite (certificats, maîtrise atteinte).
+   * `encre` est la surface d'appel d'un écran — une seule par écran.
+   */
   ton?: "papier" | "or" | "encre";
 }) {
   const tons = {
-    papier: "border-sand-200 bg-white",
-    or: "border-gold-400/50 bg-gold-300/10",
-    encre: "border-white/10 bg-ink-950 text-white",
+    papier: "border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,20,18,0.04)]",
+    or: "border-gold-400/40 bg-gold-300/10",
+    encre: "border-brand-900 bg-brand-900 text-white",
   }[ton];
   return (
-    <div
-      className={`rounded-2xl border shadow-[0_1px_2px_rgba(12,16,43,0.04)] ${tons} ${
-        flush ? "" : "p-5"
-      } ${className}`}
-    >
+    <div className={`rounded-xl border ${tons} ${flush ? "" : "p-5 sm:p-6"} ${className}`}>
       {children}
     </div>
   );
@@ -133,7 +130,7 @@ export function PanneauLien({
   return (
     <Link
       href={href}
-      className={`block rounded-2xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(12,16,43,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-gold-400/60 hover:shadow-[0_14px_32px_-18px_rgba(12,16,43,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 ${className}`}
+      className={`group block rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,20,18,0.04)] transition-[border-color,box-shadow] duration-150 hover:border-sand-300 hover:shadow-[0_6px_20px_-10px_rgba(17,20,18,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 ${className}`}
     >
       {children}
     </Link>
@@ -144,10 +141,7 @@ export function PanneauLien({
    Chiffres
    ------------------------------------------------------------------ */
 
-/**
- * Tuile de chiffre. Le nombre est en Fraunces, comme sur la page
- * publique : c'est le même geste typographique, donc la même marque.
- */
+/** Tuile de chiffre : libellé, valeur, précision. */
 export function Chiffre({
   valeur,
   libelle,
@@ -161,28 +155,26 @@ export function Chiffre({
 }) {
   const contenu = (
     <>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-        {libelle}
-      </dt>
-      <dd className="mt-1.5 font-display text-3xl font-semibold text-ink-900">
+      <dt className="text-sm font-medium text-slate-500">{libelle}</dt>
+      <dd className="mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.03em] tabular-nums text-ink-950">
         {valeur}
       </dd>
-      {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
+      {detail ? <p className="mt-2 text-xs text-slate-500">{detail}</p> : null}
     </>
   );
+  const base =
+    "rounded-xl border border-sand-200 bg-white p-4 shadow-[0_1px_2px_rgba(17,20,18,0.04)] sm:p-5";
   if (href) {
     return (
       <Link
         href={href}
-        className="rounded-2xl border border-sand-200 bg-white p-5 transition duration-200 hover:-translate-y-0.5 hover:border-gold-400/60 hover:shadow-[0_12px_28px_-18px_rgba(12,16,43,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+        className={`${base} transition-[border-color,box-shadow] duration-150 hover:border-sand-300 hover:shadow-[0_6px_20px_-10px_rgba(17,20,18,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600`}
       >
         {contenu}
       </Link>
     );
   }
-  return (
-    <div className="rounded-2xl border border-sand-200 bg-white p-5">{contenu}</div>
-  );
+  return <div className={base}>{contenu}</div>;
 }
 
 /* ------------------------------------------------------------------
@@ -206,18 +198,16 @@ export function Jauge({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={libelle ?? "Progression"}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-sand-100"
+        className="h-2 w-full overflow-hidden rounded-full bg-sand-200"
       >
         <div
           className={`h-full rounded-full transition-[width] duration-500 ${
-            valeur === 100 ? "bg-gold-400" : "bg-brand-600"
+            valeur === 100 ? "bg-gold-500" : "bg-brand-600"
           }`}
           style={{ width: `${valeur}%` }}
         />
       </div>
-      {libelle ? (
-        <p className="mt-1.5 text-xs text-slate-500">{libelle}</p>
-      ) : null}
+      {libelle ? <p className="mt-1.5 text-xs text-slate-500">{libelle}</p> : null}
     </div>
   );
 }
@@ -242,12 +232,8 @@ export function CransMaitrise({ niveau }: { niveau: string | null }) {
       {[1, 2, 3, 4].map((cran) => (
         <span
           key={cran}
-          className={`h-1.5 w-4 rounded-full ${
-            cran <= rang
-              ? cran === 4
-                ? "bg-gold-500"
-                : "bg-brand-600"
-              : "bg-sand-200"
+          className={`h-2 w-5 rounded-[3px] ${
+            cran <= rang ? (cran === 4 ? "bg-gold-500" : "bg-brand-600") : "bg-sand-200"
           }`}
         />
       ))}
@@ -264,17 +250,11 @@ export function Etiquette({
   ton = "neutre",
 }: {
   children: ReactNode;
-  ton?: "neutre" | "or" | "succes" | "alerte";
+  ton?: keyof typeof TONS_PASTILLE;
 }) {
-  const tons = {
-    neutre: "bg-sand-100 text-slate-600",
-    or: "bg-gold-300/25 text-gold-600",
-    succes: "bg-emerald-50 text-emerald-700",
-    alerte: "bg-red-50 text-red-700",
-  }[ton];
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${tons}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset first-letter:uppercase ${TONS_PASTILLE[ton]}`}
     >
       {children}
     </span>
@@ -295,10 +275,10 @@ export function Vide({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-sand-200 bg-sand-50/60 px-6 py-12 text-center">
-      <p className="font-display text-lg font-semibold text-ink-900">{titre}</p>
+    <div className="rounded-xl border border-dashed border-sand-300 bg-white px-6 py-12 text-center">
+      <p className="text-base font-semibold text-ink-900">{titre}</p>
       {texte ? (
-        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-slate-500">
           {texte}
         </p>
       ) : null}
@@ -311,14 +291,12 @@ export function Vide({
    Actions
    ------------------------------------------------------------------ */
 
-const BASE_BOUTON =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55";
-
+/** Action principale d'un écran. Le nom date de l'ancienne charte. */
 export function BoutonOr(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`${BASE_BOUTON} bg-gold-400 text-ink-950 shadow-[0_6px_18px_-6px_rgba(211,160,50,0.6)] hover:bg-gold-300 ${props.className ?? ""}`}
+      className={`${BASE_BOUTON} ${BOUTON_PRINCIPAL} ${props.className ?? ""}`}
     />
   );
 }
@@ -333,10 +311,7 @@ export function LienOr({
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={`${BASE_BOUTON} bg-gold-400 text-ink-950 shadow-[0_6px_18px_-6px_rgba(211,160,50,0.6)] hover:bg-gold-300 ${className}`}
-    >
+    <Link href={href} className={`${BASE_BOUTON} ${BOUTON_PRINCIPAL} ${className}`}>
       {children}
     </Link>
   );
@@ -352,10 +327,7 @@ export function LienSobre({
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={`${BASE_BOUTON} border border-sand-200 bg-white font-medium text-ink-900 hover:border-slate-300 hover:bg-sand-50 ${className}`}
-    >
+    <Link href={href} className={`${BASE_BOUTON} ${BOUTON_SOBRE} ${className}`}>
       {children}
     </Link>
   );
@@ -377,17 +349,11 @@ export function Champ({
   return (
     <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-3">
       <span className="text-sm font-medium text-ink-900">{children}</span>
-      {hint ? <span className="text-xs text-slate-400">{hint}</span> : null}
+      {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
     </label>
   );
 }
 
-const SAISIE =
-  "block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 " +
-  "placeholder:text-slate-400 outline-none transition duration-200 hover:bg-white " +
-  "focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 " +
-  "disabled:cursor-not-allowed disabled:bg-sand-100 disabled:text-slate-500 sm:text-sm";
-
 export function Saisie(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${SAISIE} ${props.className ?? ""}`} />;
+  return <input {...props} className={`${CLASSES_CHAMP} ${props.className ?? ""}`} />;
 }

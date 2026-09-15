@@ -174,13 +174,9 @@ export default async function AccueilPage() {
       {/* ---------- Reprendre ---------- */}
       {aReprendre ? (
         <Panneau ton="encre" className="relative overflow-hidden !p-0">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl"
-          />
           <div className="relative flex flex-col gap-6 p-6 sm:p-7 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-300">
+              <p className="text-sm font-medium text-brand-200">
                 Reprendre où vous en étiez
               </p>
               <h2 className="mt-2 font-display text-xl font-semibold text-white sm:text-2xl">
@@ -199,7 +195,10 @@ export default async function AccueilPage() {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <LienOr href={`/formations/${aReprendre.course.id}`}>
+              <LienOr
+                href={`/formations/${aReprendre.course.id}`}
+                className="!bg-white !text-brand-900 hover:!bg-brand-50"
+              >
                 Continuer
               </LienOr>
               <LienSobre
@@ -398,13 +397,9 @@ async function VueFormateur({
           lit à voix haute depuis le fond de la salle. */}
       {enCours ? (
         <Panneau ton="encre" className="relative overflow-hidden !p-0">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl"
-          />
           <div className="relative flex flex-col gap-6 p-6 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-300">
+              <p className="text-sm font-medium text-brand-200">
                 Session ouverte
               </p>
               <h2 className="mt-2 font-display text-xl font-semibold text-white sm:text-2xl">
@@ -413,7 +408,7 @@ async function VueFormateur({
               {enCours.formation ? (
                 <p className="mt-1 text-sm text-white/50">{enCours.formation}</p>
               ) : null}
-              <p className="mt-5 font-mono text-3xl font-semibold tracking-[0.25em] text-gold-300 sm:text-4xl">
+              <p className="mt-5 font-mono text-3xl font-semibold tracking-[0.25em] text-white sm:text-4xl">
                 {enCours.code}
               </p>
               <p className="mt-1.5 text-xs text-white/40">
@@ -421,7 +416,12 @@ async function VueFormateur({
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <LienOr href={`/sessions/${enCours.id}`}>Piloter la session</LienOr>
+              <LienOr
+                href={`/sessions/${enCours.id}`}
+                className="!bg-white !text-brand-900 hover:!bg-brand-50"
+              >
+                Piloter la session
+              </LienOr>
               <LienSobre
                 href="/sessions"
                 className="!border-white/20 !bg-transparent !text-white hover:!border-white/40 hover:!bg-white/5"
@@ -503,7 +503,7 @@ async function VueFormateur({
                 <li key={s.id}>
                   <Link
                     href={`/sessions/${s.id}`}
-                    className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                    className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-ink-900">{s.titre}</p>

@@ -1,12 +1,20 @@
 @import "tailwindcss";
-@import "@fontsource-variable/fraunces/index.css";
 @import "@fontsource-variable/instrument-sans/index.css";
 
 /* ------------------------------------------------------------
    Elite Academy – système visuel
-   Encre profonde, papier chaud, or de certification.
-   Fraunces (display à empattements) porte la voix de la marque ;
-   Instrument Sans assure la lecture d'interface.
+   Surfaces claires, texte presque noir, un vert profond pour
+   l'action et l'ambre réservé à la certification.
+   Une seule famille (Instrument Sans) : la hiérarchie tient à
+   la taille, à la graisse et à l'espace, pas à un effet.
+
+   Les noms de jetons historiques sont conservés — `brand`,
+   `ink`, `sand`, `gold` — pour que les écrans existants suivent
+   sans réécriture. Seules les valeurs ont changé :
+   - brand : vert d'action (boutons, liens, progression) ;
+   - ink   : texte principal ;
+   - sand  : neutres des surfaces et des bordures ;
+   - gold  : ambre des réussites (niveau Elite, certificats).
    ------------------------------------------------------------ */
 
 @theme {
@@ -16,34 +24,47 @@
   --breakpoint-xs: 25rem;
 
   --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces Variable", Georgia, serif;
+  /* `font-display` reste disponible pour les titres, sur la même famille. */
+  --font-display: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dce7fd;
-  --color-brand-200: #b9cefb;
-  --color-brand-300: #8fadf7;
-  --color-brand-400: #6189f1;
-  --color-brand-500: #3f66e8;
-  --color-brand-600: #2d4cd0;
-  --color-brand-700: #263ba8;
-  --color-brand-800: #233385;
-  --color-brand-900: #1f2c66;
-  --color-brand-950: #10142e;
+  --color-brand-50: #eff6f1;
+  --color-brand-100: #dbece1;
+  --color-brand-200: #b5d8c3;
+  --color-brand-300: #85bd9e;
+  --color-brand-400: #519d76;
+  --color-brand-500: #2f8058;
+  --color-brand-600: #216a48;
+  --color-brand-700: #1a573b;
+  --color-brand-800: #164731;
+  --color-brand-900: #123a29;
+  --color-brand-950: #0a2117;
 
-  /* Encre : fond des surfaces sombres (héros, pied de page). */
-  --color-ink-900: #0c102b;
-  --color-ink-950: #080b1f;
+  --color-ink-900: #1b1f1c;
+  --color-ink-950: #111412;
 
-  /* Papier : chaleur des surfaces claires de la page publique. */
-  --color-sand-50: #faf8f2;
-  --color-sand-100: #f3efe3;
-  --color-sand-200: #e7dfc9;
+  --color-sand-50: #f8f8f6;
+  --color-sand-100: #f1f0ec;
+  --color-sand-200: #e6e4df;
+  --color-sand-300: #d5d2cb;
 
-  /* Or : certification, excellence, accents rares. */
-  --color-gold-300: #f0cf7e;
-  --color-gold-400: #e5b954;
-  --color-gold-500: #d3a032;
-  --color-gold-600: #b3831f;
+  --color-gold-300: #f4cd8a;
+  --color-gold-400: #e9a43f;
+  --color-gold-500: #d2861d;
+  --color-gold-600: #a4620f;
+
+  /* Gris de texte : la gamme `slate` de Tailwind tire vers le bleu et
+     jurait avec les surfaces chaudes. Même échelle, teinte neutre. */
+  --color-slate-50: #fafaf9;
+  --color-slate-100: #f4f3f1;
+  --color-slate-200: #e6e4e1;
+  --color-slate-300: #d4d1cc;
+  --color-slate-400: #9b958f;
+  --color-slate-500: #716b65;
+  --color-slate-600: #56514c;
+  --color-slate-700: #423e3a;
+  --color-slate-800: #2a2724;
+  --color-slate-900: #1c1a18;
 }
 
 /* ------------------------------------------------------------
@@ -70,7 +91,17 @@ body {
   min-height: 100dvh;
   overflow-x: clip;
   -webkit-tap-highlight-color: transparent;
-  @apply bg-slate-50 font-sans text-slate-900 antialiased;
+  font-feature-settings: "ss01", "cv11";
+  @apply bg-sand-50 font-sans text-ink-900 antialiased;
+}
+
+/* Les titres se resserrent légèrement : à grande taille, l'approche
+   par défaut d'une police d'interface paraît lâche. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+  text-wrap: balance;
 }
 
 /* Les mots très longs (URL, codes, e-mails) coupent au lieu
@@ -90,6 +121,10 @@ label {
   overflow-wrap: break-word;
 }
 
+p {
+  text-wrap: pretty;
+}
+
 /* Aucun média ne dépasse jamais sa colonne. */
 img,
 svg,
@@ -105,19 +140,18 @@ iframe {
 }
 
 ::selection {
-  background: var(--color-gold-300);
+  background: var(--color-brand-100);
   color: var(--color-ink-950);
 }
 
 /* ------------------------------------------------------------
    Mise au point clavier
-   Un anneau or unique sur tout le site : la navigation au clavier
-   doit être aussi lisible que la navigation à la souris, et la
-   couleur d'accent suffit à la signaler sans ajouter de bordure.
+   Un anneau vert unique sur tout le site : la navigation au
+   clavier doit être aussi lisible que la navigation à la souris.
    ------------------------------------------------------------ */
 
 :focus-visible {
-  outline: 2px solid var(--color-gold-400);
+  outline: 2px solid var(--color-brand-600);
   outline-offset: 2px;
 }
 
@@ -129,15 +163,13 @@ iframe {
      `animation-timeline: view()` — donc sans JavaScript.
    `reveal` est enfermé dans un `@supports` : sur un navigateur qui
    ne connaît pas les timelines de défilement, la règle entière est
-   ignorée et le contenu reste simplement visible et immobile. Aucun
-   texte ne peut donc rester masqué à cause d'une animation qui ne
-   part pas — le défaut classique des révélations pilotées en JS.
+   ignorée et le contenu reste simplement visible et immobile.
    ------------------------------------------------------------ */
 
 @keyframes lever {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -146,7 +178,7 @@ iframe {
 }
 
 .lever {
-  animation: lever 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: lever 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @supports (animation-timeline: view()) {
@@ -154,38 +186,36 @@ iframe {
     .reveal {
       animation: lever linear both;
       animation-timeline: view();
-      /* La révélation s'achève dès que l'élément est entré à 45 % : elle
-         accompagne le défilement au lieu de le retenir. Une plage qui se
-         terminerait plus tard laisserait un bloc plus haut que l'écran
-         encore pâle alors qu'il est déjà entièrement lu. */
-      animation-range: entry 0% entry 45%;
+      animation-range: entry 0% entry 40%;
     }
   }
+}
+
+/* Réponses en direct (page publique) : chaque ligne entre par le haut
+   en poussant les précédentes. Voir `ReponsesEnDirect`. */
+@keyframes entree-ligne {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.entree-ligne {
+  animation: entree-ligne 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .lever {
+  .lever,
+  .entree-ligne {
     animation: none;
   }
-}
-
-/* ------------------------------------------------------------
-   Grain de papier
-   Une trame très légère posée sur les sections sable : elle casse
-   l'aplat numérique et donne la matière que le nom « papier »
-   promet. Générée en SVG inline — aucune image à charger.
-   ------------------------------------------------------------ */
-
-.grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
 /* Impression des certificats : ne garder que le contenu utile. */

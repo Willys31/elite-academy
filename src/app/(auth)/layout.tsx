@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandMark, BrandPanel } from "@/components/public";
+import { BrandPanel } from "@/components/public";
+import { Icone } from "@/components/icons";
+import { Marque } from "@/components/Marque";
 
 /**
  * Écrans d'authentification, en deux colonnes à partir de `lg` :
- * l'encre porte l'argument de marque, le papier porte le formulaire.
+ * le panneau vert porte l'argument et un aperçu du produit, la colonne
+ * blanche porte le formulaire.
  *
  * Sous `lg`, le panneau disparaît entièrement. Un téléphone doit
  * conduire au champ de saisie en un coup d'œil : y empiler un
@@ -12,16 +15,9 @@ import { BrandMark, BrandPanel } from "@/components/public";
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-sand-50 lg:grid lg:min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+    <div className="min-h-dvh bg-white lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <BrandPanel
-        titre={
-          <>
-            Le savoir se transmet.
-            <br />
-            La compétence,{" "}
-            <em className="font-display italic text-gold-300">elle se prouve.</em>
-          </>
-        }
+        titre="La formation professionnelle qui se prouve."
         argument="Concevez des parcours dans tous les domaines, animez-les en ligne comme en salle, et concluez par un certificat que n'importe qui peut vérifier."
         preuves={[
           "Quatre niveaux de maîtrise, mesurés compétence par compétence",
@@ -30,45 +26,30 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         ]}
       />
 
-      <main className="relative flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6 sm:py-12">
-        <div className="w-full max-w-[26rem]">
-          {/* Marque visible uniquement quand le panneau encre est masqué,
+      <div className="flex min-h-dvh flex-col px-4 py-4 sm:px-8 sm:py-6">
+        <div className="flex items-center justify-between gap-3">
+          {/* Marque visible uniquement quand le panneau vert est masqué,
               pour ne pas répéter deux fois le nom sur grand écran. */}
-          <div className="mb-7 lg:hidden">
-            <BrandMark sous="La plateforme de formation d'Elite Experience" />
-          </div>
-
-          {children}
-
-          {/* Entre 768 et 1024 px, le panneau encre ne tient pas à côté du
-              formulaire, mais laisser la page entièrement vide autour de la
-              carte gâcherait l'espace. L'argument y passe donc en une rangée
-              compacte, sous la carte. */}
-          <ul className="mt-7 hidden flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-slate-500 md:flex lg:hidden">
-            {[
-              "Quatre niveaux de maîtrise",
-              "En ligne et en salle",
-              "Certificats vérifiables",
-            ].map((preuve) => (
-              <li key={preuve} className="flex items-center gap-1.5">
-                <span aria-hidden className="text-gold-500">
-                  ◆
-                </span>
-                {preuve}
-              </li>
-            ))}
-          </ul>
-
-          <p className="mt-7 text-center text-sm">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 rounded text-slate-500 transition duration-200 hover:text-ink-900"
-            >
-              <span aria-hidden>←</span> Retour à l&apos;accueil
-            </Link>
-          </p>
+          <Link href="/" className="rounded-lg lg:invisible">
+            <Marque />
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-500 transition-colors duration-150 hover:bg-sand-100 hover:text-ink-900"
+          >
+            <Icone nom="flecheGauche" className="size-4" />
+            Accueil
+          </Link>
         </div>
-      </main>
+
+        <main className="flex flex-1 items-center justify-center py-10">
+          <div className="w-full max-w-[24rem]">{children}</div>
+        </main>
+
+        <p className="text-center text-xs text-slate-400">
+          Elite Experience · Abidjan, Côte d&apos;Ivoire
+        </p>
+      </div>
     </div>
   );
 }

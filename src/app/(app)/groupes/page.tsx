@@ -175,7 +175,7 @@ export default async function GroupesPage() {
                   <li key={s.id}>
                     <Link
                       href={`/sessions/${s.id}`}
-                      className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                      className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                     >
                       <div className="min-w-0">
                         <p className="font-medium text-ink-900">{s.titre}</p>

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import type { AuthState } from "@/app/(auth)/actions";
-import { Alert } from "@/components/ui";
+import { Alert, BASE_BOUTON, BOUTON_SOBRE } from "@/components/ui";
 import { GoldButton } from "@/components/public";
 
 /**
@@ -12,7 +12,7 @@ import { GoldButton } from "@/components/public";
  *
  * Deux tons de bouton. `or` est l'action principale d'un écran — s'y
  * inscrire, se connecter, affecter. `sobre` est pour tout le reste :
- * une rangée de boutons or pour « Retirer » ferait passer le retrait
+ * une rangée de boutons pleins pour « Retirer » ferait passer le retrait
  * pour le geste attendu, alors que c'est l'exception.
  */
 export function AuthForm({
@@ -39,10 +39,8 @@ export function AuthForm({
     <>
       <span
         aria-hidden
-        className={`mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 ${
-          ton === "or"
-            ? "border-ink-950/30 border-t-ink-950"
-            : "border-slate-300 border-t-slate-600"
+        className={`inline-block size-3.5 animate-spin rounded-full border-2 ${
+          ton === "or" ? "border-white/35 border-t-white" : "border-slate-300 border-t-slate-600"
         }`}
       />
       {pendingLabel}
@@ -64,7 +62,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-medium text-ink-900 transition duration-200 hover:border-slate-300 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55"
+          className={`${BASE_BOUTON} ${BOUTON_SOBRE} w-full`}
         >
           {contenu}
         </button>

@@ -179,7 +179,7 @@ export default async function UtilisateursPage({
               type="search"
               defaultValue={filtres.recherche}
               placeholder="Koné, w.yao@…"
-              className="block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 placeholder:text-slate-400 hover:bg-white focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 sm:text-sm"
+              className="block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 placeholder:text-slate-400 hover:bg-white focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-600/15 sm:text-sm"
             />
           </div>
 
@@ -211,7 +211,7 @@ export default async function UtilisateursPage({
           <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-5">
             <button
               type="submit"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gold-400 px-4 py-2.5 text-sm font-semibold text-ink-950 shadow-[0_6px_18px_-6px_rgba(211,160,50,0.6)] transition duration-200 hover:bg-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
             >
               Filtrer
             </button>
@@ -274,7 +274,7 @@ function EnTete({ elite = false }: { elite?: boolean }) {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+    <th className="whitespace-nowrap px-5 py-3 text-xs font-medium text-slate-400">
       {children}
     </th>
   );
@@ -300,7 +300,7 @@ function ChampSelect({
         id={id}
         name={id}
         defaultValue={valeur}
-        className="block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 hover:bg-white focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 sm:text-sm"
+        className="block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 hover:bg-white focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-600/15 sm:text-sm"
       >
         {children}
       </select>

@@ -138,7 +138,7 @@ export default async function ParametresPage({
                 aria-current={actif ? "page" : undefined}
                 className={`inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 ${
                   actif
-                    ? "border-gold-400 bg-gold-300/15 text-ink-900"
+                    ? "border-brand-600 bg-brand-50 text-ink-900"
                     : "border-sand-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-sand-50"
                 }`}
               >

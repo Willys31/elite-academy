@@ -162,7 +162,7 @@ export default async function RapportsPage({
                 aria-current={actif ? "page" : undefined}
                 className={`inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-medium transition duration-200 ${
                   actif
-                    ? "border-gold-400 bg-gold-300/15 text-ink-900"
+                    ? "border-brand-600 bg-brand-50 text-ink-900"
                     : "border-sand-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-sand-50"
                 }`}
               >
@@ -318,7 +318,7 @@ function EnTete({ organisation }: { organisation?: string }) {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+    <th className="whitespace-nowrap px-5 py-3 text-xs font-medium text-slate-400">
       {children}
     </th>
   );

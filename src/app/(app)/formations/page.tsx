@@ -326,13 +326,13 @@ function GrilleEncadrant({
               rattachés. C'est ce qu'un formateur regarde en premier. */}
           <dl className="mt-auto grid grid-cols-2 gap-3 border-t border-sand-200 pt-4">
             <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              <dt className="text-xs font-medium text-slate-400">
                 Sessions
               </dt>
               <dd className="mt-0.5 font-display text-lg font-semibold text-ink-900">
                 {l.sessions}
                 {l.sessionsOuvertes > 0 ? (
-                  <span className="ml-2 align-middle text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                  <span className="ml-2 align-middle text-xs font-medium text-emerald-700">
                     {l.sessionsOuvertes} ouverte
                     {l.sessionsOuvertes > 1 ? "s" : ""}
                   </span>
@@ -340,7 +340,7 @@ function GrilleEncadrant({
               </dd>
             </div>
             <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              <dt className="text-xs font-medium text-slate-400">
                 Apprenants
               </dt>
               <dd className="mt-0.5 font-display text-lg font-semibold text-ink-900">

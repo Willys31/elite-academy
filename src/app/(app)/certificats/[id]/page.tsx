@@ -11,12 +11,18 @@ import {
 import { LEVEL_LABELS } from "@/lib/courses/statuts";
 import { PrintButton } from "@/components/ui/PrintButton";
 import { Alert, Retour } from "@/components/ui";
+import { Marque } from "@/components/Marque";
 
 export const metadata: Metadata = { title: "Certificat" };
 
 /**
  * Vue imprimable d'un certificat : identité, formation, date, code
  * unique et QR code menant à la page publique de vérification.
+ *
+ * Mise en page de document plutôt que de diplôme orné : un titre, un
+ * nom, une phrase qui dit ce qui a été validé, puis les éléments de
+ * preuve en pied de page. Le double cadre intérieur tient à
+ * l'impression sans couleur de fond.
  */
 export default async function CertificatPage({
   params,
@@ -59,10 +65,22 @@ export default async function CertificatPage({
   const urlVerification = `${proto}://${host}/verifier?code=${certificat.verification_code}`;
   const qrDataUrl = await QRCode.toDataURL(urlVerification, { width: 140, margin: 1 });
 
+  const details: Array<[string, string]> = [
+    ["Délivré le", new Date(certificat.issued_at).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })],
+  ];
+  if (certificat.level) {
+    details.unshift(["Niveau", LEVEL_LABELS[certificat.level] ?? certificat.level]);
+  }
+  if (competence?.name) details.unshift(["Compétence", competence.name]);
+
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-3xl">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Retour href="/certificats" ton="sobre" />
+        <Retour href="/certificats" />
         <PrintButton />
       </div>
 
@@ -79,56 +97,56 @@ export default async function CertificatPage({
       ) : null}
 
       {/* Certificat imprimable */}
-      <div className="print-plain rounded-xl border-4 border-double border-brand-700 bg-white px-5 py-8 text-center sm:px-10 sm:py-12">
-        <p className="text-xs uppercase tracking-[0.15em] text-slate-500 sm:text-sm sm:tracking-widest">
-          Elite Academy — {organisation?.name}
-        </p>
-        <h1 className="mt-4 text-xl font-bold text-brand-800 sm:text-3xl">
-          {CERT_TYPE_LABELS[certificat.certificate_type]}
-        </h1>
+      <div className="print-plain rounded-xl border border-sand-200 bg-white p-2 shadow-[0_1px_2px_rgba(17,20,18,0.05),0_24px_48px_-28px_rgba(17,20,18,0.25)]">
+        <div className="rounded-lg border border-sand-300 px-6 py-8 sm:px-12 sm:py-12">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Marque />
+            {organisation?.name ? (
+              <p className="text-sm text-slate-500">{organisation.name}</p>
+            ) : null}
+          </div>
 
-        <p className="mt-8 text-sm text-slate-500">décerné à</p>
-        <p className="mt-1 text-xl font-semibold sm:text-2xl">{titulaire?.full_name}</p>
+          <p className="mt-12 text-sm font-medium text-brand-700 sm:mt-16">
+            {CERT_TYPE_LABELS[certificat.certificate_type]}
+          </p>
+          <p className="mt-4 text-sm text-slate-500">Décerné à</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-ink-950 sm:text-[2.75rem] sm:leading-tight">
+            {titulaire?.full_name}
+          </h1>
+          <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-slate-600">
+            pour avoir suivi et validé la formation{" "}
+            <span className="font-medium text-ink-900">{course?.title}</span>.
+          </p>
 
-        <p className="mt-6 text-sm text-slate-500">pour la formation</p>
-        <p className="mt-1 text-lg font-medium">{course?.title}</p>
+          <dl className="mt-8 grid gap-x-8 gap-y-4 sm:grid-cols-3">
+            {details.map(([terme, valeur]) => (
+              <div key={terme} className="border-t border-sand-200 pt-3">
+                <dt className="text-xs text-slate-500">{terme}</dt>
+                <dd className="mt-0.5 text-sm font-medium text-ink-900">{valeur}</dd>
+              </div>
+            ))}
+          </dl>
 
-        {competence?.name ? (
-          <p className="mt-3 text-sm text-slate-600">
-            Compétence : {competence.name}
-          </p>
-        ) : null}
-        {certificat.level ? (
-          <p className="mt-1 text-sm text-slate-600">
-            Niveau : {LEVEL_LABELS[certificat.level] ?? certificat.level}
-          </p>
-        ) : null}
-
-        <p className="mt-6 text-sm text-slate-500">
-          Délivré le{" "}
-          {new Date(certificat.issued_at).toLocaleDateString("fr-FR", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </p>
-
-        <div className="mt-8 flex flex-col items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrDataUrl}
-            alt="QR code de vérification du certificat"
-            className="h-24 w-24 sm:h-28 sm:w-28"
-          />
-          <p className="break-all font-mono text-sm font-semibold tracking-wide">
-            {certificat.verification_code}
-          </p>
-          <p className="break-all text-xs text-slate-400">
-            Vérifiable en ligne : {urlVerification}
-          </p>
-          <p className="text-xs text-slate-400">
-            Statut : {CERT_STATUS_LABELS[certificat.status]}
-          </p>
+          <div className="mt-12 flex flex-col gap-5 border-t border-sand-200 pt-6 sm:flex-row sm:items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrDataUrl}
+              alt="QR code de vérification du certificat"
+              className="size-24 shrink-0 rounded-md border border-sand-200 p-1"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">Code de vérification</p>
+              <p className="mt-0.5 break-all font-mono text-base font-semibold tracking-[0.1em] text-ink-950">
+                {certificat.verification_code}
+              </p>
+              <p className="mt-2 break-all text-xs leading-relaxed text-slate-500">
+                Vérifiable en ligne, sans compte : {urlVerification}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Statut : {CERT_STATUS_LABELS[certificat.status]}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -120,7 +120,7 @@ export default async function MesCertificatsPage() {
                 {/* Filet or en tête : la carte doit se lire comme un
                     document, pas comme une ligne de liste. */}
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <p className="text-xs font-medium text-slate-400">
                     Elite Academy
                   </p>
                   <Etiquette ton={revoque ? "alerte" : "succes"}>
@@ -134,7 +134,7 @@ export default async function MesCertificatsPage() {
                 <p className="mt-1 text-sm text-slate-600">{course?.title}</p>
 
                 <div className="mt-auto pt-5">
-                  <div className="h-px w-full bg-gradient-to-r from-gold-400/60 to-transparent" />
+                  <div className="h-px w-full bg-sand-200" />
                   <p className="mt-3 font-mono text-xs font-semibold tracking-[0.1em] text-slate-600">
                     {c.verification_code}
                   </p>

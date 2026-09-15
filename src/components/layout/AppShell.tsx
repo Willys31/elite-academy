@@ -6,6 +6,17 @@ import { usePathname } from "next/navigation";
 import type { MemberRole, NavItem } from "@/lib/auth/roles";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { useSuiviNavigation } from "@/lib/nav/historique";
+import { Icone, iconePourLien } from "@/components/icons";
+import { Marque } from "@/components/Marque";
+
+/** « Awa Koné » → « AK » ; une adresse e-mail donne sa première lettre. */
+function initiales(nom: string): string {
+  const mots = nom.includes("@") ? [nom] : nom.trim().split(/\s+/);
+  return mots
+    .slice(0, 2)
+    .map((m) => m.charAt(0).toUpperCase())
+    .join("");
+}
 
 /**
  * Shell applicatif responsive.
@@ -24,10 +35,9 @@ import { useSuiviNavigation } from "@/lib/nav/historique";
  * vers le bas, garde la page en place et reste utilisable quand la
  * navigation compte beaucoup d'entrées.
  *
- * Habillage : encre pour le cadre, papier pour le contenu — le même
- * couple que la page publique, pour qu'un apprenant qui se connecte
- * reste dans le même produit. Seules les couleurs et les formes ont
- * changé ; le comportement du tiroir est identique à l'original.
+ * Habillage : barre latérale claire à filet, une icône par rubrique pour
+ * se repérer d'un coup d'œil, entrée active sur fond vert pâle. Le
+ * contenu reste la seule surface qui attire l'œil.
  *
  * Ce composant ne contient aucune logique métier : il reçoit la
  * navigation déjà calculée selon le rôle (src/lib/auth/roles.ts).
@@ -92,82 +102,84 @@ export function AppShell({
 
   const liens = (
     <ul className="space-y-0.5">
-      {nav.map((item) => (
-        <li key={item.href}>
-          <Link
-            href={item.href}
-            onClick={fermer}
-            aria-current={estActif(item.href) ? "page" : undefined}
-            /* L'entrée active porte un liseré or à gauche plutôt qu'un
-               aplat plein : le repère reste lisible sans écraser le reste
-               de la liste, et la couleur d'accent garde son sens. */
-            className={`relative flex min-h-11 items-center rounded-lg px-3 py-2.5 text-[15px] font-medium transition duration-200 lg:text-sm ${
-              estActif(item.href)
-                ? "bg-white/10 text-white"
-                : "text-white/60 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            {estActif(item.href) ? (
-              <span
-                aria-hidden
-                className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-gold-400"
+      {nav.map((item) => {
+        const actif = estActif(item.href);
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              onClick={fermer}
+              aria-current={actif ? "page" : undefined}
+              className={`group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors duration-150 lg:min-h-10 lg:text-sm ${
+                actif
+                  ? "bg-brand-50 text-brand-800"
+                  : "text-slate-600 hover:bg-sand-100 hover:text-ink-900"
+              }`}
+            >
+              <Icone
+                nom={iconePourLien(item.href)}
+                className={`size-[18px] shrink-0 transition-colors duration-150 ${
+                  actif ? "text-brand-700" : "text-slate-400 group-hover:text-slate-600"
+                }`}
               />
-            ) : null}
-            {item.label}
-          </Link>
-        </li>
-      ))}
+              <span className="truncate">{item.label}</span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 
   const blocUtilisateur = (
-    <div className="border-t border-white/10 pt-4">
-      <p className="truncate text-sm font-medium text-white">{userName}</p>
-      <p className="text-xs text-gold-300/80">{ROLE_LABELS[role]}</p>
-      <form action={onSignOut} className="mt-3">
+    <div className="flex items-center gap-3 rounded-xl border border-sand-200 bg-sand-50 p-2 pl-2.5">
+      <span
+        aria-hidden
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[13px] font-semibold text-brand-800"
+      >
+        {initiales(userName)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-ink-900">{userName}</p>
+        <p className="truncate text-xs text-slate-500">{ROLE_LABELS[role]}</p>
+      </div>
+      <form action={onSignOut}>
         <button
           type="submit"
-          className="min-h-11 w-full rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-white/80 transition duration-200 hover:border-white/30 hover:bg-white/5 hover:text-white"
+          aria-label="Se déconnecter"
+          title="Se déconnecter"
+          className="inline-flex size-11 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-white hover:text-ink-900 lg:size-9"
         >
-          Se déconnecter
+          <Icone nom="deconnexion" className="size-[18px]" />
         </button>
       </form>
     </div>
   );
 
-  const marque = (
-    <Link
-      href="/accueil"
-      className="flex items-baseline gap-2 font-display text-xl font-semibold tracking-tight text-white transition duration-200 hover:text-gold-300"
-    >
-      Elite Academy
-    </Link>
-  );
-
   return (
     <div className="min-h-dvh bg-sand-50 lg:flex">
       {/* Barre latérale – ordinateur (collante et défilante indépendamment) */}
-      <aside className="hidden w-64 shrink-0 bg-ink-950 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
-        <div className="px-5 py-5">{marque}</div>
-        <nav
-          aria-label="Navigation principale"
-          className="flex-1 overflow-y-auto px-3"
-        >
+      <aside className="hidden w-64 shrink-0 border-r border-sand-200 bg-white lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
+        <div className="flex h-16 items-center px-5">
+          <Link
+            href="/accueil"
+            className="rounded-lg transition-opacity duration-150 hover:opacity-80"
+          >
+            <Marque />
+          </Link>
+        </div>
+        <nav aria-label="Navigation principale" className="flex-1 overflow-y-auto px-3 py-3">
           {liens}
         </nav>
-        <div className="px-5 pb-5">{blocUtilisateur}</div>
+        <div className="p-3">{blocUtilisateur}</div>
       </aside>
 
       {/* Colonne principale – mobile et tablette */}
       {/* `min-w-0` est indispensable : sans lui, un enfant large (tableau,
           bloc de code) élargit la colonne flex au lieu de défiler. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/10 bg-ink-950/95 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <Link
-            href="/accueil"
-            className="truncate font-display text-lg font-semibold tracking-tight text-white sm:text-xl"
-          >
-            Elite Academy
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-sand-200 bg-white/90 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur-md lg:hidden">
+          <Link href="/accueil" className="min-w-0 rounded-lg">
+            <Marque />
           </Link>
           <button
             ref={boutonRef}
@@ -176,13 +188,9 @@ export function AppShell({
             aria-expanded={menuOuvert}
             aria-controls="menu-mobile"
             aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"}
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm font-medium text-white/90 transition duration-200 hover:border-white/40 hover:bg-white/5"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-sand-300 bg-white px-3 py-2 text-sm font-medium text-ink-900 shadow-[0_1px_2px_rgba(17,20,18,0.05)] transition-colors duration-150 hover:bg-sand-50"
           >
-            <span aria-hidden className="flex w-4 flex-col gap-[3px]">
-              <span className="h-0.5 w-full rounded bg-gold-400" />
-              <span className="h-0.5 w-full rounded bg-gold-400" />
-              <span className="h-0.5 w-full rounded bg-gold-400" />
-            </span>
+            <Icone nom="menu" className="size-[18px]" />
             Menu
           </button>
         </header>
@@ -191,7 +199,7 @@ export function AppShell({
         <div
           onClick={fermer}
           aria-hidden
-          className={`fixed inset-0 z-40 bg-ink-950/60 transition-opacity duration-200 lg:hidden ${
+          className={`fixed inset-0 z-40 bg-ink-950/40 transition-opacity duration-200 lg:hidden ${
             menuOuvert ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         />
@@ -205,35 +213,31 @@ export function AppShell({
           aria-label="Navigation principale"
           tabIndex={-1}
           inert={menuOuvert ? undefined : true}
-          className={`fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] flex-col bg-ink-950 shadow-2xl outline-none transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 flex w-[min(20rem,85vw)] flex-col bg-white shadow-2xl outline-none transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden ${
             menuOuvert ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between gap-2 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <span className="font-display text-lg font-semibold tracking-tight text-white">
-              Elite Academy
-            </span>
+          <div className="flex items-center justify-between gap-2 border-b border-sand-200 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))]">
+            <Marque />
             <button
               type="button"
               onClick={() => {
                 fermer();
                 boutonRef.current?.focus();
               }}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-white/20 text-white/80 transition duration-200 hover:border-white/40 hover:bg-white/5"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-sand-100 hover:text-ink-900"
               aria-label="Fermer le menu"
             >
-              <span aria-hidden className="text-lg leading-none">
-                ×
-              </span>
+              <Icone nom="fermer" className="size-5" />
             </button>
           </div>
           <nav
             aria-label="Navigation principale"
-            className="flex-1 overflow-y-auto overscroll-contain px-3 py-2"
+            className="flex-1 overflow-y-auto overscroll-contain px-3 py-3"
           >
             {liens}
           </nav>
-          <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {blocUtilisateur}
           </div>
         </div>

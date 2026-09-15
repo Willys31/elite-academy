@@ -19,3 +19,6 @@ docs/
 
 # Fichiers de configuration
 .claude
+.mcp.json
+# Captures Playwright (aperçus locaux)
+.playwright-mcp/

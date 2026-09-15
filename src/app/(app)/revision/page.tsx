@@ -191,7 +191,7 @@ export default async function RevisionPage() {
               <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-sand-200 p-5">
                 <div className="min-w-0">
                   {situation?.titreCours ? (
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <p className="text-xs font-medium text-slate-400">
                       {situation.titreCours}
                       {situation.titreLecon ? ` · ${situation.titreLecon}` : ""}
                     </p>
@@ -234,7 +234,7 @@ export default async function RevisionPage() {
                                 ✕
                               </span>
                               <span>
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700/70">
+                                <span className="text-xs font-medium text-red-700/70">
                                   Votre réponse
                                 </span>
                                 <br />
@@ -253,7 +253,7 @@ export default async function RevisionPage() {
                                 ✓
                               </span>
                               <span>
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700/70">
+                                <span className="text-xs font-medium text-emerald-700/70">
                                   Bonne réponse
                                 </span>
                                 <br />
@@ -264,7 +264,7 @@ export default async function RevisionPage() {
                         </div>
 
                         {q.explication ? (
-                          <p className="mt-4 border-l-2 border-gold-400 pl-4 text-sm leading-relaxed text-slate-600">
+                          <p className="mt-4 border-l-2 border-brand-300 pl-4 text-sm leading-relaxed text-slate-600">
                             {q.explication}
                           </p>
                         ) : null}

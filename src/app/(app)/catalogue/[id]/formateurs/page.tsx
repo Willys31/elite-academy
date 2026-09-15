@@ -18,7 +18,7 @@ import { Champ, EcranTitre, Etiquette, LienSobre, Panneau, Retour, SectionTitre,
 export const metadata: Metadata = { title: "Formateurs de la formation" };
 
 const CLASSES_SELECT =
-  "block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 sm:text-sm";
+  "block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-600/15 sm:text-sm";
 
 /**
  * Qui anime cette formation.
@@ -188,7 +188,7 @@ export default async function FormateursFormationPage({
           )}
 
           {proprietaire ? (
-            <p className="mt-4 border-l-2 border-gold-400 pl-4 text-sm leading-relaxed text-slate-600">
+            <p className="mt-4 border-l-2 border-brand-300 pl-4 text-sm leading-relaxed text-slate-600">
               Cette formation a été conçue par <strong>{proprietaire}</strong>.
               Le concepteur y a accès sans affectation : c&apos;est son
               contenu, il en garde la main.

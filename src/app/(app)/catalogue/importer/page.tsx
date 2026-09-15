@@ -88,7 +88,7 @@ export default async function ImporterPage() {
               type="file"
               required
               accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="block w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
+              className="block w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
             />
             <p className="mt-1 text-xs text-slate-500">
               Word (.docx) donne le meilleur résultat. Pour un PDF scanné
@@ -100,13 +100,13 @@ export default async function ImporterPage() {
               Méthode de découpage
             </legend>
             <div className="space-y-2">
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-sand-200 px-3.5 py-3 text-sm transition duration-200 hover:border-gold-400/60 hover:bg-sand-50">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-sand-200 px-3.5 py-3 text-sm transition duration-200 hover:border-sand-300 hover:bg-sand-50">
                 <input
                   type="radio"
                   name="mode"
                   value="ia"
                   defaultChecked
-                  className="mt-0.5 h-4 w-4 accent-gold-500"
+                  className="mt-0.5 h-4 w-4 accent-brand-700"
                 />
                 <span>
                   <span className="font-medium">Découpage par IA (recommandé)</span>
@@ -117,12 +117,12 @@ export default async function ImporterPage() {
                   </span>
                 </span>
               </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-sand-200 px-3.5 py-3 text-sm transition duration-200 hover:border-gold-400/60 hover:bg-sand-50">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-sand-200 px-3.5 py-3 text-sm transition duration-200 hover:border-sand-300 hover:bg-sand-50">
                 <input
                   type="radio"
                   name="mode"
                   value="titres"
-                  className="mt-0.5 h-4 w-4 accent-gold-500"
+                  className="mt-0.5 h-4 w-4 accent-brand-700"
                 />
                 <span>
                   <span className="font-medium">Découpage simple par titres</span>

@@ -7,6 +7,9 @@ import {
   normaliserCodeVerification,
 } from "@/lib/certificats/certificats";
 import { LEVEL_LABELS } from "@/lib/courses/statuts";
+import { BASE_BOUTON, BOUTON_PRINCIPAL } from "@/components/ui";
+import { Icone } from "@/components/icons";
+import { Marque } from "@/components/Marque";
 
 /* Le gabarit du layout racine ajoute déjà « – Elite Academy » : le titre
    ne le répète pas, sinon l'onglet affiche deux fois le nom du site. */
@@ -24,14 +27,18 @@ interface ResultatVerification {
   revoque_le: string | null;
 }
 
+const FORMAT_DATE: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+};
+
 /** Ligne d'un certificat rendu : libellé discret, valeur affirmée. */
 function LigneCertificat({ terme, children }: { terme: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-sand-200 py-2 last:border-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-        {terme}
-      </dt>
-      <dd className="min-w-0 text-sm font-medium text-ink-900 sm:text-right">{children}</dd>
+    <div className="grid gap-0.5 py-3 sm:grid-cols-[9rem_1fr] sm:gap-4">
+      <dt className="text-sm text-slate-500">{terme}</dt>
+      <dd className="min-w-0 text-sm font-medium text-ink-900">{children}</dd>
     </div>
   );
 }
@@ -39,20 +46,12 @@ function LigneCertificat({ terme, children }: { terme: string; children: React.R
 /** Encadré d'échec : format invalide, ou code inconnu de la base. */
 function Echec({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
-    <div
-      role="alert"
-      className="mt-6 rounded-2xl border border-red-300/60 bg-red-50 p-5 sm:p-6"
-    >
-      <p className="flex items-center gap-2.5 font-display text-lg font-semibold text-red-900">
-        <span
-          aria-hidden
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-600 text-sm text-white"
-        >
-          ✕
-        </span>
-        {titre}
-      </p>
-      <p className="mt-2.5 text-sm leading-relaxed text-red-900/80">{children}</p>
+    <div role="alert" className="mt-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5">
+      <Icone nom="croix" className="mt-0.5 size-5 shrink-0 text-red-600" />
+      <div className="min-w-0">
+        <p className="font-semibold text-red-900">{titre}</p>
+        <p className="mt-1 text-sm leading-relaxed text-red-900/80">{children}</p>
+      </div>
     </div>
   );
 }
@@ -93,45 +92,42 @@ export default async function VerifierPage({
   const valide = resultat?.statut === "valid";
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-ink-950 px-4 py-10 sm:px-6 sm:py-16">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-brand-700/25 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-[-25%] right-[-15%] h-[420px] w-[420px] rounded-full bg-gold-500/10 blur-3xl"
-      />
-
-      <div className="relative mx-auto w-full max-w-xl">
-        {/* ---------- Marque ---------- */}
-        <div className="text-center">
+    <div className="min-h-dvh bg-sand-50">
+      <header className="border-b border-sand-200 bg-white">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Link href="/" className="rounded-lg transition-opacity duration-150 hover:opacity-80">
+            <Marque />
+          </Link>
           <Link
             href="/"
-            className="inline-flex items-baseline gap-2.5 rounded transition duration-200 hover:opacity-80"
+            className="inline-flex min-h-11 items-center rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors duration-150 hover:bg-sand-100 hover:text-ink-900"
           >
-            <span className="font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Elite Academy
-            </span>
+            Découvrir la plateforme
           </Link>
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-300">
-            Vérification officielle
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/60">
-            Saisissez le code figurant sur le certificat. La réponse est
-            immédiate, publique, et ne demande aucun compte.
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-xl px-4 py-10 sm:px-6 sm:py-16">
+        {/* ---------- Présentation ---------- */}
+        <div className="text-center">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-xl border border-sand-200 bg-white text-brand-700 shadow-[0_1px_2px_rgba(17,20,18,0.05)]">
+            <Icone nom="bouclier" className="size-6" />
+          </span>
+          <h1 className="mt-5 text-3xl font-semibold tracking-[-0.035em] text-ink-950 sm:text-[2.25rem]">
+            Vérifier un certificat
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-slate-600">
+            Saisissez le code figurant sur le certificat. La réponse est immédiate,
+            publique, et ne demande aucun compte.
           </p>
         </div>
 
         {/* ---------- Saisie du code ---------- */}
         <form
           method="get"
-          className="mt-9 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur sm:p-6"
+          className="mt-8 rounded-xl border border-sand-200 bg-white p-4 shadow-[0_1px_2px_rgba(17,20,18,0.04)] sm:p-5"
         >
-          <label
-            htmlFor="code"
-            className="mb-2.5 block text-center text-xs font-semibold uppercase tracking-[0.2em] text-white/50"
-          >
+          <label htmlFor="code" className="mb-1.5 block text-sm font-medium text-ink-900">
             Code de vérification
           </label>
           <input
@@ -148,11 +144,11 @@ export default async function VerifierPage({
                0,18 em, les dix-sept caractères de EA-XXXX-XXXX-XXXX
                dépassaient le champ sur un écran de 320 px. 16 px reste le
                minimum sous lequel iOS zoome tout seul à la mise au point. */
-            className="block min-h-14 w-full rounded-xl border border-white/15 bg-ink-900/60 px-3 py-3 text-center font-mono text-base uppercase tracking-[0.1em] text-white placeholder:text-white/25 outline-none transition duration-200 focus:border-gold-400 focus:bg-ink-900 focus:ring-4 focus:ring-gold-300/20 sm:px-4 sm:text-xl sm:tracking-[0.18em]"
+            className="block min-h-14 w-full rounded-lg border border-sand-300 bg-white px-3 py-3 text-center font-mono text-base uppercase tracking-[0.1em] text-ink-900 shadow-[0_1px_2px_rgba(17,20,18,0.04)] outline-none transition duration-150 placeholder:text-slate-300 hover:border-slate-300 focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15 sm:px-4 sm:text-xl sm:tracking-[0.16em]"
           />
           <button
             type="submit"
-            className="mt-3.5 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gold-400 px-5 py-3 text-sm font-semibold text-ink-950 shadow-[0_8px_24px_-8px_rgba(211,160,50,0.7)] transition duration-200 hover:bg-gold-300 active:translate-y-px"
+            className={`${BASE_BOUTON} ${BOUTON_PRINCIPAL} mt-3 min-h-12 w-full text-[15px]`}
           >
             Vérifier ce certificat
           </button>
@@ -166,16 +162,14 @@ export default async function VerifierPage({
         {formatInvalide ? (
           <Echec titre="Format de code invalide">
             Un code de certificat ressemble à{" "}
-            <span className="font-mono font-semibold">EA-XXXX-XXXX-XXXX</span>.
-            Il n&apos;utilise jamais{" "}
-            <span className="font-mono font-semibold">0</span>,{" "}
+            <span className="font-mono font-semibold">EA-XXXX-XXXX-XXXX</span>. Il
+            n&apos;utilise jamais <span className="font-mono font-semibold">0</span>,{" "}
             <span className="font-mono font-semibold">1</span>,{" "}
             <span className="font-mono font-semibold">I</span>,{" "}
             <span className="font-mono font-semibold">L</span> ni{" "}
-            <span className="font-mono font-semibold">O</span>, qui se
-            confondent trop facilement à la lecture. Si vous avez lu
-            l&apos;un de ces caractères, c&apos;est très probablement un{" "}
-            <span className="font-mono font-semibold">Q</span>, un{" "}
+            <span className="font-mono font-semibold">O</span>, qui se confondent trop
+            facilement à la lecture. Si vous avez lu l&apos;un de ces caractères, c&apos;est
+            très probablement un <span className="font-mono font-semibold">Q</span>, un{" "}
             <span className="font-mono font-semibold">D</span>, un{" "}
             <span className="font-mono font-semibold">J</span> ou un{" "}
             <span className="font-mono font-semibold">7</span>.
@@ -184,34 +178,28 @@ export default async function VerifierPage({
 
         {introuvable ? (
           <Echec titre="Aucun certificat ne porte ce code">
-            Vérifiez d&apos;abord la saisie. Si le code a bien été recopié
-            depuis un document, ce document n&apos;a pas été délivré par Elite
-            Academy.
+            Vérifiez d&apos;abord la saisie. Si le code a bien été recopié depuis un
+            document, ce document n&apos;a pas été délivré par Elite Academy.
           </Echec>
         ) : null}
 
         {/* ---------- Certificat rendu ---------- */}
         {resultat ? (
-          <div className="mt-8">
+          <div className="mt-8 overflow-hidden rounded-xl border border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,20,18,0.05),0_24px_48px_-28px_rgba(17,20,18,0.25)]">
             {/* Verdict d'abord, en pleine largeur : c'est la seule chose que
                 certains visiteurs liront avant de refermer la page. */}
             <div
               role="status"
-              className={`flex items-center gap-3 rounded-t-2xl px-5 py-3.5 ${
-                valide ? "bg-emerald-600" : "bg-red-700"
+              className={`flex items-center gap-3 px-5 py-4 ${
+                valide ? "bg-brand-700 text-white" : "bg-red-700 text-white"
               }`}
             >
-              <span
-                aria-hidden
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-base text-white"
-              >
-                {valide ? "✓" : "✕"}
-              </span>
+              <Icone nom={valide ? "bouclier" : "croix"} className="size-6 shrink-0" />
               <div className="min-w-0">
-                <p className="font-display text-base font-semibold text-white">
+                <p className="font-semibold">
                   {valide ? "Certificat authentique" : "Certificat révoqué"}
                 </p>
-                <p className="text-xs text-white/75">
+                <p className="text-sm text-white/80">
                   {valide
                     ? "Délivré par Elite Academy et toujours valide."
                     : "Ce certificat a été retiré par l'organisation émettrice."}
@@ -222,34 +210,19 @@ export default async function VerifierPage({
             {/* Le document lui-même. Un certificat révoqué reste affiché
                 mais désaturé : masquer ses informations empêcherait de
                 comprendre de quel document il s'agit. */}
-            <div
-              className={`rounded-b-2xl border-x-4 border-b-4 border-double bg-sand-50 p-6 shadow-2xl sm:p-8 ${
-                valide ? "border-gold-400/70" : "border-slate-300 grayscale-[0.55]"
-              }`}
-            >
-              <p className="text-center text-[10px] uppercase tracking-[0.3em] text-slate-400">
-                Elite Academy
+            <div className={`p-6 sm:p-8 ${valide ? "" : "grayscale-[0.6]"}`}>
+              <p className="text-sm text-slate-500">
+                {CERT_TYPE_LABELS[resultat.type_certificat]} décerné à
               </p>
-              <p className="mt-3 text-center font-display text-lg font-semibold text-brand-800">
-                {CERT_TYPE_LABELS[resultat.type_certificat]}
-              </p>
-
-              <p className="mt-6 text-center text-xs text-slate-500">décerné à</p>
-              <p className="mt-1 text-center font-display text-2xl font-semibold text-ink-900 sm:text-3xl">
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-ink-950 sm:text-3xl">
                 {resultat.titulaire}
               </p>
 
-              <div className="mx-auto mt-6 h-px w-24 bg-sand-200" />
-
-              <dl className="mt-6">
+              <dl className="mt-6 divide-y divide-sand-200 border-y border-sand-200">
                 <LigneCertificat terme="Formation">{resultat.formation}</LigneCertificat>
-                <LigneCertificat terme="Organisation">
-                  {resultat.organisation}
-                </LigneCertificat>
+                <LigneCertificat terme="Organisation">{resultat.organisation}</LigneCertificat>
                 {resultat.competence ? (
-                  <LigneCertificat terme="Compétence">
-                    {resultat.competence}
-                  </LigneCertificat>
+                  <LigneCertificat terme="Compétence">{resultat.competence}</LigneCertificat>
                 ) : null}
                 {resultat.niveau ? (
                   <LigneCertificat terme="Niveau">
@@ -257,26 +230,18 @@ export default async function VerifierPage({
                   </LigneCertificat>
                 ) : null}
                 <LigneCertificat terme="Délivré le">
-                  {new Date(resultat.delivre_le).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {new Date(resultat.delivre_le).toLocaleDateString("fr-FR", FORMAT_DATE)}
                 </LigneCertificat>
                 {resultat.revoque_le ? (
                   <LigneCertificat terme="Révoqué le">
                     <span className="text-red-700">
-                      {new Date(resultat.revoque_le).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {new Date(resultat.revoque_le).toLocaleDateString("fr-FR", FORMAT_DATE)}
                     </span>
                   </LigneCertificat>
                 ) : null}
               </dl>
 
-              <p className="mt-6 text-center font-mono text-sm font-semibold tracking-[0.14em] text-slate-600">
+              <p className="mt-5 font-mono text-sm font-semibold tracking-[0.12em] text-slate-600">
                 {code}
               </p>
             </div>
@@ -284,22 +249,11 @@ export default async function VerifierPage({
         ) : null}
 
         {/* ---------- Bas de page ---------- */}
-        <div className="mt-10 border-t border-white/10 pt-6 text-center">
-          <p className="text-xs leading-relaxed text-white/40">
-            Cette page n&apos;expose que les informations portées par le
-            certificat lui-même. Aucun compte n&apos;est requis, aucune donnée
-            n&apos;est conservée.
-          </p>
-          <p className="mt-4">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 text-sm text-white/60 transition duration-200 hover:text-white"
-            >
-              <span aria-hidden>←</span> Découvrir Elite Academy
-            </Link>
-          </p>
-        </div>
-      </div>
-    </main>
+        <p className="mt-10 text-center text-xs leading-relaxed text-slate-500">
+          Cette page n&apos;expose que les informations portées par le certificat
+          lui-même. Aucun compte n&apos;est requis, aucune donnée n&apos;est conservée.
+        </p>
+      </main>
+    </div>
   );
 }

@@ -122,7 +122,7 @@ export default async function ProgressionPage() {
                   action={
                     <Link
                       href={`/formations/${courseId}`}
-                      className="text-sm font-medium text-brand-700 underline-offset-4 transition duration-200 hover:text-gold-600 hover:underline"
+                      className="text-sm font-medium text-brand-700 underline-offset-4 transition duration-200 hover:text-brand-800 hover:underline"
                     >
                       Ouvrir la formation
                     </Link>
@@ -189,7 +189,7 @@ export default async function ProgressionPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 border-l-2 border-gold-400 pl-4 text-sm leading-relaxed text-slate-600">
+            <p className="mt-4 border-l-2 border-brand-300 pl-4 text-sm leading-relaxed text-slate-600">
               Le quatrième cran ne s&apos;obtient jamais par le calcul. Il est
               accordé par un formateur ou un administrateur qui atteste que
               vous savez transmettre la compétence.

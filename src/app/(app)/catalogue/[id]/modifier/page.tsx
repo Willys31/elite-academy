@@ -364,7 +364,7 @@ export default async function EditeurFormationPage({
                                     <Link
                                       key={a.id}
                                       href={`/catalogue/${formation.id}/qcm/${a.id}`}
-                                      className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-medium text-ink-900 transition duration-200 hover:bg-gold-300/30"
+                                      className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-medium text-ink-900 transition duration-200 hover:bg-brand-100"
                                     >
                                       📝 {a.title}
                                     </Link>
@@ -441,7 +441,7 @@ export default async function EditeurFormationPage({
                                           type="file"
                                           required
                                           accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.mp4,.mp3"
-                                          className="block w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
+                                          className="block w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
                                         />
                                       </div>
                                     </AuthForm>

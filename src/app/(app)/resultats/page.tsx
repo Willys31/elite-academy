@@ -211,7 +211,7 @@ export default async function ResultatsPage({
               id="formation"
               name="formation"
               defaultValue={choisie.id}
-              className="block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 sm:text-sm"
+              className="block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-600/15 sm:text-sm"
             >
               {formations.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -329,13 +329,13 @@ export default async function ResultatsPage({
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-sand-200 text-left">
-                      <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      <th className="px-5 py-3 text-xs font-medium text-slate-400">
                         Apprenant
                       </th>
-                      <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      <th className="px-5 py-3 text-xs font-medium text-slate-400">
                         Activités
                       </th>
-                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      <th className="px-5 py-3 text-right text-xs font-medium text-slate-400">
                         Moyenne
                       </th>
                     </tr>

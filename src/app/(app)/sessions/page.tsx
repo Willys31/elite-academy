@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Sessions" };
 
 /** Liste déroulante à la charte, sans dupliquer les classes du champ. */
 const CLASSES_SELECT =
-  "block min-h-11 w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-gold-400 focus:bg-white focus:ring-4 focus:ring-gold-300/25 sm:text-sm";
+  "block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none transition duration-200 focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-600/15 sm:text-sm";
 
 export default async function SessionsPage({
   searchParams,
@@ -222,7 +222,7 @@ function ListeSessions({
                     ? `/sessions/${s.id}`
                     : `/sessions/${s.id}/participer`
                 }
-                className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-4 transition duration-200 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
               >
                 <div className="min-w-0">
                   <p className="font-medium text-ink-900">{s.title as string}</p>

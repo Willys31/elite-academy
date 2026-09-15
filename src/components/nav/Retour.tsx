@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent } from "react";
 import { retourResteDansLApp } from "@/lib/nav/historique";
+import { Icone } from "@/components/icons";
 
 /**
  * Bouton « Retour » commun à tous les écrans.
@@ -20,14 +21,12 @@ import { retourResteDansLApp } from "@/lib/nav/historique";
  * ailleurs. `href` désigne donc le parent hiérarchique, qui sert de
  * porte de sortie au premier chargement.
  *
- * `ton` suit les deux chartes en cours de cohabitation : « or » pour
- * les écrans repris (apprenant, formateur), « sobre » pour les écrans
- * concepteur et administrateur encore sur l'habillage d'origine.
+ * `ton` est conservé pour compatibilité : les deux chartes ont
+ * fusionné, les deux valeurs rendent désormais le même lien discret.
  */
 export function Retour({
   href,
   children = "Retour",
-  ton = "or",
   className = "",
 }: {
   href: string;
@@ -48,20 +47,16 @@ export function Retour({
     router.back();
   };
 
-  const couleurs =
-    ton === "or"
-      ? "border-ink-900/10 bg-white text-ink-900 hover:border-gold-400/60 hover:bg-sand-50"
-      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50";
-
   return (
     <Link
       href={href}
       onClick={auClic}
-      className={`mb-4 inline-flex min-h-11 items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium shadow-sm transition duration-200 ${couleurs} ${className}`}
+      className={`group -ml-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-500 transition-colors duration-150 hover:bg-sand-100 hover:text-ink-900 ${className}`}
     >
-      <span aria-hidden className="text-base leading-none">
-        ←
-      </span>
+      <Icone
+        nom="flecheGauche"
+        className="size-4 transition-transform duration-150 group-hover:-translate-x-0.5"
+      />
       {children}
     </Link>
   );
