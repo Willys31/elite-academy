@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
@@ -10,12 +9,13 @@ import {
   FORMAT_LABELS,
   LEVEL_LABELS,
   STATUS_LABELS,
+  TON_STATUT,
   type CourseStatus,
 } from "@/lib/courses/statuts";
 import { sInscrireFormation } from "@/app/(app)/formations/actions";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
+import { Badge, Card, EmptyState, PageTitle, PrimaryLink, Retour, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Fiche formation" };
 
@@ -92,19 +92,13 @@ export default async function FicheFormationPage({
         action={
           encadre ? (
             <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/catalogue/${formation.id}/certificats`}
-                className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
+              <SecondaryLink href={`/catalogue/${formation.id}/certificats`}>
                 Certificats
-              </Link>
+              </SecondaryLink>
               {peutModifier ? (
-                <Link
-                  href={`/catalogue/${formation.id}/modifier`}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
+                <SecondaryLink href={`/catalogue/${formation.id}/modifier`}>
                   Modifier
-                </Link>
+                </SecondaryLink>
               ) : null}
             </div>
           ) : undefined
@@ -114,7 +108,9 @@ export default async function FicheFormationPage({
       </PageTitle>
 
       <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Badge>{STATUS_LABELS[formation.status as CourseStatus]}</Badge>
+        <Badge ton={TON_STATUT[formation.status as CourseStatus]}>
+          {STATUS_LABELS[formation.status as CourseStatus]}
+        </Badge>
         <span>{org?.name}</span>
         <span>· {CONTEXT_LABELS[formation.context_type] ?? formation.context_type}</span>
         <span>· {FORMAT_LABELS[formation.format] ?? formation.format}</span>
@@ -216,12 +212,9 @@ export default async function FicheFormationPage({
                 <p className="mb-3 text-sm text-slate-600">
                   Vous êtes inscrit à cette formation.
                 </p>
-                <Link
-                  href={`/formations/${formation.id}`}
-                  className="inline-flex min-h-11 items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-                >
+                <PrimaryLink href={`/formations/${formation.id}`}>
                   Continuer la formation
-                </Link>
+                </PrimaryLink>
               </div>
             ) : inscription?.status === "suspended" ? (
               <p className="text-sm text-slate-500">

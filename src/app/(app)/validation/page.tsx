@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
 import { canDesignForOrganization, organizationsForDesign } from "@/lib/courses/statuts";
-import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
+import { Badge, Card, EmptyState, LienTexte, PageTitle, Retour, SURVOL_CARTE } from "@/components/ui";
 import { DangerForm } from "@/components/ui/DangerForm";
 import { supprimerGeneration } from "@/app/(app)/validation/actions";
 
@@ -16,6 +16,16 @@ const STATUT_GENERATION: Record<string, string> = {
   running: "En cours",
   succeeded: "Terminée",
   failed: "Échouée",
+};
+
+/* Une génération échouée est une anomalie : elle doit se repérer sans
+   lire l'étiquette. Le reste est neutre — une génération en cours n'est
+   ni une réussite ni un problème. */
+const TON_GENERATION: Record<string, "neutre" | "succes" | "alerte"> = {
+  pending: "neutre",
+  running: "neutre",
+  succeeded: "succes",
+  failed: "alerte",
 };
 
 /**
@@ -73,13 +83,13 @@ export default async function ValidationPage() {
                   : c.organization;
                 return (
                   <Link key={c.id} href={`/catalogue/${c.id}/modifier`}>
-                    <Card className="transition hover:border-brand-300 hover:shadow">
+                    <Card className={SURVOL_CARTE}>
                       <p className="font-medium">{c.title}</p>
                       <p className="mt-1 text-xs text-slate-400">
                         {org?.name} · soumise le{" "}
                         {new Date(c.updated_at).toLocaleDateString("fr-FR")}
                       </p>
-                      <p className="mt-2 text-sm text-brand-600">
+                      <p className="mt-2 text-sm font-medium text-gold-600">
                         Ouvrir pour approuver, demander des corrections ou rejeter →
                       </p>
                     </Card>
@@ -107,7 +117,9 @@ export default async function ValidationPage() {
                 return (
                   <Card key={g.id}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{STATUT_GENERATION[g.status] ?? g.status}</Badge>
+                      <Badge ton={TON_GENERATION[g.status] ?? "neutre"}>
+                        {STATUT_GENERATION[g.status] ?? g.status}
+                      </Badge>
                       <span className="text-xs text-slate-400">
                         {new Date(g.created_at).toLocaleString("fr-FR")} ·{" "}
                         {requester?.full_name ?? "?"} · {g.model_name}
@@ -120,12 +132,11 @@ export default async function ValidationPage() {
                       <p className="mt-1 text-sm text-red-600">{g.error_message}</p>
                     ) : null}
                     {g.result_course_id ? (
-                      <Link
-                        href={`/catalogue/${g.result_course_id}/modifier`}
-                        className="mt-2 inline-block text-sm text-brand-600 hover:underline"
-                      >
-                        Ouvrir la formation générée →
-                      </Link>
+                      <p className="mt-2 text-sm">
+                        <LienTexte href={`/catalogue/${g.result_course_id}/modifier`}>
+                          Ouvrir la formation générée →
+                        </LienTexte>
+                      </p>
                     ) : null}
                     {/* Même jeu de rôles que la politique RLS
                         `ai_gen_delete` : administrateur ou concepteur

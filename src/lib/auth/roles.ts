@@ -99,7 +99,6 @@ export interface NavItem {
 export function navigationFor(role: MemberRole): NavItem[] {
   switch (role) {
     case "admin":
-    case "designer":
       return [
         { label: "Vue générale", href: "/accueil" },
         { label: "Organisations", href: "/organisations" },
@@ -108,7 +107,23 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Sources", href: "/sources" },
         { label: "Validation", href: "/validation" },
         { label: "Utilisateurs", href: "/utilisateurs" },
+        { label: "Rapports", href: "/rapports" },
         { label: "Paramètres", href: "/parametres" },
+      ];
+    /* Le concepteur partageait la navigation de l'administrateur. C'était
+       une erreur : « Utilisateurs » et « Paramètres » supposent un rôle
+       `admin` (politiques profiles_select, organizations_update,
+       brands_*), qu'un concepteur n'a pas. Les lui proposer menait à
+       deux écrans vides. Son menu se limite donc à la chaîne de
+       production pédagogique. */
+    case "designer":
+      return [
+        { label: "Vue générale", href: "/accueil" },
+        { label: "Organisations", href: "/organisations" },
+        { label: "Catalogue", href: "/catalogue" },
+        { label: "Compétences", href: "/competences" },
+        { label: "Sources", href: "/sources" },
+        { label: "Validation", href: "/validation" },
       ];
     case "trainer":
       return [

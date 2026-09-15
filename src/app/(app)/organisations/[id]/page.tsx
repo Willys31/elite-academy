@@ -15,6 +15,16 @@ import { Badge, Card, EmptyState, Input, Label, PageTitle, Retour, Select } from
 
 export const metadata: Metadata = { title: "Organisation" };
 
+/* La base stocke « active », « suspended »… ; l'écran affichait la
+   valeur brute, en anglais et en minuscule. Un responsable lit un
+   statut, pas une colonne SQL. */
+const STATUT_MEMBRE: Record<string, string> = {
+  active: "Actif",
+  inactive: "Inactif",
+  suspended: "Suspendu",
+  archived: "Archivé",
+};
+
 export default async function OrganisationPage({
   params,
 }: {
@@ -94,13 +104,17 @@ export default async function OrganisationPage({
                         <td className="px-4 py-3 font-medium">
                           {profil?.full_name || "—"}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          <span className="break-all">{profil?.email}</span>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                          {profil?.email}
                         </td>
                         <td className="px-4 py-3">
                           <Badge>{ROLE_LABELS[m.role as MemberRole]}</Badge>
                         </td>
-                        <td className="px-4 py-3 text-slate-500">{m.status}</td>
+                        <td className="px-4 py-3">
+                          <Badge ton={m.status === "active" ? "succes" : "alerte"}>
+                            {STATUT_MEMBRE[m.status] ?? m.status}
+                          </Badge>
+                        </td>
                       </tr>
                     );
                   })}
@@ -116,8 +130,11 @@ export default async function OrganisationPage({
                     <li key={m.id} className="p-4">
                       <p className="font-medium">{profil?.full_name || "—"}</p>
                       <p className="break-all text-sm text-slate-600">{profil?.email}</p>
-                      <p className="mt-1">
+                      <p className="mt-1.5 flex flex-wrap gap-1.5">
                         <Badge>{ROLE_LABELS[m.role as MemberRole]}</Badge>
+                        <Badge ton={m.status === "active" ? "succes" : "alerte"}>
+                          {STATUT_MEMBRE[m.status] ?? m.status}
+                        </Badge>
                       </p>
                     </li>
                   );

@@ -138,7 +138,7 @@ export default async function SourcesPage() {
                         depuis l&apos;
                         <Link
                           href="/catalogue"
-                          className="text-brand-600 hover:underline"
+                          className="font-medium text-ink-900 underline decoration-gold-400 decoration-2 underline-offset-[3px] transition duration-200 hover:decoration-gold-600"
                         >
                           éditeur de la formation
                         </Link>

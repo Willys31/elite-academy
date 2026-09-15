@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { canCreateOrganization, ORG_TYPE_LABELS, type OrgType } from "@/lib/auth/roles";
-import { Alert, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
+import { Alert, Card, EmptyState, PageTitle, Retour, SURVOL_CARTE, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Organisations" };
 
@@ -47,7 +47,7 @@ export default async function OrganisationsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {organisations.map((org) => (
             <Link key={org.id} href={`/organisations/${org.id}`}>
-              <Card className="h-full transition hover:border-brand-300 hover:shadow">
+              <Card className={`h-full ${SURVOL_CARTE}`}>
                 <h2 className="font-semibold text-slate-900">{org.name}</h2>
                 <p className="mt-1 text-sm text-slate-500">
                   {ORG_TYPE_LABELS[org.type as OrgType] ?? org.type}

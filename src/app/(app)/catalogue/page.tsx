@@ -7,11 +7,12 @@ import {
   canEditCourse,
   organizationsForCourseCreation,
   STATUS_LABELS,
+  TON_STATUT,
   FORMAT_LABELS,
   type CourseStatus,
 } from "@/lib/courses/statuts";
 import { isEliteAdmin } from "@/lib/auth/roles";
-import { Alert, Badge, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, Input, PageTitle, PrimaryButton, Retour, SURVOL_CARTE, SecondaryLink, Select } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Catalogue" };
 
@@ -96,43 +97,32 @@ export default async function CataloguePage({
       {/* Recherche + filtre statut */}
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3">
         <div className="min-w-48 flex-1">
-          <label htmlFor="q" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="q" className="mb-1.5 block text-sm font-medium text-ink-900">
             Rechercher
           </label>
-          <input
+          <Input
             id="q"
             name="q"
             defaultValue={params.q ?? ""}
             placeholder="Titre de formation…"
-            className="block min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 sm:text-sm"
           />
         </div>
         {peutCreer ? (
           <div>
-            <label htmlFor="statut" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="statut" className="mb-1.5 block text-sm font-medium text-ink-900">
               Statut
             </label>
-            <select
-              id="statut"
-              name="statut"
-              defaultValue={params.statut ?? ""}
-              className="block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm"
-            >
+            <Select id="statut" name="statut" defaultValue={params.statut ?? ""}>
               <option value="">Tous</option>
               {STATUTS.map((s) => (
                 <option key={s} value={s}>
                   {STATUS_LABELS[s]}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         ) : null}
-        <button
-          type="submit"
-          className="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-        >
-          Filtrer
-        </button>
+        <PrimaryButton type="submit">Filtrer</PrimaryButton>
       </form>
 
       {error ? (
@@ -171,15 +161,22 @@ export default async function CataloguePage({
                     : `/catalogue/${f.id}`
                 }
               >
-                <Card className="h-full transition hover:border-brand-300 hover:shadow">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="min-w-0 font-semibold text-slate-900">{f.title}</h2>
-                    {peutCreer ? (
-                      <span className="shrink-0">
-                        <Badge>{STATUS_LABELS[f.status as CourseStatus]}</Badge>
-                      </span>
-                    ) : null}
-                  </div>
+                <Card className={`h-full ${SURVOL_CARTE}`}>
+                  {/* La pastille passe AU-DESSUS du titre. Côte à côte,
+                      un statut long (« En attente de validation »)
+                      écrasait le titre jusqu'à le couper en plein mot :
+                      « Techni / ques de / vente ». Empilés, chacun
+                      dispose de toute la largeur. */}
+                  {peutCreer ? (
+                    <div className="mb-2">
+                      <Badge ton={TON_STATUT[f.status as CourseStatus]}>
+                        {STATUS_LABELS[f.status as CourseStatus]}
+                      </Badge>
+                    </div>
+                  ) : null}
+                  <h2 className="font-display text-lg font-semibold tracking-tight text-ink-900">
+                    {f.title}
+                  </h2>
                   {f.description ? (
                     <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                       {f.description}

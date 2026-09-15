@@ -27,6 +27,24 @@ export const STATUS_LABELS: Record<CourseStatus, string> = {
   archived: "Archivé",
 };
 
+/**
+ * Couleur de la pastille de statut, partagée par tous les écrans qui
+ * l'affichent — catalogue, fiche, éditeur. Une même formation doit se
+ * lire pareil d'un écran à l'autre.
+ *
+ * Seul « publié » est vert : c'est le seul état où la formation sert
+ * vraiment à quelqu'un. « En attente de validation » et « validé »
+ * portent l'or, parce qu'ils appellent un geste. Le reste est neutre,
+ * pour ne pas faire passer un brouillon pour un problème.
+ */
+export const TON_STATUT: Record<CourseStatus, "neutre" | "or" | "succes"> = {
+  draft: "neutre",
+  review: "or",
+  approved: "or",
+  published: "succes",
+  archived: "neutre",
+};
+
 export const LEVEL_LABELS: Record<string, string> = {
   fundamentals: "Fondamentaux",
   operational: "Opérationnel",

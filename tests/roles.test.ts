@@ -148,6 +148,54 @@ describe("navigationFor", () => {
     expect(navigationFor("manager").map((n) => n.label)).toContain("Rapports");
   });
 
+  it("réserve Utilisateurs et Paramètres à l'administrateur", () => {
+    // Ces deux écrans exigent le rôle `admin` en base : les proposer au
+    // concepteur ne lui donnerait que des écrans vides.
+    const concepteur = navigationFor("designer").map((n) => n.label);
+    expect(concepteur).not.toContain("Utilisateurs");
+    expect(concepteur).not.toContain("Paramètres");
+
+    const administrateur = navigationFor("admin").map((n) => n.label);
+    expect(administrateur).toContain("Utilisateurs");
+    expect(administrateur).toContain("Paramètres");
+  });
+
+  it("garde au concepteur toute la chaîne de production pédagogique", () => {
+    const concepteur = navigationFor("designer").map((n) => n.label);
+    for (const ecran of ["Catalogue", "Compétences", "Sources", "Validation"]) {
+      expect(concepteur).toContain(ecran);
+    }
+  });
+
+  it("ne laisse plus aucune entrée de menu sans écran", () => {
+    // Les trois derniers écrans manquants (/utilisateurs, /parametres,
+    // /rapports) tombaient sur la page « Écran en préparation ».
+    const ECRANS_LIVRES = [
+      "/accueil",
+      "/organisations",
+      "/catalogue",
+      "/competences",
+      "/sources",
+      "/validation",
+      "/utilisateurs",
+      "/rapports",
+      "/parametres",
+      "/groupes",
+      "/sessions",
+      "/formations",
+      "/resultats",
+      "/profil",
+      "/progression",
+      "/revision",
+      "/certificats",
+    ];
+    for (const role of ["admin", "designer", "trainer", "manager", "learner"] as const) {
+      for (const item of navigationFor(role)) {
+        expect(ECRANS_LIVRES).toContain(item.href);
+      }
+    }
+  });
+
   it("chaque élément possède un chemin absolu", () => {
     for (const role of ["admin", "designer", "trainer", "manager", "learner"] as const) {
       for (const item of navigationFor(role)) {

@@ -11,6 +11,7 @@ import {
   isContentEditable,
   LEVEL_LABELS,
   STATUS_LABELS,
+  TON_STATUT,
   transitionLabel,
   type CourseStatus,
 } from "@/lib/courses/statuts";
@@ -32,7 +33,7 @@ import {
 } from "@/app/(app)/catalogue/importer/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
-import { Alert, Badge, Card, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
+import { Alert, Badge, Card, Input, Label, LienTexte, PageTitle, Retour, SecondaryLink, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Éditeur de formation" };
 
@@ -127,18 +128,12 @@ export default async function EditeurFormationPage({
             {/* Affectation des formateurs (migration 0010) : l'écran est
                 accessible à tous, mais seuls l'admin et le responsable
                 peuvent y modifier la liste. */}
-            <Link
-              href={`/catalogue/${formation.id}/formateurs`}
-              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <SecondaryLink href={`/catalogue/${formation.id}/formateurs`}>
               Formateurs
-            </Link>
-            <Link
-              href={`/catalogue/${formation.id}`}
-              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            </SecondaryLink>
+            <SecondaryLink href={`/catalogue/${formation.id}`}>
               Voir la fiche
-            </Link>
+            </SecondaryLink>
           </>
         }
       >
@@ -146,7 +141,7 @@ export default async function EditeurFormationPage({
       </PageTitle>
 
       <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2">
-        <Badge>{STATUS_LABELS[statut]}</Badge>
+        <Badge ton={TON_STATUT[statut]}>{STATUS_LABELS[statut]}</Badge>
         {!editable ? (
           <span className="text-sm text-slate-500">
             Contenu verrouillé : repassez en brouillon pour modifier.
@@ -163,13 +158,20 @@ export default async function EditeurFormationPage({
             formation.
           </p>
         ) : (
+          /* Une seule action porte l'or : celle qui fait avancer la
+             formation dans le cycle, toujours en tête de la liste des
+             transitions. Les autres (renvoyer en brouillon, archiver)
+             restent sobres — deux boutons or côte à côte laisseraient
+             croire que « Demander des corrections » est le geste attendu
+             autant qu'« Approuver ». */
           <div className="flex flex-wrap gap-3">
-            {transitions.map((cible) => (
+            {transitions.map((cible, rang) => (
               <AuthForm
                 key={cible}
                 action={changerStatut}
                 submitLabel={transitionLabel(statut, cible)}
                 pendingLabel="Mise à jour…"
+                ton={rang === 0 ? "or" : "sobre"}
               >
                 <input type="hidden" name="course_id" value={formation.id} />
                 <input type="hidden" name="cible" value={cible} />
@@ -187,7 +189,7 @@ export default async function EditeurFormationPage({
       </Card>
 
       {generation ? (
-        <Card className="mb-6 border-brand-200 bg-brand-50/50">
+        <Card className="mb-6 border-gold-400/40 bg-gold-300/10">
           <h2 className="mb-2 font-semibold">Contenu généré par IA — à relire</h2>
           <p className="text-xs text-slate-500">
             Générée le {new Date(generation.created_at).toLocaleString("fr-FR")} ·
@@ -331,7 +333,7 @@ export default async function EditeurFormationPage({
                       {[...m.lessons]
                         .sort((a, b) => a.position - b.position)
                         .map((l) => (
-                          <li key={l.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                          <li key={l.id} className="rounded-xl bg-sand-50 px-3.5 py-2.5 text-sm">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                               <span className="min-w-0">
                                 {l.title}
@@ -362,7 +364,7 @@ export default async function EditeurFormationPage({
                                     <Link
                                       key={a.id}
                                       href={`/catalogue/${formation.id}/qcm/${a.id}`}
-                                      className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                                      className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-medium text-ink-900 transition duration-200 hover:bg-gold-300/30"
                                     >
                                       📝 {a.title}
                                     </Link>
@@ -399,7 +401,7 @@ export default async function EditeurFormationPage({
                             {editable ? (
                               <div className="mt-2 flex flex-wrap gap-4">
                                 <details>
-                                  <summary className="cursor-pointer text-xs font-medium text-brand-600">
+                                  <summary className="cursor-pointer text-xs font-medium text-slate-600 transition duration-200 hover:text-ink-900">
                                     Ajouter un QCM
                                   </summary>
                                   <div className="mt-2">
@@ -418,7 +420,7 @@ export default async function EditeurFormationPage({
                                   </div>
                                 </details>
                                 <details>
-                                  <summary className="cursor-pointer text-xs font-medium text-brand-600">
+                                  <summary className="cursor-pointer text-xs font-medium text-slate-600 transition duration-200 hover:text-ink-900">
                                     Ajouter un support (PDF, Word, vidéo…)
                                   </summary>
                                   <div className="mt-2">
@@ -439,7 +441,7 @@ export default async function EditeurFormationPage({
                                           type="file"
                                           required
                                           accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.mp4,.mp3"
-                                          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
+                                          className="block w-full rounded-xl border border-sand-200 bg-sand-50/60 px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
                                         />
                                       </div>
                                     </AuthForm>
@@ -456,7 +458,7 @@ export default async function EditeurFormationPage({
 
                   {editable ? (
                     <details className="mt-3">
-                      <summary className="cursor-pointer text-sm font-medium text-brand-600">
+                      <summary className="cursor-pointer text-sm font-medium text-slate-600 transition duration-200 hover:text-ink-900">
                         Ajouter une leçon
                       </summary>
                       <div className="mt-3">
@@ -533,7 +535,7 @@ export default async function EditeurFormationPage({
                   return (
                     <li
                       key={l.competency_id}
-                      className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                      className="flex flex-col gap-2 rounded-xl bg-sand-50 px-3.5 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                     >
                       <span className="min-w-0">
                         {comp?.name}{" "}
@@ -590,9 +592,9 @@ export default async function EditeurFormationPage({
                 </AuthForm>
                 <p className="mt-2 text-xs text-slate-400">
                   Compétence manquante ?{" "}
-                  <Link href="/competences" className="text-brand-600 hover:underline">
+                  <LienTexte href="/competences">
                     Gérer le référentiel
-                  </Link>
+                  </LienTexte>
                 </p>
               </div>
             ) : null}
