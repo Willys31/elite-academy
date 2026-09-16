@@ -192,6 +192,8 @@ describe("navigationFor", () => {
       "/badges",
       "/classement",
       "/distinctions",
+      // Lot 15 – entraide
+      "/entraide",
     ];
     for (const role of ["admin", "designer", "trainer", "manager", "learner"] as const) {
       for (const item of navigationFor(role)) {

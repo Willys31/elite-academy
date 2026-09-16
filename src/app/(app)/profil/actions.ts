@@ -103,6 +103,49 @@ export async function mettreAJourPreferencesClassement(
   };
 }
 
+/**
+ * Opt-in Entraide (lot 15, addendum Entraide §2) : désactivée par
+ * défaut, activée explicitement ici. La date d'activation est gardée
+ * pour information.
+ */
+export async function activerEntraide(
+  _prev: AuthState,
+  formData: FormData
+): Promise<AuthState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const actif = formData.get("actif") === "on";
+  const supabase = await createClient();
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("preferences")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      preferences: fusionnerPreferences(profil?.preferences, {
+        entraide: { actif, depuis: actif ? new Date().toISOString() : null },
+      }),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    loguer("entraide", error);
+    return { error: "Votre choix n'a pas pu être enregistré. Réessayez." };
+  }
+
+  revalidatePath("/profil");
+  revalidatePath("/entraide");
+  return {
+    success: actif
+      ? "Entraide activée : vous pouvez partager vos blocages et aider vos pairs."
+      : "Entraide désactivée. Vos contributions passées restent visibles.",
+  };
+}
+
 export async function changerMotDePasse(
   _prev: AuthState,
   formData: FormData

@@ -129,6 +129,18 @@ export default async function ActivitePage({
             Vous pouvez refaire le QCM : seul votre meilleur score compte pour
             la maîtrise de la compétence.
           </p>
+          {/* Entraide (lot 15) : après une tentative, l'apprenant peut
+              partager son blocage, anonymement, avec ses pairs. */}
+          {Number(derniereTentative.score) < 80 ? (
+            <p className="mt-3 text-sm">
+              <Link
+                href={`/entraide/nouveau?formation=${formation.id}&activite=${activite.id}`}
+                className="font-medium text-brand-700 underline decoration-brand-700/30 underline-offset-[3px] hover:text-brand-800"
+              >
+                Partager mon blocage avec mes pairs
+              </Link>
+            </p>
+          ) : null}
         </Card>
       ) : null}
 

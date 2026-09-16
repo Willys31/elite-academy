@@ -16,6 +16,7 @@ import {
 } from "@/lib/profil/encadrement";
 import { lirePreferences, PSEUDO_MAX, PSEUDO_MIN } from "@/lib/profil/preferences";
 import {
+  activerEntraide,
   changerMotDePasse,
   mettreAJourIdentite,
   mettreAJourPreferencesClassement,
@@ -240,7 +241,29 @@ async function PanneauClassement({ userId }: { userId: string }) {
   const prefs = lirePreferences(profil?.preferences);
 
   return (
-    <section className="mt-8">
+    <section className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div>
+      <SectionTitre>Entraide</SectionTitre>
+      <Panneau>
+        <p className="mb-4 max-w-2xl text-sm leading-relaxed text-slate-600">
+          L&apos;Entraide vous permet de partager un point bloquant — de façon
+          anonyme — et d&apos;aider les autres apprenants. Elle est désactivée
+          par défaut : c&apos;est vous qui décidez.
+        </p>
+        <AuthForm action={activerEntraide} submitLabel="Enregistrer" pendingLabel="Enregistrement…" ton="sobre">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              name="actif"
+              defaultChecked={prefs.entraide.actif}
+              className="size-4 accent-brand-700"
+            />
+            Activer l&apos;Entraide
+          </label>
+        </AuthForm>
+      </Panneau>
+      </div>
+      <div>
       <SectionTitre>Classement</SectionTitre>
       <Panneau>
         <p className="mb-4 max-w-2xl text-sm leading-relaxed text-slate-600">
@@ -278,6 +301,7 @@ async function PanneauClassement({ userId }: { userId: string }) {
           </div>
         </AuthForm>
       </Panneau>
+      </div>
     </section>
   );
 }
