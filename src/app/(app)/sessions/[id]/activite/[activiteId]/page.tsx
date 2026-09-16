@@ -132,6 +132,7 @@ export default async function ActiviteSessionPage({
             <input type="hidden" name="course_id" value={session.course_id ?? ""} />
             <input type="hidden" name="activity_id" value={activite.id} />
             <input type="hidden" name="session_id" value={session.id} />
+            <input type="hidden" name="started_at" value={Date.now()} />
             <div className="space-y-6">
               {questions.map((q, i) => (
                 <fieldset key={q.id}>

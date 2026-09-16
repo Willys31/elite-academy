@@ -14,9 +14,11 @@ import {
   synthetiserEncadrement,
   type InscriptionEncadree,
 } from "@/lib/profil/encadrement";
+import { lirePreferences, PSEUDO_MAX, PSEUDO_MIN } from "@/lib/profil/preferences";
 import {
   changerMotDePasse,
   mettreAJourIdentite,
+  mettreAJourPreferencesClassement,
 } from "@/app/(app)/profil/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Champ, Chiffre, EcranTitre, Etiquette, LienSobre, Panneau, Retour, Saisie, SectionTitre } from "@/components/app";
@@ -193,6 +195,10 @@ export default async function ProfilPage() {
         </p>
       </section>
 
+      {/* ---------- Jeu et classement (lot 14) ----------
+          Un encadrant ne joue pas : il n'a ni points ni classement. */}
+      {encadrant ? null : <PanneauClassement userId={user.id} />}
+
       {/* ---------- Certificats : parole d'apprenant ----------
           Le portefeuille de certificats ne concerne que celui qui en
           détient. Un formateur ne s'inscrit pas, donc n'en obtient
@@ -217,6 +223,62 @@ export default async function ProfilPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Préférences de classement : opt-out et pseudo (addendum Gamification
+ * §7.1). Le masquage est appliqué en base par `classement_formation`.
+ */
+async function PanneauClassement({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("preferences")
+    .eq("id", userId)
+    .maybeSingle();
+  const prefs = lirePreferences(profil?.preferences);
+
+  return (
+    <section className="mt-8">
+      <SectionTitre>Classement</SectionTitre>
+      <Panneau>
+        <p className="mb-4 max-w-2xl text-sm leading-relaxed text-slate-600">
+          Les classements sont limités à votre formation et remis à zéro chaque
+          semaine ou chaque mois. Vous pouvez y apparaître sous votre nom, sous
+          un pseudo, ou ne pas y apparaître du tout.
+        </p>
+        <AuthForm
+          action={mettreAJourPreferencesClassement}
+          submitLabel="Enregistrer"
+          pendingLabel="Enregistrement…"
+          ton="sobre"
+        >
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              name="visible"
+              defaultChecked={prefs.classement.visible}
+              className="size-4 accent-brand-700"
+            />
+            Apparaître dans les classements de mes formations
+          </label>
+          <div>
+            <Champ htmlFor="pseudo" hint={`vide = votre nom · ${PSEUDO_MIN} à ${PSEUDO_MAX} caractères`}>
+              Pseudo affiché
+            </Champ>
+            <Saisie
+              id="pseudo"
+              name="pseudo"
+              type="text"
+              maxLength={PSEUDO_MAX}
+              defaultValue={prefs.classement.pseudo ?? ""}
+              placeholder="Laisser vide pour afficher votre nom"
+            />
+          </div>
+        </AuthForm>
+      </Panneau>
+    </section>
   );
 }
 

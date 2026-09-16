@@ -10,6 +10,13 @@ import {
   genererCodeSession,
   normaliserCode,
 } from "@/lib/sessions/sessions";
+import { XP_FIXES } from "@/lib/gamification/xp";
+import {
+  attribuerXp,
+  decernerBadge,
+  incrementerCompteurs,
+  verifierBadges,
+} from "@/lib/gamification/moteur";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 function loguer(contexte: string, error: { message?: string } | null) {
@@ -138,18 +145,24 @@ export async function cloturerSession(
   const sessionId = String(formData.get("session_id") ?? "");
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: session, error } = await supabase
     .from("live_sessions")
     .update({
       status: "closed",
       current_activity_id: null,
       ends_at: new Date().toISOString(),
     })
-    .eq("id", sessionId);
+    .eq("id", sessionId)
+    .eq("status", "open")
+    .select("id, organization_id, course_id")
+    .maybeSingle();
 
   if (error) {
     loguer("clôture", error);
     return { error: "La clôture a échoué. Vérifiez vos droits." };
+  }
+  if (!session) {
+    return { error: "Cette session est déjà clôturée ou n'est pas visible." };
   }
 
   await supabase.from("live_events").insert({
@@ -159,9 +172,99 @@ export async function cloturerSession(
     created_by: user.id,
   });
 
+  await gamifierCloture(supabase, session);
+
   revalidatePath(`/sessions/${sessionId}`);
   revalidatePath("/sessions");
   return { success: "Session clôturée. Les résultats sont conservés." };
+}
+
+/**
+ * Gamification de la clôture (lot 14) : chaque participant reçoit l'XP
+ * de complétion ; les trois meilleurs scores de la session reçoivent le
+ * bonus Top 3 ; « Actif en session » va à ceux qui ont répondu à toutes
+ * les activités lancées, « Roi du direct » au premier.
+ */
+async function gamifierCloture(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  session: { id: string; organization_id: string; course_id: string | null }
+) {
+  const [{ data: participants }, { data: tentatives }, { data: lancements }] = await Promise.all([
+    supabase.from("session_participants").select("user_id").eq("session_id", session.id),
+    supabase
+      .from("attempts")
+      .select("user_id, activity_id, score")
+      .eq("session_id", session.id),
+    supabase
+      .from("live_events")
+      .select("payload")
+      .eq("session_id", session.id)
+      .eq("type", "activity_launched"),
+  ]);
+
+  const activitesLancees = new Set(
+    (lancements ?? [])
+      .map((e) => (e.payload as { activity_id?: string | null })?.activity_id)
+      .filter((a): a is string => typeof a === "string" && a.length > 0)
+  );
+
+  // Meilleur score par (participant, activité), puis total par participant.
+  const meilleurs = new Map<string, Map<string, number>>();
+  for (const t of tentatives ?? []) {
+    if (t.score === null) continue;
+    const parActivite = meilleurs.get(t.user_id) ?? new Map<string, number>();
+    const actuel = parActivite.get(t.activity_id) ?? -1;
+    if (Number(t.score) > actuel) parActivite.set(t.activity_id, Number(t.score));
+    meilleurs.set(t.user_id, parActivite);
+  }
+  const totaux = [...meilleurs.entries()]
+    .map(([userId, parActivite]) => ({
+      userId,
+      total: [...parActivite.values()].reduce((a, b) => a + b, 0),
+      nbActivites: parActivite.size,
+    }))
+    .sort((a, b) => b.total - a.total);
+  const top3 = totaux.slice(0, 3).map((t) => t.userId);
+
+  for (const p of participants ?? []) {
+    const userId = p.user_id as string;
+    await attribuerXp({
+      userId,
+      organizationId: session.organization_id,
+      type: "session_completion",
+      montant: XP_FIXES.session_completion,
+      referenceId: session.id,
+      courseId: session.course_id,
+      sessionId: session.id,
+    });
+    if (top3.includes(userId)) {
+      await attribuerXp({
+        userId,
+        organizationId: session.organization_id,
+        type: "session_top3",
+        montant: XP_FIXES.session_top3,
+        referenceId: session.id,
+        courseId: session.course_id,
+        sessionId: session.id,
+        details: { rang: top3.indexOf(userId) + 1 },
+      });
+    }
+    const repondu = meilleurs.get(userId);
+    if (
+      activitesLancees.size > 0 &&
+      repondu &&
+      [...activitesLancees].every((a) => repondu.has(a))
+    ) {
+      await decernerBadge(userId, session.organization_id, "actif_session", session.id, {
+        course_id: session.course_id,
+      });
+    }
+  }
+  if (top3[0] && activitesLancees.size > 0) {
+    await decernerBadge(top3[0], session.organization_id, "roi_du_direct", session.id, {
+      course_id: session.course_id,
+    });
+  }
 }
 
 // ------------------------------------------------------------
@@ -237,7 +340,7 @@ export async function rejoindreParCode(
   const supabase = await createClient();
   const { data: session } = await supabase
     .from("live_sessions")
-    .select("id, status, title")
+    .select("id, status, title, organization_id, course_id, starts_at")
     .eq("session_code", code)
     .maybeSingle();
 
@@ -261,6 +364,36 @@ export async function rejoindreParCode(
   if (error && error.code !== "23505") {
     loguer("présence", error);
     return { error: "L'enregistrement de votre présence a échoué. Réessayez." };
+  }
+
+  // Gamification (lot 14) : présence et ponctualité, une fois par
+  // session (référence = session). Le lot 17 affinera à la clôture.
+  if (!error) {
+    const maintenant = Date.now();
+    const debut = session.starts_at ? new Date(session.starts_at).getTime() : null;
+    const ponctuel = debut === null || maintenant <= debut + 5 * 60_000;
+    await attribuerXp({
+      userId: user.id,
+      organizationId: session.organization_id,
+      type: "session_presence",
+      montant: XP_FIXES.session_presence,
+      referenceId: session.id,
+      courseId: session.course_id,
+      sessionId: session.id,
+    });
+    if (ponctuel) {
+      await attribuerXp({
+        userId: user.id,
+        organizationId: session.organization_id,
+        type: "session_ponctualite",
+        montant: XP_FIXES.session_ponctualite,
+        referenceId: session.id,
+        courseId: session.course_id,
+        sessionId: session.id,
+      });
+    }
+    await incrementerCompteurs(user.id, { sessions_presentes: 1 });
+    await verifierBadges(user.id, session.organization_id);
   }
 
   redirect(`/sessions/${session.id}/participer`);

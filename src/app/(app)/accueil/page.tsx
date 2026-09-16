@@ -14,10 +14,14 @@ import { calculerCompletion } from "@/lib/courses/progression";
 import { lireTentative, questionsARevoir } from "@/lib/courses/revision";
 import { STATUTS_AVEC_ACCES } from "@/lib/courses/inscriptions";
 import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
+import { lirePreferences } from "@/lib/profil/preferences";
+import { libelleNiveau } from "@/lib/gamification/niveaux";
+import { resumeGamification } from "@/lib/gamification/resume";
 import {
   Chiffre,
   EcranTitre,
   Etiquette,
+  Jauge,
   LienOr,
   LienSobre,
   Panneau,
@@ -249,6 +253,9 @@ export default async function AccueilPage() {
         />
       </dl>
 
+      {/* ---------- Niveau, prochain badge, série (lot 14) ---------- */}
+      <PanneauJeu userId={user.id} />
+
       {/* ---------- Deux colonnes : révision et session ---------- */}
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <Panneau>
@@ -323,6 +330,80 @@ export default async function AccueilPage() {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   Gamification de l'accueil apprenant (addendum §8.1)
+   ------------------------------------------------------------------ */
+
+/**
+ * Barre de niveau global, prochain badge en cours, série de jours,
+ * accès au classement. Reste discret : c'est une couche de motivation,
+ * pas le cœur de l'écran.
+ */
+async function PanneauJeu({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const [resume, { data: profil }] = await Promise.all([
+    resumeGamification(supabase, userId),
+    supabase.from("profiles").select("preferences").eq("id", userId).maybeSingle(),
+  ]);
+  const prefs = lirePreferences(profil?.preferences);
+
+  return (
+    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <Panneau className="lg:col-span-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-medium text-slate-500">Niveau global</p>
+          <Link href="/badges" className="text-xs font-medium text-brand-700 hover:text-brand-800">
+            Mes badges
+          </Link>
+        </div>
+        <p className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-950">
+          Niveau {resume.niveau.niveau} · {resume.niveau.titre}
+        </p>
+        <div className="mt-3">
+          <Jauge pourcent={resume.niveau.progressionPourcent} libelle={libelleNiveau(resume.niveau)} />
+        </div>
+      </Panneau>
+
+      <Panneau>
+        <p className="text-sm font-medium text-slate-500">Prochain badge</p>
+        {resume.prochain ? (
+          <>
+            <p className="mt-1 text-base font-semibold text-ink-900">{resume.prochain.badge.nom}</p>
+            <p className="text-xs text-slate-500">{resume.prochain.badge.description}</p>
+            <div className="mt-3">
+              <Jauge
+                pourcent={(resume.prochain.actuel / resume.prochain.cible) * 100}
+                libelle={`${resume.prochain.actuel}/${resume.prochain.cible}`}
+              />
+            </div>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-slate-600">Tous les badges à compteur sont obtenus.</p>
+        )}
+      </Panneau>
+
+      <Panneau>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-medium text-slate-500">Série en cours</p>
+          {prefs.classement.visible ? (
+            <Link href="/classement" className="text-xs font-medium text-brand-700 hover:text-brand-800">
+              Voir le classement
+            </Link>
+          ) : null}
+        </div>
+        <p className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-950">
+          {resume.serieJours} jour{resume.serieJours > 1 ? "s" : ""} d&apos;affilée
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          {resume.serieJours === 0
+            ? "Terminez une leçon ou un QCM aujourd'hui pour démarrer une série."
+            : "Une leçon ou un QCM par jour suffit à la prolonger."}
+        </p>
+      </Panneau>
     </div>
   );
 }

@@ -143,6 +143,8 @@ export default async function ActivitePage({
           >
             <input type="hidden" name="course_id" value={formation.id} />
             <input type="hidden" name="activity_id" value={activite.id} />
+            {/* Horodatage de l'affichage, pour le bonus de rapidité (lot 14). */}
+            <input type="hidden" name="started_at" value={Date.now()} />
             <div className="space-y-6">
               {questions.map((q, i) => (
                 <fieldset key={q.id}>

@@ -132,6 +132,7 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Mes sessions", href: "/sessions" },
         { label: "Mes formations", href: "/formations" },
         { label: "Résultats", href: "/resultats" },
+        { label: "Distinctions", href: "/distinctions" },
         { label: "Profil", href: "/profil" },
       ];
     case "manager":
@@ -140,6 +141,7 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Mon organisation", href: "/organisations" },
         { label: "Parcours attribués", href: "/formations" },
         { label: "Rapports", href: "/rapports" },
+        { label: "Distinctions", href: "/distinctions" },
         { label: "Profil", href: "/profil" },
       ];
     case "learner":
@@ -150,6 +152,8 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Mes formations", href: "/formations" },
         { label: "Ma progression", href: "/progression" },
         { label: "Ma révision", href: "/revision" },
+        { label: "Badges", href: "/badges" },
+        { label: "Classement", href: "/classement" },
         { label: "Mes certificats", href: "/certificats" },
         { label: "Mon profil", href: "/profil" },
       ];

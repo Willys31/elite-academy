@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
+import { fusionnerPreferences, validerPseudo } from "@/lib/profil/preferences";
 import type { AuthState } from "@/app/(auth)/actions";
 
 /**
@@ -53,6 +54,53 @@ export async function mettreAJourIdentite(
      barre latérale jusqu'à la navigation suivante. */
   revalidatePath("/", "layout");
   return { success: "Votre nom a été mis à jour." };
+}
+
+/**
+ * Préférences de classement (lot 14) : apparaître ou non dans les
+ * classements de ses formations, et sous quel nom. Le filtrage réel se
+ * fait dans la fonction SQL `classement_formation`, qui lit ces mêmes
+ * préférences : l'écran ne peut pas « oublier » le masquage.
+ */
+export async function mettreAJourPreferencesClassement(
+  _prev: AuthState,
+  formData: FormData
+): Promise<AuthState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const visible = formData.get("visible") === "on";
+  const pseudo = validerPseudo(String(formData.get("pseudo") ?? ""));
+  if (!pseudo.ok) return { error: pseudo.raison };
+
+  const supabase = await createClient();
+  const { data: profil } = await supabase
+    .from("profiles")
+    .select("preferences")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      preferences: fusionnerPreferences(profil?.preferences, {
+        classement: { visible, pseudo: pseudo.pseudo },
+      }),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    loguer("préférences de classement", error);
+    return { error: "Vos préférences n'ont pas pu être enregistrées. Réessayez." };
+  }
+
+  revalidatePath("/profil");
+  revalidatePath("/classement");
+  return {
+    success: visible
+      ? `Vous apparaissez dans les classements${pseudo.pseudo ? ` sous le nom « ${pseudo.pseudo} »` : " sous votre nom"}.`
+      : "Vous n'apparaissez plus dans les classements.",
+  };
 }
 
 export async function changerMotDePasse(

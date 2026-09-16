@@ -188,6 +188,10 @@ describe("navigationFor", () => {
       "/progression",
       "/revision",
       "/certificats",
+      // Lot 14 – gamification
+      "/badges",
+      "/classement",
+      "/distinctions",
     ];
     for (const role of ["admin", "designer", "trainer", "manager", "learner"] as const) {
       for (const item of navigationFor(role)) {
