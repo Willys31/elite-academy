@@ -133,6 +133,7 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Mes formations", href: "/formations" },
         { label: "Résultats", href: "/resultats" },
         { label: "Entraide", href: "/entraide" },
+        { label: "Situations de travail", href: "/situations" },
         { label: "Distinctions", href: "/distinctions" },
         { label: "Profil", href: "/profil" },
       ];
@@ -154,6 +155,7 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Ma progression", href: "/progression" },
         { label: "Ma révision", href: "/revision" },
         { label: "Entraide", href: "/entraide" },
+        { label: "Situations de travail", href: "/situations" },
         { label: "Badges", href: "/badges" },
         { label: "Classement", href: "/classement" },
         { label: "Mes certificats", href: "/certificats" },

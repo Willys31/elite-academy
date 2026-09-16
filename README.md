@@ -51,8 +51,9 @@ Dans l'éditeur SQL de Supabase, exécuter dans l'ordre :
 12. `supabase/migrations/0012_socle_notifications_visibilite.sql`
 13. `supabase/migrations/0013_gamification.sql`
 14. `supabase/migrations/0014_entraide.sql`
-15. Créer votre compte via l'écran d'inscription de l'application
-16. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
+15. `supabase/migrations/0015_situations_travail.sql`
+16. Créer votre compte via l'écran d'inscription de l'application
+17. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
     pour devenir administrateur Elite Experience
 
 ### 4. Lancer
