@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/reinitialisation",
   "/auth",
   "/verifier", // vérification publique des certificats, sans compte
+  "/api/tldv", // webhook tl;dv, protégé par secret partagé (lot 17)
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -71,7 +72,8 @@ export async function updateSession(request: NextRequest) {
     if (
       pathname !== "/reinitialisation" &&
       !pathname.startsWith("/auth") &&
-      !pathname.startsWith("/verifier")
+      !pathname.startsWith("/verifier") &&
+      !pathname.startsWith("/api/")
     ) {
       const url = request.nextUrl.clone();
       url.pathname = "/accueil";

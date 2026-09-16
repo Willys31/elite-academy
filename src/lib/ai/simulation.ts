@@ -81,3 +81,48 @@ export function genererSimulation(brief: BriefGeneration): string {
 
   return JSON.stringify(resultat);
 }
+
+/**
+ * Analyse de session de démonstration (lot 17), sans appel au LLM.
+ * Les locuteurs et quelques extraits sont pris dans la transcription
+ * pour que le bilan ressemble à une vraie analyse, mais tout est
+ * étiqueté démonstration.
+ */
+export function simulerAnalyseSession(params: {
+  titre: string;
+  formateur: string;
+  locuteurs: string[];
+  extraits: Array<{ locuteur: string; texte: string }>;
+}): string {
+  const marque = "[DÉMONSTRATION — analyse produite en mode simulation, sans IA.]";
+  const participants = params.locuteurs.filter((l) => l !== params.formateur);
+  const interventions = params.extraits.slice(0, 6).map((e, i) => ({
+    speaker: e.locuteur,
+    start_seconds: i * 90,
+    end_seconds: i * 90 + 30,
+    type: e.texte.includes("?") ? "question" : e.locuteur === params.formateur ? "answer" : "remark",
+    snippet: e.texte.slice(0, 160),
+    quality_score: e.texte.includes("?") ? 4 : null,
+  }));
+  const resultat = {
+    summary: `${marque}\n\nSession « ${params.titre} » animée par ${params.formateur}. ${params.locuteurs.length} locuteur(s) identifié(s) dans la transcription. Lors d'une vraie analyse, ce résumé reprendrait les objectifs annoncés, les notions traitées, les exemples donnés et les conclusions de la séance.`,
+    key_points: [
+      "[DÉMO] Point clé 1 : notion principale traitée pendant la session.",
+      "[DÉMO] Point clé 2 : exemple professionnel développé par le formateur.",
+      "[DÉMO] Point clé 3 : question récurrente des participants.",
+    ],
+    keywords: ["démonstration", "session", "analyse"],
+    interventions,
+    insights: {
+      trainer_talk_ratio: 0.65,
+      participation_rate: participants.length > 0 ? Math.min(1, participants.length / Math.max(1, params.locuteurs.length)) : 0,
+      recommendations_trainer: [
+        "[DÉMO] Laisser un temps de silence après chaque question pour favoriser les prises de parole.",
+        "[DÉMO] Reformuler les questions des participants avant d'y répondre.",
+      ],
+      recommendations_learners: ["[DÉMO] Préparer une question avant la prochaine session."],
+      warnings: ["CONTENU DE DÉMONSTRATION généré en mode simulation, sans appel au LLM."],
+    },
+  };
+  return JSON.stringify(resultat);
+}

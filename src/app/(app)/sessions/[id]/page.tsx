@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -16,7 +17,7 @@ import {
 import { SessionRealtimeRefresh } from "@/components/sessions/SessionRealtimeRefresh";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
-import { Alert, Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Session en direct" };
 
@@ -39,7 +40,7 @@ export default async function SessionDirectePage({
   const { data: session } = await supabase
     .from("live_sessions")
     .select(
-      "id, title, session_code, status, current_activity_id, trainer_id, course_id, organization_id, starts_at, course:courses(title, current_version_id)"
+      "id, title, session_code, status, current_activity_id, trainer_id, course_id, organization_id, starts_at, ends_at, location, recording_enabled, course:courses(title, current_version_id)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -73,7 +74,7 @@ export default async function SessionDirectePage({
   const [{ data: participants }, { data: tentatives }] = await Promise.all([
     supabase
       .from("session_participants")
-      .select("id, joined_at, profile:profiles(full_name, email)")
+      .select("id, joined_at, left_at, recording_consent, profile:profiles(full_name, email)")
       .eq("session_id", session.id)
       .order("joined_at"),
     session.current_activity_id
@@ -107,11 +108,33 @@ export default async function SessionDirectePage({
       <SessionRealtimeRefresh sessionId={session.id} />
 
       <Retour href="/sessions" ton="sobre" />
-      <PageTitle action={<Badge>{SESSION_STATUS_LABELS[session.status]}</Badge>}>
+      <PageTitle
+        action={
+          <>
+            <Badge>{SESSION_STATUS_LABELS[session.status]}</Badge>
+            {session.recording_enabled ? <Badge ton="or">Enregistrée</Badge> : null}
+            <SecondaryLink href={`/sessions/${session.id}/bilan`}>
+              {ouverte ? "Transcription et bilan" : "Bilan de la session"}
+            </SecondaryLink>
+          </>
+        }
+      >
         {session.title}
       </PageTitle>
-      {course?.title ? (
-        <p className="-mt-4 mb-6 text-sm text-slate-500">Formation : {course.title}</p>
+      {course?.title || session.location || session.starts_at ? (
+        <p className="-mt-4 mb-6 text-sm text-slate-500">
+          {[
+            course?.title ? `Formation : ${course.title}` : null,
+            session.location,
+            session.starts_at
+              ? `${new Date(session.starts_at).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}${
+                  session.ends_at ? ` → ${new Date(session.ends_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""
+                }`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
@@ -144,13 +167,23 @@ export default async function SessionDirectePage({
               {participants.map((p) => {
                 const profil = Array.isArray(p.profile) ? p.profile[0] : p.profile;
                 return (
-                  <li key={p.id} className="rounded bg-slate-50 px-3 py-1.5">
-                    {profil?.full_name || profil?.email}
-                    <span className="ml-2 text-xs text-slate-400">
-                      {new Date(p.joined_at).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                  <li key={p.id} className="flex items-center justify-between gap-2 rounded bg-slate-50 px-3 py-1.5">
+                    <span className="min-w-0 truncate">
+                      {profil?.full_name || profil?.email}
+                      <span className="ml-2 text-xs text-slate-400">
+                        {new Date(p.joined_at).toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {p.left_at
+                        ? `parti à ${new Date(p.left_at as string).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                        : ouverte
+                          ? "dans la salle"
+                          : ""}
+                      {session.recording_enabled && !p.recording_consent ? " · sans enregistrement" : ""}
                     </span>
                   </li>
                 );
@@ -250,8 +283,9 @@ export default async function SessionDirectePage({
           {ouverte ? (
             <div>
               <p className="mb-3 text-sm text-slate-600">
-                La clôture arrête les activités et conserve présences et
-                résultats. Cette action est définitive.
+                La clôture arrête les activités, calcule présences,
+                ponctualité et points de chaque participant, et conserve
+                les résultats. Cette action est définitive.
               </p>
               <AuthForm
                 action={cloturerSession}
@@ -263,7 +297,10 @@ export default async function SessionDirectePage({
             </div>
           ) : (
             <p className="text-sm text-slate-500">
-              Session clôturée — présences et résultats conservés.
+              Session clôturée — présences et résultats conservés.{" "}
+              <Link href={`/sessions/${session.id}/bilan`} className="font-medium text-brand-700 hover:underline">
+                Voir le bilan
+              </Link>
             </p>
           )}
 

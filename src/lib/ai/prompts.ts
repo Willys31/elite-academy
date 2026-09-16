@@ -152,3 +152,72 @@ Contraintes :
 - choisis uniquement les méthodes pédagogiques pertinentes pour ce sujet ; n'impose pas une structure commerciale à une formation non commerciale ;
 - rédige tout en français professionnel clair.`;
 }
+
+/* ------------------------------------------------------------------
+   Lot 17 – Analyse pédagogique d'une session (note taker IA)
+   ------------------------------------------------------------------ */
+
+export const PROMPT_VERSION_SESSION = "analyse-session/v1";
+
+/**
+ * Contexte système : synthèse fidèle d'une transcription de session,
+ * sans invention, avec des insights mesurés. Format JSON strict.
+ */
+export const SYSTEM_ANALYSE_SESSION = `Tu es un assistant pédagogique pour Elite Academy, plateforme de formation professionnelle multi-domaines d'Elite Experience. On te confie la TRANSCRIPTION d'une session de formation en direct (présentiel ou distanciel). Ta mission : en produire des notes fidèles et une analyse pédagogique mesurée. N'invente aucun fait, aucun chiffre, aucune intervention : tout ce que tu écris doit pouvoir se retrouver dans la transcription. Si une information manque, dis-le dans "warnings". Reste neutre et bienveillant : l'analyse sert à améliorer les prochaines sessions, pas à juger les personnes.
+
+Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises de code. Structure exacte attendue :
+{
+  "summary": "string (résumé structuré : objectifs de la session, points clés traités, conclusions ; 10 à 25 lignes)",
+  "key_points": ["string (point clé, définition ou exemple important)"],
+  "keywords": ["string (terme ou compétence importante, en minuscules)"],
+  "interventions": [
+    {
+      "speaker": "string (étiquette du locuteur telle qu'elle apparaît dans la transcription)",
+      "start_seconds": number | null,
+      "end_seconds": number | null,
+      "type": "question" | "answer" | "remark",
+      "snippet": "string (extrait court, cité fidèlement)",
+      "quality_score": number | null (1 à 5 : pertinence et clarté d'une question ou d'une contribution)
+    }
+  ],
+  "insights": {
+    "trainer_talk_ratio": number (part de parole du formateur, entre 0 et 1, estimée à partir de la transcription),
+    "participation_rate": number (part des participants nommés qui sont intervenus au moins une fois, entre 0 et 1),
+    "recommendations_trainer": ["string (conseil concret pour le formateur)"],
+    "recommendations_learners": ["string (conseil concret pour les apprenants)"],
+    "warnings": ["string (limites de l'analyse : transcription partielle, locuteurs non identifiés…)"]
+  }
+}`;
+
+export interface ContexteAnalyseSession {
+  titre: string;
+  formation: string | null;
+  dureeMinutes: number | null;
+  /** Étiquettes attendues : formateur puis participants. */
+  formateur: string;
+  participants: string[];
+  transcript: string;
+  /** Remplacer les noms par « Apprenant 1 », « Apprenant 2 »… */
+  anonymiser: boolean;
+}
+
+/** Prompt utilisateur d'analyse de session (addendum Sessions §7). */
+export function construirePromptAnalyseSession(c: ContexteAnalyseSession): string {
+  return `Analyse la session suivante.
+
+Titre : ${c.titre}
+Formation liée : ${c.formation ?? "non précisée"}
+Durée : ${c.dureeMinutes !== null ? `${c.dureeMinutes} minutes` : "non précisée"}
+Formateur : ${c.formateur}
+Participants inscrits : ${c.participants.length > 0 ? c.participants.join(", ") : "liste non disponible"}
+${c.anonymiser ? "Anonymisation demandée : dans ta réponse, désigne les participants par « Apprenant 1 », « Apprenant 2 »… dans l'ordre de première prise de parole ; ne cite jamais leur nom.\n" : ""}
+Consignes :
+- résume fidèlement, sans ajouter d'information absente de la transcription ;
+- repère les questions posées par les participants et les réponses du formateur ;
+- estime la part de parole du formateur et le taux de participation ;
+- formule 2 à 5 recommandations concrètes pour le formateur et 1 à 3 pour les apprenants ;
+- rédige en français professionnel clair.
+
+TRANSCRIPTION :
+${c.transcript}`;
+}

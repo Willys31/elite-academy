@@ -5,9 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { activeMemberships, isEliteAdmin } from "@/lib/auth/roles";
 import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
+import {
+  etiquettePortee,
+  PORTEE_DESCRIPTIONS,
+  PORTEE_LABELS,
+  PORTEES,
+  porteeValide,
+  recommandationPortee,
+} from "@/lib/partage/visibilite";
 import { creerSession } from "@/app/(app)/sessions/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
-import { Alert } from "@/components/ui";
+import { Alert, Textarea } from "@/components/ui";
 import { Champ, EcranTitre, Etiquette, LienSobre, Panneau, Retour, Saisie, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Sessions" };
@@ -19,11 +27,12 @@ const CLASSES_SELECT =
 export default async function SessionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ supprimee?: string }>;
+  searchParams: Promise<{ supprimee?: string; portee?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
   const params = await searchParams;
+  const filtrePortee = porteeValide(params.portee) ? params.portee : null;
 
   const actives = activeMemberships(user.memberships);
   const elite = isEliteAdmin(user.memberships);
@@ -42,10 +51,10 @@ export default async function SessionsPage({
     supabase
       .from("live_sessions")
       .select(
-        "id, title, session_code, status, starts_at, created_at, trainer_id, course:courses(title), organization:organizations(name)"
+        "id, title, session_code, status, starts_at, ends_at, location, visibility_scope, created_at, trainer_id, course:courses(title), organization:organizations(name)"
       )
       .order("created_at", { ascending: false })
-      .limit(30),
+      .limit(50),
     animateur
       ? supabase
           .from("courses")
@@ -55,7 +64,9 @@ export default async function SessionsPage({
       : Promise.resolve({ data: [] }),
   ]);
 
-  const listees = sessions ?? [];
+  const listees = (sessions ?? []).filter(
+    (s) => !filtrePortee || s.visibility_scope === filtrePortee
+  );
   /* Les sessions ouvertes remontent en tête : c'est la seule catégorie
      sur laquelle on agit dans l'instant. Le reste est de l'historique. */
   const ouvertes = listees.filter((s) => s.status === "open");
@@ -87,6 +98,22 @@ export default async function SessionsPage({
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Sessions">
+          {/* Filtre par niveau de partage (addendum Sessions §11.4). */}
+          <nav aria-label="Filtrer par portée" className="mb-4 flex flex-wrap gap-2">
+            {[null, ...PORTEES].map((p) => (
+              <Link
+                key={p ?? "toutes"}
+                href={p ? `/sessions?portee=${p}` : "/sessions"}
+                className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
+                  p === filtrePortee
+                    ? "border-brand-700 bg-brand-700 text-white"
+                    : "border-sand-300 bg-white text-slate-700 hover:bg-sand-50"
+                }`}
+              >
+                {p ? PORTEE_LABELS[p] : "Toutes"}
+              </Link>
+            ))}
+          </nav>
           {listees.length === 0 ? (
             <Vide
               titre="Aucune session"
@@ -181,10 +208,58 @@ export default async function SessionsPage({
                   </p>
                 </div>
                 <div>
-                  <Champ htmlFor="starts_at" hint="facultatif">
-                    Date et heure
+                  <Champ htmlFor="description" hint="facultatif">
+                    Description
                   </Champ>
-                  <Saisie id="starts_at" name="starts_at" type="datetime-local" />
+                  <Textarea id="description" name="description" rows={2} maxLength={500} placeholder="Objectifs, déroulé, matériel à prévoir…" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Champ htmlFor="starts_at" hint="facultatif">
+                      Début
+                    </Champ>
+                    <Saisie id="starts_at" name="starts_at" type="datetime-local" />
+                  </div>
+                  <div>
+                    <Champ htmlFor="ends_at" hint="facultatif">
+                      Fin prévue
+                    </Champ>
+                    <Saisie id="ends_at" name="ends_at" type="datetime-local" />
+                  </div>
+                </div>
+                <p className="-mt-2 text-xs text-slate-500">
+                  Début et fin servent au calcul de la ponctualité et de la
+                  présence à la clôture.
+                </p>
+                <div>
+                  <Champ htmlFor="location" hint="facultatif">
+                    Lieu ou lien
+                  </Champ>
+                  <Saisie id="location" name="location" placeholder="Salle B2 · ou lien de visioconférence" />
+                </div>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium text-ink-900">Qui peut la voir et la rejoindre ?</legend>
+                  <div className="space-y-2">
+                    {PORTEES.map((p) => (
+                      <label key={p} className="flex cursor-pointer gap-3 rounded-lg border border-sand-200 px-3.5 py-2.5 text-sm has-checked:border-brand-600 has-checked:bg-brand-50">
+                        <input type="radio" name="portee" value={p} defaultChecked={p === "organization"} className="mt-0.5 size-4 accent-brand-700" />
+                        <span>
+                          <span className="font-medium text-ink-900">{PORTEE_LABELS[p]}</span>
+                          <span className="block text-xs leading-relaxed text-slate-500">{PORTEE_DESCRIPTIONS[p]} {recommandationPortee(p)}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink-900">
+                  <input type="checkbox" name="recording_enabled" className="size-4 accent-brand-700" />
+                  Session enregistrée et transcrite (consentement demandé aux participants)
+                </label>
+                <div>
+                  <Champ htmlFor="tldv_meeting_id" hint="facultatif">
+                    Identifiant de réunion tl;dv
+                  </Champ>
+                  <Saisie id="tldv_meeting_id" name="tldv_meeting_id" placeholder="Pour rattacher automatiquement la transcription" />
                 </div>
               </AuthForm>
             </Panneau>
@@ -214,6 +289,7 @@ function ListeSessions({
             : s.organization;
           const estAnimateur = s.trainer_id === userId || animateur;
           const ouverte = s.status === "open";
+          const portee = etiquettePortee((s.visibility_scope as "group") ?? "organization");
           return (
             <li key={s.id as string}>
               <Link
@@ -230,13 +306,17 @@ function ListeSessions({
                     {[
                       (org as { name?: string })?.name,
                       (course as { title?: string })?.title,
+                      s.location as string | null,
                       s.starts_at
                         ? new Date(s.starts_at as string).toLocaleString("fr-FR", {
                             day: "numeric",
                             month: "long",
                             hour: "2-digit",
                             minute: "2-digit",
-                          })
+                          }) +
+                          (s.ends_at
+                            ? ` → ${new Date(s.ends_at as string).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                            : "")
                         : null,
                     ]
                       .filter(Boolean)
@@ -244,6 +324,7 @@ function ListeSessions({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                  <Etiquette ton={portee.ton}>{portee.libelle}</Etiquette>
                   {/* Le code n'est mis en avant que sur une session ouverte :
                       ailleurs, il n'a plus d'usage. */}
                   <span
