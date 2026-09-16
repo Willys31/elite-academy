@@ -154,6 +154,7 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Mes formations", href: "/formations" },
         { label: "Ma progression", href: "/progression" },
         { label: "Ma révision", href: "/revision" },
+        { label: "Tutorat IA", href: "/tutorat" },
         { label: "Entraide", href: "/entraide" },
         { label: "Situations de travail", href: "/situations" },
         { label: "Badges", href: "/badges" },

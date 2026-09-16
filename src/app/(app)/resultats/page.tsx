@@ -10,6 +10,7 @@ import {
   syntheseParApprenant,
   type LigneTentative,
 } from "@/lib/resultats/resultats";
+import { bandeDeBlocage, SEUIL_ALERTE, TON_BANDE, TYPE_BLOCAGE_LABELS, type Bande, type TypeBlocage } from "@/lib/tutorat/blocage";
 import { TableScroll } from "@/components/ui";
 import { Chiffre, EcranTitre, Etiquette, LienSobre, Panneau, Retour, SectionTitre, Vide } from "@/components/app";
 
@@ -118,7 +119,7 @@ export default async function ResultatsPage({
   }
 
   const idsActivites = activites.map((a) => a.id);
-  const [{ data: tentatives }, { data: competences }] = await Promise.all([
+  const [{ data: tentatives }, { data: competences }, { data: blocages }] = await Promise.all([
     idsActivites.length > 0
       ? supabase
           .from("attempts")
@@ -130,13 +131,23 @@ export default async function ResultatsPage({
       .select("user_id, mastery_level, score, competency:competencies(id, name, domain)")
       .eq("course_id", choisie.id)
       .not("competency_id", "is", null),
+    /* Alertes de blocage (lot 18) : score ≥ 0,6, du plus élevé au plus bas. */
+    supabase
+      .from("competency_blocking_scores")
+      .select("user_id, score, band, blocking_types, computed_at, competency:competencies(name)")
+      .eq("course_id", choisie.id)
+      .gte("score", SEUIL_ALERTE)
+      .order("score", { ascending: false }),
   ]);
 
   /* Noms des apprenants. `profiles_select` autorise la lecture des
      profils partageant une organisation : un formateur voit donc bien
      les noms de ses apprenants, et personne d'autre. */
   const idsApprenants = [
-    ...new Set((tentatives ?? []).map((t) => t.user_id as string)),
+    ...new Set([
+      ...(tentatives ?? []).map((t) => t.user_id as string),
+      ...(blocages ?? []).map((b) => b.user_id as string),
+    ]),
   ];
   const noms = new Map<string, string>();
   if (idsApprenants.length > 0) {
@@ -228,6 +239,42 @@ export default async function ResultatsPage({
           </button>
         </form>
       </Panneau>
+
+      {/* ---------- Alertes de blocage (lot 18) ---------- */}
+      {(blocages ?? []).length > 0 ? (
+        <section className="mb-8">
+          <SectionTitre compte={(blocages ?? []).length}>Alertes de blocage</SectionTitre>
+          <p className="mb-3 text-sm leading-relaxed text-slate-600">
+            Score de blocage ≥ 0,6 : le tuteur IA recommande un exercice de
+            remédiation ou un point individuel. Un score ≥ 0,8 justifie une
+            pause et un entretien.
+          </p>
+          <Panneau flush>
+            <ul className="divide-y divide-sand-100">
+              {(blocages ?? []).map((b, i) => {
+                const comp = Array.isArray(b.competency) ? b.competency[0] : b.competency;
+                const bande = bandeDeBlocage(Number(b.score));
+                const types = ((b.blocking_types as string[] | null) ?? []) as TypeBlocage[];
+                return (
+                  <li key={i} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink-900">
+                        {noms.get(b.user_id as string) ?? "Apprenant"}
+                        <span className="text-slate-500"> · {comp?.name ?? "compétence"}</span>
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {types.length > 0 ? types.map((t) => TYPE_BLOCAGE_LABELS[t] ?? t).join(", ") + " · " : ""}
+                        {bande.action}
+                      </p>
+                    </div>
+                    <Etiquette ton={TON_BANDE[bande.bande as Bande]}>{Number(b.score)} · {bande.libelle}</Etiquette>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panneau>
+        </section>
+      ) : null}
 
       {lignes.length === 0 ? (
         <Vide

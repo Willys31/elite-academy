@@ -126,3 +126,50 @@ export function simulerAnalyseSession(params: {
   };
   return JSON.stringify(resultat);
 }
+
+/** Aide de démonstration (lot 18), sans appel au LLM. */
+export function simulerAide(type: string, enonce: string): string {
+  const marque = "[DÉMO — tuteur en mode simulation, sans IA]";
+  const court = enonce.slice(0, 120);
+  const textes: Record<string, string> = {
+    reformulate: `${marque} Autrement dit : « ${court} ». La question vous demande d'identifier, parmi les options, celle qui respecte la règle vue dans la leçon. Relisez la définition, puis éliminez les options qui la contredisent.`,
+    dont_understand: `${marque} La notion en jeu est celle que la leçon présente juste avant cette question. Imaginez-la dans votre quotidien professionnel : que se passerait-il si on l'appliquait mal ? C'est souvent ainsi qu'on comprend pourquoi elle existe.`,
+    hint: `${marque} Indice de méthode : commencez par repérer ce que la question mesure exactement, puis vérifiez chaque option une à une contre cette définition. Une seule survit.`,
+    example: `${marque} Exemple similaire : avec d'autres chiffres ou une autre situation, la même règle s'applique. Refaites le raisonnement pas à pas sur cet exemple, puis transposez-le à la question.`,
+    detailed_explanation: `${marque} Explication détaillée : la bonne réponse est celle qui applique strictement la règle de la leçon ; l'erreur classique consiste à confondre deux notions proches. Relisez l'explication de la correction et refaites une tentative.`,
+  };
+  return textes[type] ?? textes.hint;
+}
+
+/** Exercices de démonstration (lot 18), sans appel au LLM. */
+export function simulerExercices(competence: string, typeExercice: string, nb: number): string {
+  const marque = "[DÉMO]";
+  const exercises = Array.from({ length: Math.max(1, Math.min(5, nb)) }, (_, i) => ({
+    title: `${marque} ${typeExercice} ${i + 1} — ${competence}`,
+    instructions:
+      "Contenu de démonstration généré en mode simulation. Une seule bonne réponse par question.",
+    type: typeExercice,
+    difficulty: 2,
+    questions: [
+      {
+        prompt: `${marque} Quelle affirmation décrit le mieux la compétence « ${competence} » ?`,
+        options: [
+          "Une capacité observable, mesurée par des critères",
+          "Une opinion personnelle",
+          "Un titre honorifique",
+        ],
+        correct_index: 0,
+        explanation:
+          "Une compétence est un comportement observable et mesurable — c'est le principe de la plateforme.",
+      },
+      {
+        prompt: `${marque} Face à une situation nouvelle, quelle démarche mobilise cette compétence ?`,
+        options: ["Agir sans analyser", "Analyser, décider, puis vérifier le résultat", "Attendre une consigne"],
+        correct_index: 1,
+        explanation:
+          "Analyser puis vérifier : c'est ce qui distingue le niveau Opérationnel du niveau Fondamentaux.",
+      },
+    ],
+  }));
+  return JSON.stringify({ exercises });
+}

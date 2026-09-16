@@ -196,6 +196,8 @@ describe("navigationFor", () => {
       "/entraide",
       // Lot 16 – situations de travail
       "/situations",
+      // Lot 18 – tutorat IA
+      "/tutorat",
     ];
     for (const role of ["admin", "designer", "trainer", "manager", "learner"] as const) {
       for (const item of navigationFor(role)) {

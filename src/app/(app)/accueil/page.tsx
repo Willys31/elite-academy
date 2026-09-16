@@ -450,13 +450,21 @@ async function VueFormateur({
   const ouvertes = liste.filter((s) => s.statut === "open");
   const idsSessions = liste.map((s) => s.id);
 
-  const { data: participations } =
+  const [{ data: participations }, { count: alertesBlocage }] = await Promise.all([
     idsSessions.length > 0
-      ? await supabase
+      ? supabase
           .from("session_participants")
           .select("session_id, user_id")
           .in("session_id", idsSessions)
-      : { data: [] as Array<Record<string, unknown>> };
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+    /* Alertes de blocage (lot 18) : apprenants des formations encadrées
+       dont le score de blocage atteint 0,6 — la RLS limite aux formations
+       que ce formateur encadre. */
+    supabase
+      .from("competency_blocking_scores")
+      .select("user_id", { count: "exact", head: true })
+      .gte("score", 0.6),
+  ]);
 
   const apprenantsDistincts = new Set(
     (participations ?? []).map((p) => p.user_id as string)
@@ -540,9 +548,9 @@ async function VueFormateur({
           href="/groupes"
         />
         <Chiffre
-          valeur={liste.filter((s) => s.statut === "closed").length}
-          libelle="Clôturées"
-          detail="résultats consultables"
+          valeur={alertesBlocage ?? 0}
+          libelle="Alertes de blocage"
+          detail={alertesBlocage ? "compétences à ≥ 0,6 — à traiter" : "aucun blocage important"}
           href="/resultats"
         />
       </dl>

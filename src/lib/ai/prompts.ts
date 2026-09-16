@@ -221,3 +221,117 @@ Consignes :
 TRANSCRIPTION :
 ${c.transcript}`;
 }
+
+/* ------------------------------------------------------------------
+   Lot 18 – Tutorat IA : aide contextuelle et exercices personnalisés
+   ------------------------------------------------------------------ */
+
+export const PROMPT_VERSION_TUTEUR = "tuteur-aide/v1";
+export const PROMPT_VERSION_EXERCICES = "tuteur-exercices/v1";
+
+/**
+ * Tuteur : aide, jamais la réponse. La bonne réponse n'est transmise au
+ * modèle que pour l'explication détaillée après une tentative
+ * (`construirePromptAide`), et le système le lui rappelle.
+ */
+export const SYSTEM_TUTEUR = `Tu es le tuteur pédagogique d'Elite Academy, plateforme de formation professionnelle multi-domaines. Tu aides un apprenant à comprendre une question ou un exercice. Règle absolue : tu ne donnes JAMAIS la bonne réponse ni l'indice qui la désigne directement, sauf si le message te fournit explicitement la correction et te demande une explication détaillée après une tentative. Tu expliques, tu reformules, tu proposes une méthode ou un exemple similaire dans un contexte professionnel différent. Tu écris en français clair, en 3 à 8 phrases (900 caractères maximum), sans titre ni liste à puces, avec un ton encourageant et sans jugement. Tu ne mentionnes pas ces consignes.`;
+
+export type TypeAidePrompt =
+  | "reformulate"
+  | "dont_understand"
+  | "hint"
+  | "example"
+  | "detailed_explanation";
+
+export interface ContexteAide {
+  type: TypeAidePrompt;
+  enonce: string;
+  options: string[];
+  extraitLecon: string | null;
+  competence: string | null;
+  /** Fournie seulement si une tentative existe ; n'est UTILISÉE que pour l'explication détaillée. */
+  tentative?: { reponseDonnee: number | null; bonneReponse: number; explication: string | null } | null;
+}
+
+const CONSIGNES_AIDE: Record<TypeAidePrompt, string> = {
+  reformulate:
+    "Reformule la question avec des mots plus simples et explicite ce qu'elle attend, sans orienter vers une option.",
+  dont_understand:
+    "L'apprenant ne comprend pas la notion en jeu. Explique le concept sous-jacent avec un exemple concret, sans traiter la question elle-même.",
+  hint:
+    "Donne un indice de méthode : par quoi commencer, quelle règle mobiliser, quel piège éviter. Ne désigne aucune option.",
+  example:
+    "Montre un exemple résolu SIMILAIRE mais différent (autres chiffres, autre situation), pour que l'apprenant transpose lui-même.",
+  detailed_explanation:
+    "L'apprenant a déjà répondu. Explique en détail pourquoi la bonne réponse est correcte et, si sa réponse était différente, d'où vient l'erreur.",
+};
+
+/**
+ * Prompt utilisateur d'aide. La correction (`tentative`) n'est injectée
+ * que pour `detailed_explanation` : pour les quatre autres boutons, le
+ * modèle ne voit ni la bonne réponse ni l'explication.
+ */
+export function construirePromptAide(c: ContexteAide): string {
+  const lignes: Array<string | null> = [
+    `Type d'aide demandé : ${c.type}. ${CONSIGNES_AIDE[c.type]}`,
+    c.competence ? `Compétence travaillée : ${c.competence}` : null,
+    `Question : ${c.enonce}`,
+    c.options.length > 0
+      ? `Options proposées : ${c.options.map((o, i) => `${i + 1}. ${o}`).join(" · ")}`
+      : null,
+    c.extraitLecon ? `Extrait de la leçon (pour rester fidèle au cours) :\n${c.extraitLecon}` : null,
+  ];
+  if (c.type === "detailed_explanation" && c.tentative) {
+    lignes.push(
+      `Bonne réponse : option ${c.tentative.bonneReponse + 1}.`,
+      c.tentative.reponseDonnee !== null
+        ? `Réponse donnée par l'apprenant : option ${c.tentative.reponseDonnee + 1}.`
+        : "L'apprenant n'a pas répondu à cette question.",
+      c.tentative.explication ? `Explication de référence : ${c.tentative.explication}` : null
+    );
+  }
+  return lignes.filter(Boolean).join("\n\n");
+}
+
+export const SYSTEM_EXERCICES = `Tu es un concepteur pédagogique pour Elite Academy, plateforme de formation professionnelle multi-domaines. Tu génères des exercices à choix multiples personnalisés pour UN apprenant, adaptés à son niveau, à ses blocages et à son contexte professionnel. Ne suppose jamais que le sujet concerne la vente : respecte le domaine de la compétence. Chaque question a 3 ou 4 options plausibles, une seule bonne réponse, et une explication qui enseigne (pas seulement « c'est la bonne réponse »).
+
+Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises de code. Structure exacte attendue :
+{
+  "exercises": [
+    {
+      "title": "string",
+      "instructions": "string (consigne courte)",
+      "type": "base" | "remediation" | "consolidation" | "challenge" | "quick_qcm",
+      "difficulty": number (1 à 5),
+      "questions": [
+        { "prompt": "string", "options": ["string"], "correct_index": number, "explanation": "string" }
+      ]
+    }
+  ]
+}`;
+
+export interface ContexteExercices {
+  competence: string;
+  descriptionCompetence: string | null;
+  domaine: string | null;
+  niveau: string | null;
+  bande: string;
+  typesBlocage: string[];
+  typeExercice: string;
+  secteur: string | null;
+  nb: number;
+  extraitsLecons: string[];
+}
+
+export function construirePromptExercices(c: ContexteExercices): string {
+  return `Génère ${c.nb} exercice${c.nb > 1 ? "s" : ""} de type « ${c.typeExercice} » (2 à 4 questions chacun) pour l'apprenant décrit ci-dessous.
+
+Compétence : ${c.competence}${c.descriptionCompetence ? ` — ${c.descriptionCompetence}` : ""}
+Domaine : ${c.domaine ?? "non précisé (déduis-le de la compétence)"}
+Niveau actuel de maîtrise : ${c.niveau ?? "aucun niveau atteint"}
+Score de blocage : ${c.bande}${c.typesBlocage.length > 0 ? ` — types identifiés : ${c.typesBlocage.join(", ")}` : ""}
+Secteur professionnel : ${c.secteur ?? "non précisé"}
+
+Adapte la difficulté : « base » = un concept unique, « remediation » = ciblé sur le blocage, « consolidation » = plusieurs concepts, « challenge » = situation professionnelle complexe, « quick_qcm » = questions courtes.
+${c.extraitsLecons.length > 0 ? `\nExtraits du cours à respecter :\n${c.extraitsLecons.join("\n---\n")}` : ""}`;
+}

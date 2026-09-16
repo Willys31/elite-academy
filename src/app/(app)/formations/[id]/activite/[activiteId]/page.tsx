@@ -6,7 +6,12 @@ import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
+import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
+import { MAX_AIDES_PAR_JOUR, TYPE_AIDE_LABELS, type TypeAide } from "@/lib/tutorat/blocage";
+import { generationsDuJour } from "@/lib/tutorat/moteur";
+import { BoutonsAide } from "@/components/tutorat/BoutonsAide";
 import { AuthForm } from "@/components/ui/AuthForm";
+import { Icone } from "@/components/icons";
 import { Alert, Badge, Card, PageTitle } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Activité" };
@@ -78,6 +83,19 @@ export default async function ActivitePage({
       return c?.name;
     })
     .filter(Boolean) as string[];
+
+  // Tutorat IA (lot 18) : aides déjà demandées sur cette activité, quota du jour.
+  const tuteurDisponible = iaConfiguree() || modeSimulation();
+  const [{ data: aides }, aidesDuJour] = await Promise.all([
+    supabase
+      .from("tutor_help_events")
+      .select("id, help_type, response_text, created_at, question_id")
+      .eq("user_id", user.id)
+      .eq("activity_id", activite.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    tuteurDisponible ? generationsDuJour(user.id, ["tutor_help"]) : Promise.resolve(0),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -185,6 +203,52 @@ export default async function ActivitePage({
           </AuthForm>
         </Card>
       )}
+
+      {/* ---------- Tuteur IA (lot 18) ---------- */}
+      {questions && questions.length > 0 ? (
+        <Card className="mt-6">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <Icone nom="robot" className="size-5 text-brand-700" />
+            Besoin d&apos;aide ? Le tuteur explique, il ne donne pas la réponse.
+          </h2>
+          {tuteurDisponible ? (
+            <div className="mt-4">
+              <BoutonsAide
+                activityId={activite.id}
+                questions={questions.map((q) => ({ id: q.id, prompt: q.prompt }))}
+                aUneTentative={Boolean(derniereTentative)}
+                restantes={Math.max(0, MAX_AIDES_PAR_JOUR - aidesDuJour)}
+              />
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">
+              Le tuteur IA n&apos;est pas configuré sur cette installation. Vous pouvez partager votre blocage dans l&apos;Entraide.
+            </p>
+          )}
+          {(aides ?? []).length > 0 ? (
+            <details className="mt-4 text-sm">
+              <summary className="cursor-pointer text-slate-500 hover:text-ink-900">
+                Aides précédentes sur cette activité ({(aides ?? []).length})
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {(aides ?? []).map((a) => {
+                  const numero = questions.findIndex((q) => q.id === a.question_id) + 1;
+                  return (
+                    <li key={a.id} className="rounded-lg border border-sand-200 bg-sand-50 p-3">
+                      <p className="text-xs font-medium text-slate-500">
+                        {TYPE_AIDE_LABELS[a.help_type as TypeAide] ?? a.help_type}
+                        {numero > 0 ? ` · question ${numero}` : ""} ·{" "}
+                        {new Date(a.created_at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      <p className="mt-1 whitespace-pre-line leading-relaxed text-ink-900">{a.response_text}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          ) : null}
+        </Card>
+      ) : null}
     </div>
   );
 }
