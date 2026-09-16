@@ -6,8 +6,10 @@ import { usePathname } from "next/navigation";
 import type { MemberRole, NavItem } from "@/lib/auth/roles";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { useSuiviNavigation } from "@/lib/nav/historique";
+import type { NotificationResume } from "@/lib/notifications/notifications";
 import { Icone, iconePourLien } from "@/components/icons";
 import { Marque } from "@/components/Marque";
+import { ClocheNotifications } from "@/components/layout/ClocheNotifications";
 
 /** « Awa Koné » → « AK » ; une adresse e-mail donne sa première lettre. */
 function initiales(nom: string): string {
@@ -45,13 +47,17 @@ function initiales(nom: string): string {
 export function AppShell({
   nav,
   role,
+  userId,
   userName,
+  notifications,
   onSignOut,
   children,
 }: {
   nav: NavItem[];
   role: MemberRole;
+  userId: string;
   userName: string;
+  notifications: { nonLues: number; recentes: NotificationResume[] };
   onSignOut: () => Promise<void>;
   children: React.ReactNode;
 }) {
@@ -130,6 +136,14 @@ export function AppShell({
     </ul>
   );
 
+  const cloche = (
+    <ClocheNotifications
+      userId={userId}
+      nonLues={notifications.nonLues}
+      recentes={notifications.recentes}
+    />
+  );
+
   const blocUtilisateur = (
     <div className="flex items-center gap-3 rounded-xl border border-sand-200 bg-sand-50 p-2 pl-2.5">
       <span
@@ -170,7 +184,17 @@ export function AppShell({
         <nav aria-label="Navigation principale" className="flex-1 overflow-y-auto px-3 py-3">
           {liens}
         </nav>
-        <div className="p-3">{blocUtilisateur}</div>
+        <div className="space-y-2 p-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-medium text-slate-500">
+              {notifications.nonLues > 0
+                ? `${notifications.nonLues} notification${notifications.nonLues > 1 ? "s" : ""} non lue${notifications.nonLues > 1 ? "s" : ""}`
+                : "Aucune notification"}
+            </span>
+            {cloche}
+          </div>
+          {blocUtilisateur}
+        </div>
       </aside>
 
       {/* Colonne principale – mobile et tablette */}
@@ -181,8 +205,10 @@ export function AppShell({
           <Link href="/accueil" className="min-w-0 rounded-lg">
             <Marque />
           </Link>
-          <button
-            ref={boutonRef}
+          <div className="flex shrink-0 items-center gap-1">
+            {cloche}
+            <button
+              ref={boutonRef}
             type="button"
             onClick={() => setMenuOuvert((v) => !v)}
             aria-expanded={menuOuvert}
@@ -190,9 +216,10 @@ export function AppShell({
             aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"}
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-sand-300 bg-white px-3 py-2 text-sm font-medium text-ink-900 shadow-[0_1px_2px_rgba(17,20,18,0.05)] transition-colors duration-150 hover:bg-sand-50"
           >
-            <Icone nom="menu" className="size-[18px]" />
-            Menu
-          </button>
+              <Icone nom="menu" className="size-[18px]" />
+              Menu
+            </button>
+          </div>
         </header>
 
         {/* Voile de fond : ferme le tiroir au clic hors navigation. */}
