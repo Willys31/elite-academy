@@ -94,6 +94,55 @@ export function questionsARevoir(
   return aRevoir;
 }
 
+/**
+ * Questions réussies à la dernière tentative de chaque activité : les
+ * notions acquises, que l'on peut relire pour les entretenir.
+ *
+ * Même règle de la dernière tentative que pour `questionsARevoir` : les
+ * deux listes forment ainsi une partition exacte. Une question est soit
+ * à retravailler, soit acquise, jamais les deux ; une question réussie
+ * hier mais ratée aujourd'hui repasse du côté « à retravailler ».
+ */
+export function questionsAcquises(
+  tentatives: TentativeBrute[]
+): QuestionARevoir[] {
+  const acquises: QuestionARevoir[] = [];
+  for (const t of dernieresTentatives(tentatives).values()) {
+    for (const d of t.details) {
+      if (!d.correcte) continue;
+      acquises.push({
+        activityId: t.activityId,
+        questionId: d.questionId,
+        reponseDonnee: d.reponseDonnee,
+        bonneReponse: d.bonneReponse,
+        explication: d.explication,
+      });
+    }
+  }
+  return acquises;
+}
+
+/** Les deux volets de l'écran « À revoir ». */
+export type VueRevision = "a-retravailler" | "acquises";
+
+export const VUE_REVISION_LABELS: Record<VueRevision, string> = {
+  "a-retravailler": "À retravailler",
+  acquises: "Notions acquises",
+};
+
+/** Lit `?vue=` ; toute valeur inconnue retombe sur ce qu'il faut retravailler. */
+export function lireVueRevision(valeur: unknown): VueRevision {
+  return valeur === "acquises" ? "acquises" : "a-retravailler";
+}
+
+/**
+ * Une compétence est acquise dès le niveau Opérationnel. Sans niveau, ou
+ * aux seuls fondamentaux, elle reste à consolider.
+ */
+export function competenceAcquise(niveau: string | null | undefined): boolean {
+  return niveau !== null && niveau !== undefined && niveau !== "fundamentals";
+}
+
 /** Activités dont la dernière tentative comporte au moins une erreur. */
 export function activitesARevoir(tentatives: TentativeBrute[]): string[] {
   const ids = new Set<string>();

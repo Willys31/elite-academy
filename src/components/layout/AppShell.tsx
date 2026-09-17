@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { MemberRole, NavItem } from "@/lib/auth/roles";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { ROLE_LABELS, cheminDans, entreeActive } from "@/lib/auth/roles";
 import { useSuiviNavigation } from "@/lib/nav/historique";
 import type { NotificationResume } from "@/lib/notifications/notifications";
 import { Icone, iconePourLien } from "@/components/icons";
@@ -103,13 +103,52 @@ export function AppShell({
     };
   }, [menuOuvert]);
 
-  const estActif = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  /* Une entrée qui regroupe plusieurs écrans (« Ma révision » :
+     À revoir, Tutorat IA, Entraide) affiche ses onglets en haut du
+     contenu, sur chacun de ces écrans. */
+  const onglets = nav.find(
+    (item) => item.onglets && entreeActive(item, pathname)
+  )?.onglets;
+
+  const barreOnglets = onglets ? (
+    <nav
+      aria-label="Rubriques de la révision"
+      /* Le filet est porté par la liste, pas par le conteneur défilant :
+         le soulignement de l'onglet actif le recouvre sans déborder,
+         donc sans faire apparaître de barre de défilement verticale. */
+      className="-mx-4 mb-6 overflow-x-auto overflow-y-hidden px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:mb-8 [&::-webkit-scrollbar]:hidden"
+    >
+      <ul className="flex w-max min-w-full gap-1 border-b border-sand-200">
+        {onglets.map((o) => {
+          const actif = cheminDans(o.href, pathname);
+          return (
+            <li key={o.href} className="shrink-0">
+              <Link
+                href={o.href}
+                aria-current={actif ? "page" : undefined}
+                className={`-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors duration-150 ${
+                  actif
+                    ? "border-brand-600 text-brand-800"
+                    : "border-transparent text-slate-500 hover:border-sand-300 hover:text-ink-900"
+                }`}
+              >
+                <Icone
+                  nom={iconePourLien(o.href)}
+                  className={`size-4 shrink-0 ${actif ? "text-brand-700" : "text-slate-400"}`}
+                />
+                {o.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  ) : null;
 
   const liens = (
     <ul className="space-y-0.5">
       {nav.map((item) => {
-        const actif = estActif(item.href);
+        const actif = entreeActive(item, pathname);
         return (
           <li key={item.href}>
             <Link
@@ -270,6 +309,7 @@ export function AppShell({
         </div>
 
         <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 lg:px-10 lg:py-10">
+          {barreOnglets}
           {children}
         </main>
       </div>

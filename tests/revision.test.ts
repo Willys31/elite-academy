@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   activitesARevoir,
+  competenceAcquise,
   dernieresTentatives,
   lireTentative,
+  lireVueRevision,
+  questionsAcquises,
   questionsARevoir,
   type TentativeBrute,
 } from "@/lib/courses/revision";
@@ -166,5 +169,57 @@ describe("lireTentative", () => {
       started_at: "2026-01-01T09:00:00Z",
     });
     expect(t.horodatage).toBe("2026-01-01T09:00:00Z");
+  });
+});
+
+describe("questionsAcquises", () => {
+  it("retient les questions réussies à la dernière tentative", () => {
+    const acquises = questionsAcquises([
+      tentative("a", "2026-01-01T10:00:00Z", [["q1", true], ["q2", true]]),
+      tentative("a", "2026-02-01T10:00:00Z", [["q1", true], ["q2", false]]),
+    ]);
+    // q2, réussie hier mais ratée aujourd'hui, n'est plus acquise.
+    expect(acquises.map((q) => q.questionId)).toEqual(["q1"]);
+  });
+
+  it("forme une partition exacte avec les questions à revoir", () => {
+    const tentatives = [
+      tentative("a", "2026-01-01T10:00:00Z", [["q1", true], ["q2", false]]),
+      tentative("b", "2026-01-02T10:00:00Z", [["q3", false], ["q4", true]]),
+    ];
+    const acquises = questionsAcquises(tentatives).map((q) => q.questionId);
+    const aRevoir = questionsARevoir(tentatives).map((q) => q.questionId);
+    expect([...acquises, ...aRevoir].sort()).toEqual(["q1", "q2", "q3", "q4"]);
+    expect(acquises.filter((id) => aRevoir.includes(id))).toEqual([]);
+  });
+
+  it("ne renvoie rien sans tentative", () => {
+    expect(questionsAcquises([])).toEqual([]);
+  });
+});
+
+describe("lireVueRevision", () => {
+  it("reconnaît la vue des notions acquises", () => {
+    expect(lireVueRevision("acquises")).toBe("acquises");
+  });
+
+  it("retombe sur « à retravailler » pour toute autre valeur", () => {
+    expect(lireVueRevision(undefined)).toBe("a-retravailler");
+    expect(lireVueRevision("n'importe quoi")).toBe("a-retravailler");
+    expect(lireVueRevision(["acquises"])).toBe("a-retravailler");
+  });
+});
+
+describe("competenceAcquise", () => {
+  it("considère une compétence acquise à partir du niveau Opérationnel", () => {
+    expect(competenceAcquise("operational")).toBe(true);
+    expect(competenceAcquise("advanced")).toBe(true);
+    expect(competenceAcquise("elite")).toBe(true);
+  });
+
+  it("laisse à consolider une compétence sans niveau ou aux fondamentaux", () => {
+    expect(competenceAcquise(null)).toBe(false);
+    expect(competenceAcquise(undefined)).toBe(false);
+    expect(competenceAcquise("fundamentals")).toBe(false);
   });
 });

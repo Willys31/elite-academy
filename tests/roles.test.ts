@@ -3,6 +3,7 @@ import {
   activeMemberships,
   canCreateOrganization,
   canManageMembers,
+  entreeActive,
   hasAnyRole,
   isEliteAdmin,
   navigationFor,
@@ -204,6 +205,36 @@ describe("navigationFor", () => {
         expect(ECRANS_LIVRES).toContain(item.href);
       }
     }
+  });
+
+  it("regroupe Tutorat IA et Entraide sous « Ma révision » pour l'apprenant", () => {
+    const nav = navigationFor("learner");
+    const hrefs = nav.map((n) => n.href);
+    expect(hrefs).not.toContain("/tutorat");
+    expect(hrefs).not.toContain("/entraide");
+
+    const revision = nav.find((n) => n.href === "/revision");
+    expect(revision?.onglets?.map((o) => o.href)).toEqual([
+      "/revision",
+      "/tutorat",
+      "/entraide",
+    ]);
+  });
+
+  it("garde « Ma révision » active sur les écrans regroupés", () => {
+    const revision = navigationFor("learner").find((n) => n.href === "/revision")!;
+    expect(entreeActive(revision, "/revision")).toBe(true);
+    expect(entreeActive(revision, "/tutorat/exercice/abc")).toBe(true);
+    expect(entreeActive(revision, "/entraide/nouveau")).toBe(true);
+    expect(entreeActive(revision, "/progression")).toBe(false);
+    // Un préfixe commun ne suffit pas : /revisions n'est pas /revision.
+    expect(entreeActive(revision, "/revisions")).toBe(false);
+  });
+
+  it("laisse l'entraide en entrée directe au formateur", () => {
+    const entraide = navigationFor("trainer").find((n) => n.href === "/entraide");
+    expect(entraide).toBeDefined();
+    expect(entraide?.onglets).toBeUndefined();
   });
 
   it("chaque élément possède un chemin absolu", () => {

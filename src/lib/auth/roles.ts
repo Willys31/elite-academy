@@ -84,10 +84,29 @@ export function primaryRole(memberships: Membership[]): MemberRole {
   return "learner";
 }
 
-/** Élément de navigation. */
+/**
+ * Élément de navigation.
+ *
+ * `onglets` regroupe plusieurs écrans sous une seule entrée du menu :
+ * l'entrée reste active sur chacun d'eux et le cadre affiche une barre
+ * d'onglets en haut du contenu. Le premier onglet reprend d'ordinaire
+ * le `href` de l'entrée elle-même.
+ */
 export interface NavItem {
   label: string;
   href: string;
+  onglets?: NavItem[];
+}
+
+/** Le chemin courant appartient-il à cet écran (ou à l'un de ses sous-écrans) ? */
+export function cheminDans(href: string, pathname: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** L'entrée de menu est-elle active, onglets regroupés compris ? */
+export function entreeActive(item: NavItem, pathname: string): boolean {
+  if (cheminDans(item.href, pathname)) return true;
+  return (item.onglets ?? []).some((o) => cheminDans(o.href, pathname));
 }
 
 /**
@@ -153,9 +172,18 @@ export function navigationFor(role: MemberRole): NavItem[] {
         { label: "Catalogue", href: "/catalogue" },
         { label: "Mes formations", href: "/formations" },
         { label: "Ma progression", href: "/progression" },
-        { label: "Ma révision", href: "/revision" },
-        { label: "Tutorat IA", href: "/tutorat" },
-        { label: "Entraide", href: "/entraide" },
+        /* Tutorat IA et Entraide servent le même moment que la révision
+           (« je bloque, comment je m'en sors ? ») : ils vivent sous la
+           même entrée, en onglets, plutôt que d'allonger le menu. */
+        {
+          label: "Ma révision",
+          href: "/revision",
+          onglets: [
+            { label: "À revoir", href: "/revision" },
+            { label: "Tutorat IA", href: "/tutorat" },
+            { label: "Entraide", href: "/entraide" },
+          ],
+        },
         { label: "Situations de travail", href: "/situations" },
         { label: "Badges", href: "/badges" },
         { label: "Classement", href: "/classement" },
