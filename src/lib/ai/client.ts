@@ -1,4 +1,5 @@
 import "server-only";
+import { lireEnv } from "@/lib/ai/env";
 
 /**
  * Appel du LLM (API Anthropic) — STRICTEMENT côté serveur.
@@ -22,7 +23,7 @@ export interface ReponseLlm {
  * le contenu produit est clairement étiqueté « démonstration ».
  */
 export function modeSimulation(): boolean {
-  return process.env.ELITE_IA_MODE === "simulation";
+  return lireEnv("ELITE_IA_MODE").toLowerCase() === "simulation";
 }
 
 /**
@@ -55,7 +56,7 @@ const PRESETS: Record<
 };
 
 export function fournisseurConfigure(): Fournisseur {
-  const f = (process.env.LLM_PROVIDER ?? "").toLowerCase();
+  const f = lireEnv("LLM_PROVIDER").toLowerCase();
   if (f === "gemini" || f === "groq" || f === "openrouter") return f;
   return "anthropic";
 }
@@ -63,17 +64,17 @@ export function fournisseurConfigure(): Fournisseur {
 /** Une configuration IA utilisable existe-t-elle (hors simulation) ? */
 export function iaConfiguree(): boolean {
   if (fournisseurConfigure() === "anthropic") {
-    return Boolean(process.env.ANTHROPIC_API_KEY);
+    return Boolean(lireEnv("ANTHROPIC_API_KEY"));
   }
-  return Boolean(process.env.LLM_API_KEY);
+  return Boolean(lireEnv("LLM_API_KEY"));
 }
 
 export function modeleConfigure(): string {
   if (modeSimulation()) return "simulation-locale";
   const fournisseur = fournisseurConfigure();
-  if (process.env.LLM_MODEL) return process.env.LLM_MODEL;
+  if (lireEnv("LLM_MODEL")) return lireEnv("LLM_MODEL");
   if (fournisseur === "anthropic") {
-    return process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    return lireEnv("ANTHROPIC_MODEL") || "claude-sonnet-4-5";
   }
   return PRESETS[fournisseur].modeleDefaut;
 }
@@ -92,7 +93,7 @@ function erreurHttp(status: number, fournisseur: string): Error {
 
 /** Appel via l'API Anthropic. */
 async function appelerAnthropic(system: string, prompt: string): Promise<ReponseLlm> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = lireEnv("ANTHROPIC_API_KEY");
   if (!apiKey) {
     throw new Error(
       "Aucune configuration IA : renseignez ANTHROPIC_API_KEY, ou un fournisseur gratuit via LLM_PROVIDER + LLM_API_KEY (voir .env.example)."
@@ -143,14 +144,14 @@ async function appelerOpenAiCompatible(
   system: string,
   prompt: string
 ): Promise<ReponseLlm> {
-  const apiKey = process.env.LLM_API_KEY;
+  const apiKey = lireEnv("LLM_API_KEY");
   if (!apiKey) {
     throw new Error(
       `Clé manquante pour ${fournisseur} : renseignez LLM_API_KEY dans .env.local (voir .env.example).`
     );
   }
 
-  const baseUrl = process.env.LLM_BASE_URL || PRESETS[fournisseur].baseUrl;
+  const baseUrl = lireEnv("LLM_BASE_URL") || PRESETS[fournisseur].baseUrl;
   const modele = modeleConfigure();
 
   const reponse = await fetch(`${baseUrl}/chat/completions`, {
