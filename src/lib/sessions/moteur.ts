@@ -16,6 +16,8 @@ import {
   type SegmentTranscription,
 } from "@/lib/sessions/tldv";
 import { calculerPresence, presenceAvecJustification } from "@/lib/sessions/presence";
+import { meetConfigure, participantsDeLaSalle } from "@/lib/sessions/meet";
+import { rapprocherPresencesMeet, type CanalParticipant } from "@/lib/sessions/visio";
 import { XP_FIXES } from "@/lib/gamification/xp";
 import { attribuerXp, decernerBadge, incrementerCompteurs, verifierBadges } from "@/lib/gamification/moteur";
 import { emettreNotification, emettreNotifications } from "@/lib/notifications/emettre";
@@ -230,6 +232,85 @@ export async function recalculerPresenceParticipant(participantId: string): Prom
       presence_seconds: presence.dureeSecondes,
     })
     .eq("id", participantId);
+}
+
+// ------------------------------------------------------------
+// Visio : présence reprise de Google Meet (lot 19)
+// ------------------------------------------------------------
+
+/**
+ * Lit les participants de la salle Meet de la session et reporte
+ * l'arrivée et le départ réels des inscrits à distance. Appelée juste
+ * avant le calcul de présence à la clôture, puis à la demande du
+ * formateur (les statuts sont alors recalculés, pas les points).
+ * Renvoie un message d'erreur, ou null.
+ */
+export async function synchroniserPresenceMeet(
+  sessionId: string,
+  options: { recalculer?: boolean } = {}
+): Promise<string | null> {
+  const client = admin();
+  if (!client) return "Configuration serveur incomplète.";
+  if (!meetConfigure()) return "Google Meet n'est pas configuré (voir .env.example).";
+
+  const { data: session } = await client
+    .from("live_sessions")
+    .select("id, trainer_id, meet_space_name, closed_at")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!session?.meet_space_name) return "Cette session n'a pas de salle Meet créée par la plateforme.";
+
+  let participantsMeet;
+  try {
+    participantsMeet = await participantsDeLaSalle(session.meet_space_name as string);
+  } catch (erreur) {
+    loguer("lecture de la salle Meet", erreur);
+    return "Google Meet n'a pas répondu. Réessayez dans quelques minutes.";
+  }
+
+  const [{ data: participants }, { data: formateur }] = await Promise.all([
+    client
+      .from("session_participants")
+      .select("id, user_id, channel, profile:profiles(full_name)")
+      .eq("session_id", sessionId),
+    client.from("profiles").select("id, full_name").eq("id", session.trainer_id).maybeSingle(),
+  ]);
+  const inscrits = (participants ?? []).map((p) => {
+    const profil = Array.isArray(p.profile) ? p.profile[0] : p.profile;
+    return {
+      participantId: p.id as string,
+      userId: p.user_id as string,
+      fullName: (profil?.full_name as string) || "",
+      canal: p.channel as CanalParticipant,
+    };
+  });
+  const resultat = rapprocherPresencesMeet(
+    participantsMeet,
+    inscrits.filter((i) => i.fullName),
+    formateur ? { userId: formateur.id as string, fullName: (formateur.full_name as string) || "" } : null,
+    (session.closed_at as string) ?? null
+  );
+
+  for (const p of resultat.presences) {
+    const { error } = await client
+      .from("session_participants")
+      .update({ joined_at: p.arrivee, left_at: p.depart, attendance_status: p.depart ? "left" : "present" })
+      .eq("id", p.participantId);
+    loguer("présence Meet", error);
+    if (options.recalculer) await recalculerPresenceParticipant(p.participantId);
+  }
+
+  const { error } = await client
+    .from("live_sessions")
+    .update({
+      visio_started_at: resultat.debutVisio,
+      visio_ended_at: resultat.finVisio ?? (session.closed_at as string | null),
+      visio_synced_at: new Date().toISOString(),
+      visio_unmatched: resultat.nonReconnus,
+    })
+    .eq("id", sessionId);
+  loguer("fenêtre de visio", error);
+  return null;
 }
 
 // ------------------------------------------------------------

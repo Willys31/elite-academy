@@ -14,6 +14,8 @@ import {
   recommandationPortee,
 } from "@/lib/partage/visibilite";
 import { creerSession } from "@/app/(app)/sessions/actions";
+import { meetConfigure } from "@/lib/sessions/meet";
+import { MODE_DESCRIPTIONS, MODE_LABELS, MODES_SESSION, modeAvecVisio } from "@/lib/sessions/visio";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, Textarea } from "@/components/ui";
 import { Champ, EcranTitre, Etiquette, LienSobre, Panneau, Retour, Saisie, SectionTitre, Vide } from "@/components/app";
@@ -51,7 +53,7 @@ export default async function SessionsPage({
     supabase
       .from("live_sessions")
       .select(
-        "id, title, session_code, status, starts_at, ends_at, location, visibility_scope, created_at, trainer_id, course:courses(title), organization:organizations(name)"
+        "id, title, session_code, status, starts_at, ends_at, location, mode, visibility_scope, created_at, trainer_id, course:courses(title), organization:organizations(name)"
       )
       .order("created_at", { ascending: false })
       .limit(50),
@@ -231,11 +233,39 @@ export default async function SessionsPage({
                   Début et fin servent au calcul de la ponctualité et de la
                   présence à la clôture.
                 </p>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium text-ink-900">Mode</legend>
+                  <div className="space-y-2">
+                    {MODES_SESSION.map((m) => (
+                      <label key={m} className="flex cursor-pointer gap-3 rounded-lg border border-sand-200 px-3.5 py-2.5 text-sm has-checked:border-brand-600 has-checked:bg-brand-50">
+                        <input type="radio" name="mode" value={m} defaultChecked={m === "onsite"} className="mt-0.5 size-4 accent-brand-700" />
+                        <span>
+                          <span className="font-medium text-ink-900">{MODE_LABELS[m]}</span>
+                          <span className="block text-xs leading-relaxed text-slate-500">{MODE_DESCRIPTIONS[m]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    Le mode reste modifiable jusqu&apos;à la clôture (ex. : cours passé en visio le jour même).
+                  </p>
+                </fieldset>
                 <div>
                   <Champ htmlFor="location" hint="facultatif">
-                    Lieu ou lien
+                    Lieu
                   </Champ>
-                  <Saisie id="location" name="location" placeholder="Salle B2 · ou lien de visioconférence" />
+                  <Saisie id="location" name="location" placeholder="Salle B2" />
+                </div>
+                <div>
+                  <Champ htmlFor="meet_link" hint="visio ou hybride, facultatif">
+                    Lien Google Meet
+                  </Champ>
+                  <Saisie id="meet_link" name="meet_link" placeholder="https://meet.google.com/abc-defg-hij" />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    {meetConfigure()
+                      ? "Laissez vide : la salle Meet est créée automatiquement et la présence à distance est reprise à la clôture."
+                      : "Collez le lien d'une réunion Google Meet (création automatique non configurée)."}
+                  </p>
                 </div>
                 <fieldset>
                   <legend className="mb-1.5 text-sm font-medium text-ink-900">Qui peut la voir et la rejoindre ?</legend>
@@ -324,6 +354,9 @@ function ListeSessions({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                  {modeAvecVisio(s.mode as string) ? (
+                    <Etiquette ton="or">{MODE_LABELS[s.mode as "remote" | "hybrid"]}</Etiquette>
+                  ) : null}
                   <Etiquette ton={portee.ton}>{portee.libelle}</Etiquette>
                   {/* Le code n'est mis en avant que sur une session ouverte :
                       ailleurs, il n'a plus d'usage. */}

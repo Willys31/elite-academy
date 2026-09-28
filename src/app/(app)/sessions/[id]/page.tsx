@@ -11,9 +11,13 @@ import {
 } from "@/lib/sessions/sessions";
 import {
   cloturerSession,
+  definirVisio,
   lancerActivite,
   supprimerSession,
+  synchroniserPresenceVisio,
 } from "@/app/(app)/sessions/actions";
+import { meetConfigure } from "@/lib/sessions/meet";
+import { MODE_DESCRIPTIONS, MODE_LABELS, MODES_SESSION, modeAvecVisio, type ModeSession } from "@/lib/sessions/visio";
 import { SessionRealtimeRefresh } from "@/components/sessions/SessionRealtimeRefresh";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
@@ -40,7 +44,7 @@ export default async function SessionDirectePage({
   const { data: session } = await supabase
     .from("live_sessions")
     .select(
-      "id, title, session_code, status, current_activity_id, trainer_id, course_id, organization_id, starts_at, ends_at, location, recording_enabled, course:courses(title, current_version_id)"
+      "id, title, session_code, status, current_activity_id, trainer_id, course_id, organization_id, starts_at, ends_at, location, recording_enabled, mode, meet_uri, meet_space_name, visio_synced_at, course:courses(title, current_version_id)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -74,7 +78,7 @@ export default async function SessionDirectePage({
   const [{ data: participants }, { data: tentatives }] = await Promise.all([
     supabase
       .from("session_participants")
-      .select("id, joined_at, left_at, recording_consent, profile:profiles(full_name, email)")
+      .select("id, joined_at, left_at, recording_consent, channel, profile:profiles(full_name, email)")
       .eq("session_id", session.id)
       .order("joined_at"),
     session.current_activity_id
@@ -102,6 +106,10 @@ export default async function SessionDirectePage({
 
   const activiteEnCours = activites.find((a) => a.id === session.current_activity_id);
   const ouverte = session.status === "open";
+  const mode = (session.mode as ModeSession) ?? "onsite";
+  const avecVisio = modeAvecVisio(mode);
+  const nbDistance = (participants ?? []).filter((p) => p.channel === "remote").length;
+  const meetAuto = meetConfigure();
 
   return (
     <div>
@@ -112,6 +120,7 @@ export default async function SessionDirectePage({
         action={
           <>
             <Badge>{SESSION_STATUS_LABELS[session.status]}</Badge>
+            <Badge ton={avecVisio ? "or" : undefined}>{MODE_LABELS[mode]}</Badge>
             {session.recording_enabled ? <Badge ton="or">Enregistrée</Badge> : null}
             <SecondaryLink href={`/sessions/${session.id}/bilan`}>
               {ouverte ? "Transcription et bilan" : "Bilan de la session"}
@@ -183,6 +192,7 @@ export default async function SessionDirectePage({
                         : ouverte
                           ? "dans la salle"
                           : ""}
+                      {avecVisio ? (p.channel === "remote" ? " · en visio" : " · sur place") : ""}
                       {session.recording_enabled && !p.recording_consent ? " · sans enregistrement" : ""}
                     </span>
                   </li>
@@ -230,6 +240,93 @@ export default async function SessionDirectePage({
           )}
         </Card>
       </div>
+
+      {/* Visio et mode hybride (lot 19) */}
+      <Card className="mt-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Visio Google Meet</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {avecVisio
+                ? session.meet_uri
+                  ? `${MODE_DESCRIPTIONS[mode]} ${nbDistance} participant${nbDistance > 1 ? "s" : ""} à distance.`
+                  : "Aucune salle Meet pour l'instant : créez-la ou collez un lien ci-dessous."
+                : "Session en présentiel. Passez-la en visio ou en hybride si le cours se fait à distance."}
+            </p>
+          </div>
+          {avecVisio && session.meet_uri ? (
+            <a
+              href={session.meet_uri as string}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex min-h-11 items-center rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+              Ouvrir la visio
+            </a>
+          ) : null}
+        </div>
+        {avecVisio && session.meet_uri ? (
+          <p className="mt-2 break-all text-xs text-slate-500">
+            {session.meet_uri as string} ·{" "}
+            {session.meet_space_name
+              ? "salle créée par la plateforme : présence reprise de Meet à la clôture"
+              : "lien collé à la main : présence non reprise de Meet"}
+          </p>
+        ) : null}
+
+        {ouverte ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <AuthForm action={definirVisio} submitLabel="Enregistrer le mode" pendingLabel="Enregistrement…" ton="sobre">
+              <input type="hidden" name="session_id" value={session.id} />
+              <fieldset>
+                <legend className="mb-1.5 text-sm font-medium text-ink-900">Mode de la session</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {MODES_SESSION.map((m) => (
+                    <label key={m} className="flex cursor-pointer gap-3 rounded-lg border border-sand-200 px-3.5 py-2.5 text-sm has-checked:border-brand-600 has-checked:bg-brand-50">
+                      <input type="radio" name="mode" value={m} defaultChecked={m === mode} className="mt-0.5 size-4 accent-brand-700" />
+                      <span>
+                        <span className="font-medium text-ink-900">{MODE_LABELS[m]}</span>
+                        <span className="block text-xs leading-relaxed text-slate-500">{MODE_DESCRIPTIONS[m]}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <div>
+                <label htmlFor="meet_link" className="mb-1.5 block text-sm font-medium text-ink-900">
+                  Lien Google Meet <span className="font-normal text-slate-500">(facultatif)</span>
+                </label>
+                <input
+                  id="meet_link"
+                  name="meet_link"
+                  placeholder="https://meet.google.com/abc-defg-hij"
+                  className="block min-h-11 w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-base text-ink-900 outline-none focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15 sm:text-sm"
+                />
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {meetAuto
+                    ? "Laissez vide : la plateforme crée la salle Meet et reprend la présence à la clôture."
+                    : "La création automatique n'est pas configurée : collez le lien d'une réunion Meet."}
+                </p>
+              </div>
+            </AuthForm>
+          </div>
+        ) : null}
+
+        {session.meet_space_name && meetAuto && !ouverte ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="mb-3 text-sm text-slate-600">
+              {session.visio_synced_at
+                ? `Présence reprise de Meet le ${new Date(session.visio_synced_at as string).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`
+                : "La présence n'a pas encore été reprise de Meet."}{" "}
+              Meet publie la liste des participants quelques minutes après la fin de la réunion : relancez si des
+              participants à distance apparaissent absents.
+            </p>
+            <AuthForm action={synchroniserPresenceVisio} submitLabel="Reprendre la présence Meet" pendingLabel="Lecture de Meet…" ton="sobre">
+              <input type="hidden" name="session_id" value={session.id} />
+            </AuthForm>
+          </div>
+        ) : null}
+      </Card>
 
       {/* Animation */}
       <div className="mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[2fr_1fr]">

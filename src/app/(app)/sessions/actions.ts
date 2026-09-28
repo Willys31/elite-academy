@@ -17,7 +17,10 @@ import {
   analyserTranscription,
   cloturerEtCalculerPresences,
   recalculerPresenceParticipant,
+  synchroniserPresenceMeet,
 } from "@/lib/sessions/moteur";
+import { creerSalleMeet, meetConfigure } from "@/lib/sessions/meet";
+import { lireLienMeet, lireMode, modeAvecVisio, type ModeSession } from "@/lib/sessions/visio";
 import { emettreNotification } from "@/lib/notifications/emettre";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
@@ -60,6 +63,9 @@ export async function creerSession(
   const portee = lirePortee(formData.get("portee"));
   const recording = formData.get("recording_enabled") === "on";
   const tldvMeetingId = String(formData.get("tldv_meeting_id") ?? "").trim();
+  const mode = lireMode(formData.get("mode"));
+  const lienSaisi = String(formData.get("meet_link") ?? "").trim();
+  const lienMeet = lienSaisi ? lireLienMeet(lienSaisi) : null;
 
   if (!organizationId) return { error: "Veuillez choisir une organisation." };
   if (!title) return { error: "Veuillez saisir le titre de la session." };
@@ -68,6 +74,9 @@ export async function creerSession(
   }
   if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
     return { error: "La fin doit être postérieure au début." };
+  }
+  if (lienSaisi && !lienMeet) {
+    return { error: "Le lien de visio doit être un lien Google Meet (ex. : https://meet.google.com/abc-defg-hij)." };
   }
 
   const actives = activeMemberships(user.memberships);
@@ -102,12 +111,21 @@ export async function creerSession(
         sector: org?.sector ?? null,
         recording_enabled: recording,
         tldv_meeting_id: tldvMeetingId || null,
+        mode,
+        meet_uri: modeAvecVisio(mode) ? (lienMeet?.uri ?? null) : null,
+        meet_code: modeAvecVisio(mode) ? (lienMeet?.code ?? null) : null,
         status: "open",
       })
       .select("id")
       .single();
 
     if (!error && session) {
+      // Visio sans lien collé : la salle Meet est créée d'office. En cas
+      // d'échec, la session existe quand même et l'écran d'animation
+      // propose de réessayer.
+      if (modeAvecVisio(mode) && !lienMeet && meetConfigure()) {
+        await attacherSalleMeet(session.id);
+      }
       redirect(`/sessions/${session.id}`);
     }
     if (error && error.code === "23505" && error.message?.includes("tldv")) {
@@ -185,7 +203,7 @@ export async function cloturerSession(
     .update({ status: "closed", current_activity_id: null, closed_at: maintenant })
     .eq("id", sessionId)
     .eq("status", "open")
-    .select("id, ends_at")
+    .select("id, ends_at, meet_space_name")
     .maybeSingle();
 
   if (error) {
@@ -208,12 +226,20 @@ export async function cloturerSession(
     created_by: user.id,
   });
 
+  // Visio : les heures réelles d'arrivée et de départ des participants
+  // à distance sont reprises de Google Meet avant le calcul.
+  let avertissementMeet = "";
+  if (session.meet_space_name && meetConfigure()) {
+    const erreurMeet = await synchroniserPresenceMeet(sessionId);
+    if (erreurMeet) avertissementMeet = ` Présence Meet non reprise : ${erreurMeet}`;
+  }
+
   await cloturerEtCalculerPresences(sessionId);
 
   revalidatePath(`/sessions/${sessionId}`);
   revalidatePath(`/sessions/${sessionId}/bilan`);
   revalidatePath("/sessions");
-  return { success: "Session clôturée. Présences, points et résultats sont calculés — voir le bilan." };
+  return { success: `Session clôturée. Présences, points et résultats sont calculés — voir le bilan.${avertissementMeet}` };
 }
 
 // ------------------------------------------------------------
@@ -280,6 +306,7 @@ export async function rejoindreParCode(
 
   const saisie = String(formData.get("code") ?? "");
   const consentement = formData.get("consent") === "on";
+  const canal = formData.get("canal") === "remote" ? "remote" : "onsite";
   if (!codeValide(saisie)) {
     return {
       error: "Code invalide : il comporte 6 lettres et chiffres (ex. : ABC234).",
@@ -290,7 +317,7 @@ export async function rejoindreParCode(
   const supabase = await createClient();
   const { data: session } = await supabase
     .from("live_sessions")
-    .select("id, status, title, recording_enabled")
+    .select("id, status, title, recording_enabled, mode")
     .eq("session_code", code)
     .maybeSingle();
 
@@ -314,11 +341,17 @@ export async function rejoindreParCode(
     };
   }
 
+  // Canal : « à distance » seulement si la session a une visio ; une
+  // session entièrement en visio met tout le monde à distance.
+  const canalRetenu =
+    session.mode === "remote" ? "remote" : session.mode === "hybrid" ? canal : "onsite";
+
   const { error } = await supabase.from("session_participants").insert({
     session_id: session.id,
     user_id: user.id,
     attendance_status: "present",
     recording_consent: session.recording_enabled ? consentement : false,
+    channel: canalRetenu,
   });
 
   if (error) {
@@ -327,7 +360,7 @@ export async function rejoindreParCode(
       // Un seul intervalle de présence est retenu (documenté).
       await supabase
         .from("session_participants")
-        .update({ left_at: null, attendance_status: "present" })
+        .update({ left_at: null, attendance_status: "present", channel: canalRetenu })
         .eq("session_id", session.id)
         .eq("user_id", user.id);
     } else {
@@ -600,4 +633,129 @@ export async function lancerAnalyseTranscription(
   revalidatePath(`/sessions/${transcript.session_id}/bilan`);
   if (erreur) return { error: erreur };
   return { success: "Analyse terminée : résumé, points clés et recommandations sont disponibles." };
+}
+
+// ------------------------------------------------------------
+// Visio Google Meet et mode hybride (lot 19)
+// ------------------------------------------------------------
+
+/**
+ * Crée une salle Google Meet et la rattache à la session. Le droit
+ * d'écrire est celui de la politique RLS `sessions_update`. Renvoie un
+ * message d'erreur, ou null.
+ */
+async function attacherSalleMeet(sessionId: string): Promise<string | null> {
+  let salle;
+  try {
+    salle = await creerSalleMeet();
+  } catch (erreur) {
+    loguer("création de la salle Meet", erreur);
+    return "Google Meet n'a pas pu créer la salle. Vérifiez la configuration ou collez un lien Meet.";
+  }
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("live_sessions")
+    .update(
+      { meet_space_name: salle.name, meet_uri: salle.meetingUri, meet_code: salle.meetingCode },
+      { count: "exact" }
+    )
+    .eq("id", sessionId);
+  if (error) {
+    loguer("rattachement de la salle Meet", error);
+    return "La salle a été créée mais n'a pas pu être rattachée à la session.";
+  }
+  if (count === 0) return "Droits insuffisants sur cette session.";
+  return null;
+}
+
+/**
+ * Change le mode d'une session ouverte (ex. : un cours prévu sur place
+ * passe en visio le jour même) et, si besoin, sa salle Meet : lien
+ * collé, ou salle créée par la plateforme.
+ */
+export async function definirVisio(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const sessionId = String(formData.get("session_id") ?? "");
+  const mode: ModeSession = lireMode(formData.get("mode"));
+  const lienSaisi = String(formData.get("meet_link") ?? "").trim();
+  const lienMeet = lienSaisi ? lireLienMeet(lienSaisi) : null;
+  if (lienSaisi && !lienMeet) {
+    return { error: "Le lien doit être un lien Google Meet (ex. : https://meet.google.com/abc-defg-hij)." };
+  }
+
+  const supabase = await createClient();
+  const { data: session } = await supabase
+    .from("live_sessions")
+    .select("id, status, meet_uri")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!session) return { error: "Session introuvable." };
+  if (session.status !== "open") return { error: "Le mode ne peut plus être changé : la session est clôturée." };
+
+  const maj: Record<string, unknown> = { mode };
+  // Un lien collé remplace la salle créée par la plateforme : la
+  // présence ne pourra plus être reprise de Meet.
+  if (lienMeet) Object.assign(maj, { meet_uri: lienMeet.uri, meet_code: lienMeet.code, meet_space_name: null });
+
+  const { error, count } = await supabase
+    .from("live_sessions")
+    .update(maj, { count: "exact" })
+    .eq("id", sessionId);
+  if (error) {
+    loguer("mode de session", error);
+    return { error: "Le changement n'a pas pu être enregistré." };
+  }
+  if (count === 0) return { error: "Seul le formateur animateur ou un administrateur peut modifier la session." };
+
+  let message = `Session passée en mode ${mode === "onsite" ? "présentiel" : mode === "remote" ? "visio" : "hybride"}.`;
+  if (modeAvecVisio(mode) && !lienMeet && !session.meet_uri) {
+    if (meetConfigure()) {
+      const erreur = await attacherSalleMeet(sessionId);
+      if (erreur) return { error: erreur };
+      message += " Salle Google Meet créée.";
+    } else {
+      message += " Collez un lien Google Meet pour que les participants puissent la rejoindre.";
+    }
+  }
+
+  await supabase.from("live_events").insert({
+    session_id: sessionId,
+    type: "mode_changed",
+    payload: { mode },
+    created_by: user.id,
+  });
+
+  revalidatePath(`/sessions/${sessionId}`);
+  revalidatePath(`/sessions/${sessionId}/participer`);
+  revalidatePath("/sessions");
+  return { success: message };
+}
+
+/** Reprend la présence des participants à distance depuis Google Meet. */
+export async function synchroniserPresenceVisio(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const sessionId = String(formData.get("session_id") ?? "");
+  const supabase = await createClient();
+  const { data: encadrement } = await supabase.rpc("oversees_session", { sid: sessionId });
+  if (!encadrement) return { error: "Droits insuffisants sur cette session." };
+
+  const erreur = await synchroniserPresenceMeet(sessionId, { recalculer: true });
+  if (erreur) return { error: erreur };
+
+  revalidatePath(`/sessions/${sessionId}`);
+  revalidatePath(`/sessions/${sessionId}/bilan`);
+  return {
+    success:
+      "Présence reprise de Google Meet. Les statuts sont recalculés ; les points attribués à la clôture ne changent pas.",
+  };
 }

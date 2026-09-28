@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { SESSION_STATUS_LABELS } from "@/lib/sessions/sessions";
+import { modeAvecVisio } from "@/lib/sessions/visio";
 import {
   PONCTUALITE_LABELS,
   PRESENCE_LABELS,
@@ -48,7 +49,7 @@ export default async function ParticiperPage({
   const { data: session } = await supabase
     .from("live_sessions")
     .select(
-      "id, title, status, current_activity_id, session_code, location, starts_at, ends_at, recording_enabled, course:courses(title)"
+      "id, title, status, current_activity_id, session_code, location, starts_at, ends_at, recording_enabled, mode, meet_uri, course:courses(title)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -56,7 +57,7 @@ export default async function ParticiperPage({
 
   const { data: presence } = await supabase
     .from("session_participants")
-    .select("id, joined_at, left_at, presence_status, punctuality_status, xp_awarded, recording_consent, justification, justification_status")
+    .select("id, joined_at, left_at, channel, presence_status, punctuality_status, xp_awarded, recording_consent, justification, justification_status")
     .eq("session_id", session.id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -88,6 +89,7 @@ export default async function ParticiperPage({
   const ponctualite = presence.punctuality_status as Ponctualite | null;
   const departAnticipe = Boolean(presence.left_at) && session.ends_at && new Date(presence.left_at as string) < new Date(session.ends_at as string);
   const insights = (transcript?.insights ?? null) as { recommendations_learners?: string[] } | null;
+  const visioOuverte = !cloturee && modeAvecVisio(session.mode as string) && Boolean(session.meet_uri);
 
   return (
     <div className="mx-auto max-w-md">
@@ -101,6 +103,33 @@ export default async function ParticiperPage({
         <p className="-mt-4 mb-6 text-sm text-slate-500">
           {[course?.title ? `Formation : ${course.title}` : null, session.location].filter(Boolean).join(" · ")}
         </p>
+      ) : null}
+
+      {visioOuverte ? (
+        <Card className="mb-4 text-center">
+          <h2 className="font-semibold">
+            {session.mode === "remote" ? "Session en visio" : "Session hybride"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {presence.channel === "remote"
+              ? "Vous suivez à distance. La visio s'ouvre dans un nouvel onglet ; gardez cet écran pour répondre aux activités."
+              : "Vous êtes inscrit sur place. Si vous suivez finalement à distance, rejoignez la visio ici."}
+          </p>
+          {/* Lien simple (pas next/link) : pas de préchargement, qui
+              enregistrerait la présence à distance. */}
+          <a
+            href={`/sessions/${session.id}/visio`}
+            target="_blank"
+            rel="noopener"
+            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+          >
+            Rejoindre la visio Google Meet
+          </a>
+          <p className="mt-2 text-xs text-slate-500">
+            Dans Meet, utilisez votre nom complet ({user.fullName || "celui de votre profil"}) : votre présence
+            est reprise automatiquement à la clôture.
+          </p>
+        </Card>
       ) : null}
 
       <Card className="text-center">

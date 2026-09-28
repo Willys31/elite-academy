@@ -15,6 +15,7 @@ import {
 } from "@/lib/sessions/presence";
 import { indicateursQualite, partFormateur, TYPE_INTERVENTION_LABELS, type InsightsSession, type TypeIntervention } from "@/lib/sessions/analyse";
 import { statistiquesLocuteurs, type SegmentTranscription } from "@/lib/sessions/tldv";
+import { dureeMinutes, formaterDuree, modeAvecVisio } from "@/lib/sessions/visio";
 import {
   definirIdentifiantTldv,
   importerTranscription,
@@ -49,7 +50,7 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
   const supabase = await createClient();
   const { data: session } = await supabase
     .from("live_sessions")
-    .select("id, title, status, starts_at, ends_at, closed_at, location, recording_enabled, tldv_meeting_id, analysis_status, trainer_id, course:courses(title)")
+    .select("id, title, status, starts_at, ends_at, closed_at, location, recording_enabled, tldv_meeting_id, analysis_status, trainer_id, mode, visio_started_at, visio_ended_at, visio_unmatched, course:courses(title)")
     .eq("id", id)
     .maybeSingle();
   if (!session) notFound();
@@ -61,7 +62,7 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
     await Promise.all([
       supabase
         .from("session_participants")
-        .select("id, user_id, joined_at, left_at, presence_status, punctuality_status, presence_seconds, xp_awarded, recording_consent, justification, justification_status, profile:profiles(full_name, email)")
+        .select("id, user_id, joined_at, left_at, channel, presence_status, punctuality_status, presence_seconds, xp_awarded, recording_consent, justification, justification_status, profile:profiles(full_name, email)")
         .eq("session_id", session.id)
         .order("joined_at"),
       supabase.from("session_feedbacks").select("satisfaction_score, clarity_score, usefulness_score, comment").eq("session_id", session.id),
@@ -169,6 +170,34 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
         </ul>
       </Panneau>
 
+      {/* ---------- Visio (lot 19) ---------- */}
+      {modeAvecVisio(session.mode as string) ? (
+        <Panneau className="mt-4">
+          <SectionTitre>Visio Google Meet</SectionTitre>
+          {session.visio_started_at ? (
+            <p className="text-sm text-slate-700">
+              Visio du {new Date(session.visio_started_at as string).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+              {session.visio_ended_at
+                ? ` au ${new Date(session.visio_ended_at as string).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                : ""}{" "}
+              · durée réelle {formaterDuree(dureeMinutes(session.visio_started_at as string, (session.visio_ended_at as string) ?? null))}
+              {session.starts_at && session.ends_at
+                ? ` (prévue ${formaterDuree(dureeMinutes(session.starts_at as string, session.ends_at as string))})`
+                : ""}
+              {" "}· {(participants ?? []).filter((p) => p.channel === "remote").length} participant(s) à distance.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600">La présence n&apos;a pas encore été reprise de Google Meet.</p>
+          )}
+          {Array.isArray(session.visio_unmatched) && session.visio_unmatched.length > 0 ? (
+            <p className="mt-2 text-sm text-slate-600">
+              Vus dans Meet sans correspondance avec un inscrit : {(session.visio_unmatched as string[]).join(", ")}.
+              Leur nom affiché dans Meet diffère de leur profil, ou ils n&apos;ont pas rejoint la session sur la plateforme.
+            </p>
+          ) : null}
+        </Panneau>
+      ) : null}
+
       {/* ---------- Présences ---------- */}
       <section className="mt-8">
         <SectionTitre compte={nbParticipants}>Présences</SectionTitre>
@@ -197,6 +226,7 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
                     <tr key={p.id}>
                       <td className="px-4 py-3 font-medium text-ink-900">
                         {profil?.full_name || profil?.email}
+                        {modeAvecVisio(session.mode as string) ? <span className="ml-2 text-xs text-slate-400">{p.channel === "remote" ? "en visio" : "sur place"}</span> : null}
                         {session.recording_enabled && !p.recording_consent ? <span className="ml-2 text-xs text-slate-400">sans enregistrement</span> : null}
                       </td>
                       <td className="px-4 py-3 tabular-nums">{heure(p.joined_at as string)}</td>

@@ -21,19 +21,19 @@ export const metadata: Metadata = { title: "Rejoindre une session" };
 export default async function RejoindrePage({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; visio?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
   const params = await searchParams;
 
-  type ApercuSession = { title: string; recording_enabled: boolean; status: string; location: string | null };
+  type ApercuSession = { title: string; recording_enabled: boolean; status: string; location: string | null; mode: string };
   let session: ApercuSession | null = null;
   if (params.code && codeValide(params.code)) {
     const supabase = await createClient();
     const { data } = await supabase
       .from("live_sessions")
-      .select("title, recording_enabled, status, location")
+      .select("title, recording_enabled, status, location, mode")
       .eq("session_code", normaliserCode(params.code))
       .maybeSingle();
     session = (data as ApercuSession | null) ?? null;
@@ -52,7 +52,8 @@ export default async function RejoindrePage({
           <div className="mb-4">
             <Alert kind={session.status === "open" ? "info" : "error"}>
               <span className="font-medium">{session.title}</span>
-              {session.location ? ` · ${session.location}` : ""}
+              {session.location && session.mode !== "remote" ? ` · ${session.location}` : ""}
+              {session.mode === "remote" ? " · en visio" : session.mode === "hybrid" ? " · sur place ou en visio" : ""}
               {session.status !== "open" ? " — cette session n'est pas ouverte." : ""}
             </Alert>
           </div>
@@ -75,6 +76,28 @@ export default async function RejoindrePage({
               maxLength={8}
             />
           </div>
+          {session?.mode === "hybrid" ? (
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-ink-900">Vous suivez la session…</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["onsite", "Sur place"],
+                  ["remote", "En visio"],
+                ].map(([valeur, libelle]) => (
+                  <label key={valeur} className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-sand-300 text-sm font-medium has-checked:border-brand-700 has-checked:bg-brand-700 has-checked:text-white">
+                    <input
+                      type="radio"
+                      name="canal"
+                      value={valeur}
+                      defaultChecked={valeur === (params.visio ? "remote" : "onsite")}
+                      className="sr-only"
+                    />
+                    {libelle}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           {session?.recording_enabled ? (
             <fieldset className="rounded-lg border border-sand-200 bg-sand-50 p-3">
               <legend className="px-1 text-sm font-medium text-ink-900">Enregistrement de la session</legend>
