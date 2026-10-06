@@ -32,14 +32,18 @@ export function modeSimulation(): boolean {
  * - LLM_PROVIDER=gemini     (GRATUIT — clé LLM_API_KEY via aistudio.google.com)
  * - LLM_PROVIDER=groq       (GRATUIT — clé LLM_API_KEY via console.groq.com)
  * - LLM_PROVIDER=openrouter (modèles ':free' — clé LLM_API_KEY)
- * Gemini/Groq/OpenRouter parlent le protocole « OpenAI compatible ».
+ * - LLM_PROVIDER=deepseek   (payant, peu coûteux — clé LLM_API_KEY via platform.deepseek.com)
+ * Gemini/Groq/OpenRouter/DeepSeek parlent le protocole « OpenAI compatible ».
  * Sans LLM_PROVIDER : anthropic si ANTHROPIC_API_KEY est définie.
  */
-type Fournisseur = "anthropic" | "gemini" | "groq" | "openrouter";
+type Fournisseur = "anthropic" | "gemini" | "groq" | "openrouter" | "deepseek";
+
+/** Plafond de sortie par défaut ; certains fournisseurs refusent au-delà du leur. */
+const MAX_TOKENS_DEFAUT = 16000;
 
 const PRESETS: Record<
   Exclude<Fournisseur, "anthropic">,
-  { baseUrl: string; modeleDefaut: string }
+  { baseUrl: string; modeleDefaut: string; maxTokens?: number }
 > = {
   gemini: {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -53,11 +57,18 @@ const PRESETS: Record<
     baseUrl: "https://openrouter.ai/api/v1",
     modeleDefaut: "meta-llama/llama-3.3-70b-instruct:free",
   },
+  // `deepseek-chat` plafonne la réponse à 8 192 jetons : au-delà,
+  // l'API répond 400. `deepseek-reasoner` (LLM_MODEL) accepte plus.
+  deepseek: {
+    baseUrl: "https://api.deepseek.com",
+    modeleDefaut: "deepseek-chat",
+    maxTokens: 8192,
+  },
 };
 
 export function fournisseurConfigure(): Fournisseur {
   const f = lireEnv("LLM_PROVIDER").toLowerCase();
-  if (f === "gemini" || f === "groq" || f === "openrouter") return f;
+  if (f === "gemini" || f === "groq" || f === "openrouter" || f === "deepseek") return f;
   return "anthropic";
 }
 
@@ -138,7 +149,7 @@ async function appelerAnthropic(system: string, prompt: string): Promise<Reponse
   };
 }
 
-/** Appel via un fournisseur « OpenAI compatible » (Gemini, Groq, OpenRouter). */
+/** Appel via un fournisseur « OpenAI compatible » (Gemini, Groq, OpenRouter, DeepSeek). */
 async function appelerOpenAiCompatible(
   fournisseur: Exclude<Fournisseur, "anthropic">,
   system: string,
@@ -153,6 +164,10 @@ async function appelerOpenAiCompatible(
 
   const baseUrl = lireEnv("LLM_BASE_URL") || PRESETS[fournisseur].baseUrl;
   const modele = modeleConfigure();
+  const maxTokens =
+    modele === PRESETS[fournisseur].modeleDefaut
+      ? (PRESETS[fournisseur].maxTokens ?? MAX_TOKENS_DEFAUT)
+      : MAX_TOKENS_DEFAUT;
 
   const reponse = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -162,7 +177,7 @@ async function appelerOpenAiCompatible(
     },
     body: JSON.stringify({
       model: modele,
-      max_tokens: 16000,
+      max_tokens: maxTokens,
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt },
@@ -177,10 +192,17 @@ async function appelerOpenAiCompatible(
   }
 
   const donnees = (await reponse.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     model?: string;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
+  // Réponse coupée au plafond de jetons : le JSON serait incomplet.
+  if (donnees.choices?.[0]?.finish_reason === "length") {
+    console.error(`[ia] ${fournisseur} : réponse tronquée à ${maxTokens} jetons (${modele}).`);
+    throw new Error(
+      `La réponse du modèle ${modele} a été coupée (limite de ${maxTokens} jetons). Réduisez le nombre de modules demandés, ou choisissez un modèle à sortie plus longue (LLM_MODEL).`
+    );
+  }
   return {
     texte: donnees.choices?.[0]?.message?.content ?? "",
     modele: donnees.model ?? modele,
