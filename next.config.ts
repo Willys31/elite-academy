@@ -26,9 +26,13 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      // Téléversement de supports de cours (limite alignée sur le
-      // bucket Storage : 20 Mo + marge d'encodage).
-      bodySizeLimit: "25mb",
+      // Depuis le lot 20, les supports de cours (jusqu'à 5 Go) vont
+      // directement du navigateur vers Storage : aucune action serveur
+      // ne reçoit plus de gros fichier. Seule l'importation d'une
+      // transcription de réunion (.txt/.vtt/.srt, 5 Mo max côté
+      // application) passe encore par un formulaire ; la limite est
+      // posée juste sous le plafond de 4,5 Mo des fonctions Vercel.
+      bodySizeLimit: "4mb",
     },
   },
 };

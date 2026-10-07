@@ -9,6 +9,9 @@ import {
   organizationsForDesign,
 } from "@/lib/courses/statuts";
 import { supprimerSource } from "@/app/(app)/sources/actions";
+import { lireUsagesStockage } from "@/lib/stockage/usage";
+import { formaterTaille } from "@/lib/stockage/limites";
+import { JaugeStockage } from "@/components/stockage/JaugeStockage";
 import { DangerForm } from "@/components/ui/DangerForm";
 import { Badge, Card, EmptyState, PageTitle, Retour, SecondaryLink } from "@/components/ui";
 
@@ -28,7 +31,10 @@ const FORMATS: Record<string, string> = {
   "image/jpeg": "Image",
   "image/webp": "Image",
   "video/mp4": "Vidéo",
+  "video/webm": "Vidéo",
+  "video/quicktime": "Vidéo",
   "audio/mpeg": "Audio",
+  "audio/mp4": "Audio",
 };
 
 /**
@@ -60,11 +66,27 @@ export default async function SourcesPage() {
     .from("sources")
     .select(
       `id, organization_id, title, mime_type, source_type, status, created_at,
+       size_bytes, upload_status,
        owner:profiles!sources_owner_id_fkey(full_name),
        organization:organizations(name)`
     )
     .order("created_at", { ascending: false })
     .limit(100);
+
+  // Jauges de stockage : une par organisation gérée (toutes pour
+  // l'admin Elite). Le quota se mesure sur les fichiers prêts et les
+  // envois en cours de moins de 24 h (migration 0018).
+  let organisationsGerees: Array<{ id: string; name: string }> = organizationsForDesign(
+    user.memberships
+  ).map((m) => ({ id: m.organization_id, name: m.organization?.name ?? "Organisation" }));
+  if (isEliteAdmin(user.memberships)) {
+    const { data } = await supabase.from("organizations").select("id, name").order("name");
+    organisationsGerees = data ?? organisationsGerees;
+  }
+  const usagesStockage = await lireUsagesStockage(
+    supabase,
+    organisationsGerees.map((o) => o.id)
+  );
 
   // Un seul aller-retour pour savoir quels documents servent encore de
   // support : interroger activité par activité multiplierait les
@@ -100,6 +122,23 @@ export default async function SourcesPage() {
         {(sources?.length ?? 0) > 1 ? "s" : ""}.
       </p>
 
+      {organisationsGerees.length > 0 ? (
+        <section aria-label="Stockage" className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold">Stockage</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {organisationsGerees.map((o) => {
+              const u = usagesStockage.get(o.id);
+              return (
+                <Card key={o.id}>
+                  <p className="mb-2 truncate text-sm font-medium">{o.name}</p>
+                  <JaugeStockage usage={u?.usage ?? 0} quota={u?.quota ?? 0} compact />
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {!sources || sources.length === 0 ? (
         <EmptyState
           title="Aucun document importé"
@@ -122,12 +161,20 @@ export default async function SourcesPage() {
                     <p className="font-medium break-words">{s.title}</p>
                     <p className="mt-1 text-xs text-slate-400">
                       {FORMATS[s.mime_type] ?? s.mime_type}
+                      {s.size_bytes ? ` · ${formaterTaille(Number(s.size_bytes))}` : ""}
                       {org?.name ? ` · ${org.name}` : ""}
                       {owner?.full_name ? ` · ${owner.full_name}` : ""}
                       {` · ${new Date(s.created_at).toLocaleDateString("fr-FR")}`}
                     </p>
                   </div>
-                  {estUtilisee ? <Badge>Utilisé dans une leçon</Badge> : null}
+                  <div className="flex flex-wrap gap-1.5">
+                    {s.upload_status === "pending" ? (
+                      <Badge ton="or">Téléversement en cours</Badge>
+                    ) : s.upload_status === "failed" ? (
+                      <Badge ton="alerte">Échec du téléversement</Badge>
+                    ) : null}
+                    {estUtilisee ? <Badge>Utilisé dans une leçon</Badge> : null}
+                  </div>
                 </div>
 
                 {peutSupprimer ? (

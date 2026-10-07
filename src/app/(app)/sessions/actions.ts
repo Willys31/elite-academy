@@ -527,7 +527,9 @@ export async function importerTranscription(
   let texte = String(formData.get("texte") ?? "");
   const fichier = formData.get("fichier");
   if (fichier instanceof File && fichier.size > 0) {
-    if (fichier.size > 5 * 1024 * 1024) return { error: "Le fichier dépasse 5 Mo." };
+    // Ce formulaire passe encore par le serveur : la limite suit le
+    // plafond de corps des actions (`bodySizeLimit`, 4 Mo).
+    if (fichier.size > 4 * 1024 * 1024) return { error: "Le fichier dépasse 4 Mo." };
     texte = await fichier.text();
   }
   texte = texte.replace(/\r\n?/g, "\n").trim();

@@ -10,6 +10,8 @@ import {
   type OrgType,
 } from "@/lib/auth/roles";
 import { ajouterMembre } from "@/app/(app)/organisations/actions";
+import { lireUsageStockage } from "@/lib/stockage/usage";
+import { JaugeStockage } from "@/components/stockage/JaugeStockage";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Badge, Card, EmptyState, Input, Label, PageTitle, Retour, Select } from "@/components/ui";
 
@@ -49,13 +51,16 @@ export default async function OrganisationPage({
 
   // La liste des membres n'est visible que selon les droits RLS
   // (admin/manager/trainer de l'organisation ou admin Elite Experience).
-  const { data: membres } = gestionnaire
-    ? await supabase
-        .from("organization_members")
-        .select("id, role, status, joined_at, profile:profiles(full_name, email)")
-        .eq("organization_id", org.id)
-        .order("joined_at")
-    : { data: null };
+  const [{ data: membres }, stockage] = await Promise.all([
+    gestionnaire
+      ? supabase
+          .from("organization_members")
+          .select("id, role, status, joined_at, profile:profiles(full_name, email)")
+          .eq("organization_id", org.id)
+          .order("joined_at")
+      : Promise.resolve({ data: null }),
+    gestionnaire ? lireUsageStockage(supabase, org.id) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -145,6 +150,19 @@ export default async function OrganisationPage({
         </section>
 
         {gestionnaire ? (
+          <div className="space-y-6">
+          {stockage ? (
+            <section aria-label="Stockage">
+              <h2 className="mb-3 text-lg font-semibold">Stockage</h2>
+              <Card>
+                <JaugeStockage usage={stockage.usage} quota={stockage.quota} />
+                <p className="mt-3 text-xs text-slate-500">
+                  Supports de cours et vidéos versés par l&apos;organisation.
+                  Le quota est ajustable par Elite Experience.
+                </p>
+              </Card>
+            </section>
+          ) : null}
           <section aria-label="Ajouter un membre">
             <h2 className="mb-3 text-lg font-semibold">Ajouter un membre</h2>
             <Card>
@@ -180,6 +198,7 @@ export default async function OrganisationPage({
               </AuthForm>
             </Card>
           </section>
+          </div>
         ) : null}
       </div>
     </div>

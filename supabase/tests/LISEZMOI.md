@@ -36,6 +36,7 @@ psql -h /tmp -p 5433 -U postgres -d ea -f jeu_essai.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f fonctions_essai.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f fonctions_essai_generique.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f test_creation.sql
+psql -h /tmp -p 5433 -U postgres -d ea -f test_stockage.sql   # lot 20 : quota, politique UPDATE Storage
 ```
 
 ## Les deux pièces qui font que le test prouve quelque chose

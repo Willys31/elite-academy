@@ -2,15 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
-import {
-  canCreateCourse,
-  isContentEditable,
-  slugify,
-  type CourseStatus,
-} from "@/lib/courses/statuts";
+import { canCreateCourse, slugify } from "@/lib/courses/statuts";
 import {
   decouperHtml,
   decouperTexte,
@@ -24,131 +18,22 @@ import {
   SYSTEM_IMPORT,
 } from "@/lib/ai/prompts";
 import { extraireJson, validerResultat, type ResultatGeneration } from "@/lib/ai/schema";
+import { creerActiviteSupport } from "@/lib/stockage/activites";
+import { verifierEdition } from "@/lib/stockage/edition";
+import {
+  extensionDe,
+  formaterTaille,
+  TAILLE_MAX_EXTRACTION,
+} from "@/lib/stockage/limites";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 /** Taille maximale du texte envoyé à l'IA (≈ 30 000 jetons). */
 const MAX_TEXTE_IA = 120000;
 
-const TAILLE_MAX = 20 * 1024 * 1024; // 20 Mo, alignée sur le bucket
-
-const MIMES_SUPPORTS: Record<string, string> = {
-  ".pdf": "application/pdf",
-  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ".doc": "application/msword",
-  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ".ppt": "application/vnd.ms-powerpoint",
-  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ".txt": "text/plain",
-  ".md": "text/markdown",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".mp4": "video/mp4",
-  ".mp3": "audio/mpeg",
-};
-
 function loguer(contexte: string, error: unknown) {
   const message =
     error instanceof Error ? error.message : (error as { message?: string })?.message;
   if (message) console.error(`[import] ${contexte} :`, message);
-}
-
-function extensionDe(nom: string): string {
-  const i = nom.lastIndexOf(".");
-  return i === -1 ? "" : nom.slice(i).toLowerCase();
-}
-
-function mimePour(fichier: File): string | null {
-  const ext = extensionDe(fichier.name);
-  return MIMES_SUPPORTS[ext] ?? null;
-}
-
-function nomSur(nom: string): string {
-  return nom
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .slice(0, 100);
-}
-
-/**
- * Téléverse un fichier dans le bucket « supports » et le trace dans
- * `sources`. Retourne le chemin et l'identifiant de la source.
- */
-async function stockerFichier(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  params: {
-    organizationId: string;
-    ownerId: string;
-    fichier: File;
-    mime: string;
-    sousDossier: string;
-  }
-): Promise<{ chemin: string; sourceId: string } | { erreur: string }> {
-  const chemin = `org/${params.organizationId}/${params.sousDossier}/${randomUUID()}-${nomSur(params.fichier.name)}`;
-  const contenu = Buffer.from(await params.fichier.arrayBuffer());
-
-  const { error: erreurStockage } = await supabase.storage
-    .from("supports")
-    .upload(chemin, contenu, { contentType: params.mime, upsert: false });
-  if (erreurStockage) {
-    loguer("stockage", erreurStockage);
-    return {
-      erreur:
-        "Le téléversement a échoué. Vérifiez que la migration 0008 est appliquée (bucket « supports ») et réessayez.",
-    };
-  }
-
-  const { data: source, error: erreurSource } = await supabase
-    .from("sources")
-    .insert({
-      organization_id: params.organizationId,
-      owner_id: params.ownerId,
-      title: params.fichier.name,
-      file_path: chemin,
-      mime_type: params.mime,
-      source_type: "support_pedagogique",
-    })
-    .select("id")
-    .single();
-  if (erreurSource || !source) {
-    loguer("traçabilité source", erreurSource);
-    await supabase.storage.from("supports").remove([chemin]);
-    return { erreur: "L'enregistrement du document a échoué. Réessayez." };
-  }
-
-  return { chemin, sourceId: source.id };
-}
-
-/** Crée une activité « support » rattachée à une leçon. */
-async function creerActiviteSupport(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  params: {
-    lessonId: string;
-    titre: string;
-    chemin: string;
-    mime: string;
-    sourceId: string;
-  }
-) {
-  const { count } = await supabase
-    .from("activities")
-    .select("id", { count: "exact", head: true })
-    .eq("lesson_id", params.lessonId);
-
-  return supabase.from("activities").insert({
-    lesson_id: params.lessonId,
-    type: "file",
-    title: params.titre,
-    content: {
-      file_path: params.chemin,
-      mime_type: params.mime,
-      source_id: params.sourceId,
-    },
-    position: (count ?? 0) + 1,
-    status: "draft",
-  });
 }
 
 // ------------------------------------------------------------
@@ -189,6 +74,11 @@ async function chargerAnalyseurPdf() {
 
 // ------------------------------------------------------------
 // Import d'un document de cours → formation en brouillon
+//
+// Depuis le lot 20, le document est d'abord déposé directement dans
+// Storage par le navigateur (composant `TeleverseurFichier`), puis
+// finalisé : cette action ne reçoit que l'identifiant de la source et
+// télécharge le fichier depuis le bucket pour en extraire le texte.
 // ------------------------------------------------------------
 
 export async function importerDocument(
@@ -200,19 +90,31 @@ export async function importerDocument(
 
   const organizationId = String(formData.get("organization_id") ?? "");
   const titreSaisi = String(formData.get("title") ?? "").trim();
-  const fichier = formData.get("file");
+  const sourceId = String(formData.get("source_id") ?? "");
 
   if (!organizationId) return { error: "Veuillez choisir une organisation." };
-  if (!(fichier instanceof File) || fichier.size === 0) {
-    return { error: "Veuillez choisir le document de cours à importer." };
-  }
-  if (fichier.size > TAILLE_MAX) {
-    return { error: "Le fichier dépasse 20 Mo. Réduisez-le ou découpez-le." };
+  if (!sourceId) {
+    return { error: "Veuillez d'abord téléverser le document de cours à importer." };
   }
   if (!canCreateCourse(user.memberships, organizationId)) {
     return { error: "Vous n'avez pas le droit de créer une formation dans cette organisation." };
   }
 
+  const supabase = await createClient();
+  const { data: source } = await supabase
+    .from("sources")
+    .select("id, organization_id, owner_id, title, file_path, mime_type, upload_status, size_bytes")
+    .eq("id", sourceId)
+    .maybeSingle();
+
+  if (!source || source.owner_id !== user.id || source.organization_id !== organizationId) {
+    return { error: "Document téléversé introuvable. Recommencez le téléversement." };
+  }
+  if (source.upload_status !== "ready") {
+    return { error: "Le téléversement du document n'est pas terminé. Patientez puis réessayez." };
+  }
+
+  const fichier = { name: source.title };
   const ext = extensionDe(fichier.name);
   if (ext !== ".docx" && ext !== ".pdf") {
     return {
@@ -221,10 +123,31 @@ export async function importerDocument(
     };
   }
 
+  /* Le fichier est lu en mémoire dans la fonction serveur pour en
+     extraire le texte : au-delà de la limite, il reste disponible comme
+     support de leçon (déjà stocké), sans analyse automatique. */
+  const taille = Number(source.size_bytes ?? 0);
+  if (taille > TAILLE_MAX_EXTRACTION) {
+    return {
+      error:
+        `Pour l'import automatique, le document doit faire moins de ${formaterTaille(TAILLE_MAX_EXTRACTION)} ` +
+        `(celui-ci fait ${formaterTaille(taille)}). Il reste disponible dans vos sources et peut être joint ` +
+        "comme support à une leçon.",
+    };
+  }
+
+  const { data: blob, error: erreurTelechargement } = await supabase.storage
+    .from("supports")
+    .download(source.file_path);
+  if (erreurTelechargement || !blob) {
+    loguer("téléchargement du document", erreurTelechargement);
+    return { error: "Le document n'a pas pu être relu depuis le stockage. Réessayez." };
+  }
+
   // 1. Extraction du contenu (texte balisé pour l'IA + découpage
   // par titres, qui sert de mode simple et de repli).
   const mode = String(formData.get("mode") ?? "ia");
-  const contenu = Buffer.from(await fichier.arrayBuffer());
+  const contenu = Buffer.from(await blob.arrayBuffer());
   let texteBrut = "";
   let decoupage: Decoupage;
 
@@ -256,17 +179,10 @@ export async function importerDocument(
     };
   }
 
-  const supabase = await createClient();
-
-  // 2. Stockage du document original (traçabilité, PRD §17).
-  const stocke = await stockerFichier(supabase, {
-    organizationId,
-    ownerId: user.id,
-    fichier,
-    mime: MIMES_SUPPORTS[ext],
-    sousDossier: "imports",
-  });
-  if ("erreur" in stocke) return { error: stocke.erreur };
+  // 2. Le document original est déjà stocké et tracé dans `sources`
+  // (traçabilité, PRD §17) : la finalisation du téléversement s'en est
+  // chargée avant l'appel de cette action.
+  const stocke = { chemin: source.file_path, sourceId: source.id };
 
   // 2 bis. Structuration par IA (mode recommandé) : réorganisation
   // fidèle du contenu + extraction des QCM/exercices, tracée dans
@@ -570,7 +486,7 @@ export async function importerDocument(
       lessonId: premiereLecon,
       titre: `Document original — ${fichier.name}`,
       chemin: stocke.chemin,
-      mime: MIMES_SUPPORTS[ext],
+      mime: source.mime_type,
       sourceId: stocke.sourceId,
     });
   }
@@ -580,77 +496,14 @@ export async function importerDocument(
 }
 
 // ------------------------------------------------------------
-// Supports de leçon : téléverser / retirer (formation en brouillon)
+// Supports de leçon : retirer (formation en brouillon)
+//
+// Le téléversement d'un support passe désormais par
+// `preparerTeleversement` / `finaliserTeleversement`
+// (`src/app/(app)/sources/televersement.ts`) et le composant client
+// `TeleverseurFichier` : le fichier va du navigateur au stockage sans
+// transiter par le serveur.
 // ------------------------------------------------------------
-
-async function verifierEdition(courseId: string) {
-  const user = await getCurrentUser();
-  if (!user) return { erreur: "Vous devez être connecté." as const };
-  const supabase = await createClient();
-  const { data: course } = await supabase
-    .from("courses")
-    .select("id, organization_id, status")
-    .eq("id", courseId)
-    .maybeSingle();
-  if (!course) return { erreur: "Formation introuvable ou non autorisée." as const };
-  if (!isContentEditable(course.status as CourseStatus)) {
-    return {
-      erreur:
-        "Les supports ne sont modifiables qu'en brouillon : repassez la formation en brouillon d'abord." as const,
-    };
-  }
-  return { user, supabase, course };
-}
-
-export async function televerserSupport(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const courseId = String(formData.get("course_id") ?? "");
-  const lessonId = String(formData.get("lesson_id") ?? "");
-  const fichier = formData.get("file");
-
-  if (!(fichier instanceof File) || fichier.size === 0) {
-    return { error: "Veuillez choisir un fichier." };
-  }
-  if (fichier.size > TAILLE_MAX) {
-    return { error: "Le fichier dépasse 20 Mo." };
-  }
-  const mime = mimePour(fichier);
-  if (!mime) {
-    return {
-      error:
-        "Format non pris en charge. Acceptés : PDF, Word, PowerPoint, Excel, texte, images (PNG/JPG/WebP), MP4, MP3.",
-    };
-  }
-
-  const ctx = await verifierEdition(courseId);
-  if ("erreur" in ctx) return { error: ctx.erreur };
-
-  const stocke = await stockerFichier(ctx.supabase, {
-    organizationId: ctx.course.organization_id,
-    ownerId: ctx.user.id,
-    fichier,
-    mime,
-    sousDossier: `courses/${courseId}`,
-  });
-  if ("erreur" in stocke) return { error: stocke.erreur };
-
-  const { error } = await creerActiviteSupport(ctx.supabase, {
-    lessonId,
-    titre: fichier.name.replace(/\.[^.]+$/, ""),
-    chemin: stocke.chemin,
-    mime,
-    sourceId: stocke.sourceId,
-  });
-  if (error) {
-    loguer("activité support", error);
-    return { error: "Le support est stocké mais n'a pas pu être rattaché à la leçon. Réessayez." };
-  }
-
-  revalidatePath(`/catalogue/${courseId}/modifier`);
-  return { success: `Support « ${fichier.name} » ajouté à la leçon.` };
-}
 
 export async function supprimerSupport(
   _prev: ActionState,

@@ -54,8 +54,11 @@ Dans l'éditeur SQL de Supabase, exécuter dans l'ordre :
 15. `supabase/migrations/0015_situations_travail.sql`
 16. `supabase/migrations/0016_sessions_hybrides.sql`
 17. `supabase/migrations/0017_tutorat_ia.sql`
-18. Créer votre compte via l'écran d'inscription de l'application
-19. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
+18. `supabase/migrations/0018_stockage_gros_fichiers.sql` — puis, dans
+    le Dashboard Supabase, Project Settings → Storage → **Global file
+    size limit : 5 GB** (plan Pro requis pour dépasser 50 Mo)
+19. Créer votre compte via l'écran d'inscription de l'application
+20. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
     pour devenir administrateur Elite Experience
 
 ### 4. Lancer

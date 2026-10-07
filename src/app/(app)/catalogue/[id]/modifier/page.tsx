@@ -27,10 +27,10 @@ import {
   supprimerLecon,
   supprimerModule,
 } from "@/app/(app)/catalogue/actions";
-import {
-  supprimerSupport,
-  televerserSupport,
-} from "@/app/(app)/catalogue/importer/actions";
+import { supprimerSupport } from "@/app/(app)/catalogue/importer/actions";
+import { TeleverseurFichier } from "@/components/stockage/TeleverseurFichier";
+import { lireUsageStockage } from "@/lib/stockage/usage";
+import { ACCEPT_SUPPORTS, formaterTaille, TAILLE_MAX_FICHIER } from "@/lib/stockage/limites";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { DangerForm } from "@/components/ui/DangerForm";
 import { Alert, Badge, Card, Input, Label, LienTexte, PageTitle, Retour, SecondaryLink, Select, Textarea } from "@/components/ui";
@@ -91,7 +91,7 @@ export default async function EditeurFormationPage({
         ? supabase
             .from("modules")
             .select(
-              "id, title, description, position, lessons(id, title, position, estimated_minutes, activities(id, title, type))"
+              "id, title, description, position, lessons(id, title, position, estimated_minutes, activities(id, title, type, content))"
             )
             .eq("course_version_id", formation.current_version_id)
             .order("position")
@@ -105,6 +105,26 @@ export default async function EditeurFormationPage({
 
   const idsLiees = new Set((liees ?? []).map((l) => l.competency_id));
   const disponibles = (toutesCompetences ?? []).filter((c) => !idsLiees.has(c.id));
+
+  // Tailles des supports et quota de l'organisation : un concepteur qui
+  // dépose des vidéos doit voir ce qu'il reste avant de choisir un fichier.
+  const activitesFichier = (modules ?? [])
+    .flatMap((m) => m.lessons ?? [])
+    .flatMap((l) => l.activities ?? [])
+    .filter((a) => a.type === "file");
+  const [{ data: sourcesSupports }, usageStockage] = await Promise.all([
+    activitesFichier.length > 0
+      ? supabase
+          .from("sources")
+          .select("id, size_bytes")
+          .eq("organization_id", formation.organization_id)
+          .eq("upload_status", "ready")
+      : Promise.resolve({ data: [] as Array<{ id: string; size_bytes: number | null }> }),
+    editable ? lireUsageStockage(supabase, formation.organization_id) : Promise.resolve(null),
+  ]);
+  const tailleParSource = new Map(
+    (sourcesSupports ?? []).map((s) => [s.id, Number(s.size_bytes ?? 0)])
+  );
 
   // Provenance IA éventuelle : afficher les alertes de la génération.
   const { data: generation } = await supabase
@@ -377,12 +397,20 @@ export default async function EditeurFormationPage({
                               <ul className="mt-2 space-y-1">
                                 {(l.activities ?? [])
                                   .filter((a) => a.type === "file")
-                                  .map((a) => (
+                                  .map((a) => {
+                                    const sourceId = (a.content as { source_id?: string } | null)?.source_id;
+                                    const taille = sourceId ? tailleParSource.get(sourceId) : undefined;
+                                    return (
                                     <li
                                       key={a.id}
                                       className="flex flex-col gap-1.5 rounded bg-white px-2.5 py-1.5 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-2"
                                     >
-                                      <span className="min-w-0 break-words sm:truncate">📎 {a.title}</span>
+                                      <span className="min-w-0 break-words sm:truncate">
+                                        📎 {a.title}
+                                        {taille ? (
+                                          <span className="ml-2 text-slate-400">{formaterTaille(taille)}</span>
+                                        ) : null}
+                                      </span>
                                       {editable ? (
                                         <AuthForm
                                           action={supprimerSupport}
@@ -394,7 +422,8 @@ export default async function EditeurFormationPage({
                                         </AuthForm>
                                       ) : null}
                                     </li>
-                                  ))}
+                                    );
+                                  })}
                               </ul>
                             ) : null}
 
@@ -424,27 +453,23 @@ export default async function EditeurFormationPage({
                                     Ajouter un support (PDF, Word, vidéo…)
                                   </summary>
                                   <div className="mt-2">
-                                    <AuthForm
-                                      action={televerserSupport}
-                                      submitLabel="Téléverser le support"
-                                      pendingLabel="Téléversement…"
-                                    >
-                                      <input type="hidden" name="course_id" value={formation.id} />
-                                      <input type="hidden" name="lesson_id" value={l.id} />
-                                      <div>
-                                        <Label htmlFor={`support-${l.id}`}>
-                                          Fichier (20 Mo max)
-                                        </Label>
-                                        <input
-                                          id={`support-${l.id}`}
-                                          name="file"
-                                          type="file"
-                                          required
-                                          accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.mp4,.mp3"
-                                          className="block w-full rounded-lg border border-sand-300 bg-white px-3.5 py-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900"
-                                        />
-                                      </div>
-                                    </AuthForm>
+                                    {/* Le fichier part directement vers Storage
+                                        (lot 20) : la finalisation crée l'activité
+                                        et rafraîchit la page. */}
+                                    <TeleverseurFichier
+                                      organizationId={formation.organization_id}
+                                      destination={{ type: "lecon", courseId: formation.id, lessonId: l.id }}
+                                      accept={ACCEPT_SUPPORTS}
+                                      libelle={`Fichier (${formaterTaille(TAILLE_MAX_FICHIER)} max)`}
+                                      aide={
+                                        usageStockage
+                                          ? `PDF, Word, PowerPoint, images, vidéo (MP4, WebM, MOV), audio. Espace restant : ${formaterTaille(Math.max(0, usageStockage.quota - usageStockage.usage))}.`
+                                          : undefined
+                                      }
+                                      usageOctets={usageStockage?.usage}
+                                      quotaOctets={usageStockage?.quota}
+                                      rattacherAFinalisation
+                                    />
                                   </div>
                                 </details>
                               </div>

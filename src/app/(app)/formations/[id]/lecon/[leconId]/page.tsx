@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
+import { obtenirUrlLecture, type UrlLecture } from "@/lib/stockage/fournisseur";
+import { formaterTaille } from "@/lib/stockage/limites";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Badge, Card, PageTitle } from "@/components/ui";
 
@@ -83,29 +85,56 @@ export default async function LeconPage({
   const terminee = Boolean(progres);
 
   // Supports de la leçon : URL signées (1 h), accès contrôlé par
-  // les politiques Storage de l'organisation.
+  // les politiques Storage de l'organisation. `obtenirUrlLecture`
+  // isole le fournisseur (Supabase aujourd'hui, Cloudflare Stream
+  // plus tard) : la page ne connaît qu'un type d'URL.
   const quizzes = (activites ?? []).filter((a) => a.type === "quiz");
   const fichiers = (activites ?? []).filter((a) => a.type === "file");
+  const idsSources = fichiers
+    .map((a) => (a.content as { source_id?: string } | null)?.source_id)
+    .filter((id): id is string => Boolean(id));
+  const { data: sourcesSupports } = idsSources.length
+    ? await supabase
+        .from("sources")
+        .select("id, file_path, mime_type, size_bytes, storage_provider, provider_ref")
+        .in("id", idsSources)
+    : { data: [] as Array<{
+        id: string;
+        file_path: string;
+        mime_type: string;
+        size_bytes: number | null;
+        storage_provider: string | null;
+        provider_ref: string | null;
+      }> };
+  const sourceParId = new Map((sourcesSupports ?? []).map((s) => [s.id, s]));
+
   const supports = await Promise.all(
     fichiers.map(async (a) => {
-      const c = (a.content ?? {}) as { file_path?: string; mime_type?: string };
-      if (!c.file_path) return null;
-      const { data } = await supabase.storage
-        .from("supports")
-        .createSignedUrl(c.file_path, 3600);
-      if (!data?.signedUrl) return null;
+      const c = (a.content ?? {}) as { file_path?: string; mime_type?: string; source_id?: string };
+      const source = c.source_id ? sourceParId.get(c.source_id) : undefined;
+      const chemin = source?.file_path ?? c.file_path;
+      if (!chemin) return null;
+      const lecture = await obtenirUrlLecture(supabase, {
+        file_path: chemin,
+        mime_type: source?.mime_type ?? c.mime_type ?? "application/octet-stream",
+        storage_provider: source?.storage_provider,
+        provider_ref: source?.provider_ref,
+      });
+      if (!lecture) return null;
       return {
         id: a.id,
         titre: a.title,
-        url: data.signedUrl,
-        mime: c.mime_type ?? "application/octet-stream",
+        lecture,
+        mime: source?.mime_type ?? c.mime_type ?? "application/octet-stream",
+        taille: source?.size_bytes ? Number(source.size_bytes) : null,
       };
     })
   ).then((liste) => liste.filter(Boolean) as Array<{
     id: string;
     titre: string;
-    url: string;
+    lecture: UrlLecture;
     mime: string;
+    taille: number | null;
   }>);
 
   return (
@@ -138,32 +167,56 @@ export default async function LeconPage({
             <Card key={s.id} flush className="overflow-hidden">
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
                 <p className="truncate text-sm font-medium">📎 {s.titre}</p>
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 text-sm text-brand-600 hover:underline"
-                >
-                  Ouvrir / Télécharger
-                </a>
+                {s.lecture.type === "fichier" ? (
+                  <span className="flex shrink-0 items-center gap-3 text-sm">
+                    <a
+                      href={s.lecture.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand-600 hover:underline"
+                    >
+                      Ouvrir
+                    </a>
+                    <a href={s.lecture.urlTelechargement} className="text-brand-600 hover:underline">
+                      Télécharger{s.taille ? ` (${formaterTaille(s.taille)})` : ""}
+                    </a>
+                  </span>
+                ) : null}
               </div>
-              {s.mime === "application/pdf" ? (
+              {s.lecture.type === "iframe" || s.lecture.type === "hls" ? (
                 <iframe
-                  src={s.url}
+                  src={s.lecture.url}
+                  title={s.titre}
+                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className="aspect-video w-full bg-black"
+                />
+              ) : s.mime === "application/pdf" ? (
+                <iframe
+                  src={s.lecture.url}
                   title={s.titre}
                   className="h-[60svh] min-h-80 w-full sm:h-[70svh]"
                 />
               ) : s.mime.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.url} alt={s.titre} className="w-full" />
+                <img src={s.lecture.url} alt={s.titre} className="w-full" />
               ) : s.mime.startsWith("video/") ? (
-                <video src={s.url} controls className="w-full" />
+                /* `preload="metadata"` : le navigateur ne lit que l'en-tête
+                   puis avance par requêtes Range ; une vidéo de plusieurs
+                   Go ne se télécharge pas entière à l'ouverture. */
+                <video
+                  src={s.lecture.url}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  className="aspect-video w-full bg-black"
+                />
               ) : s.mime.startsWith("audio/") ? (
-                <audio src={s.url} controls className="w-full px-4 py-3" />
+                <audio src={s.lecture.url} controls preload="metadata" className="w-full px-4 py-3" />
               ) : (
                 <p className="px-4 py-3 text-sm text-slate-500">
                   Ce format (Word, PowerPoint…) s&apos;ouvre via le bouton
-                  « Ouvrir / Télécharger » ci-dessus.
+                  « Télécharger » ci-dessus.
                 </p>
               )}
             </Card>
