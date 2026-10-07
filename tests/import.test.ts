@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { decouperHtml, decouperTexte } from "@/lib/import/decoupage";
+import {
+  decouperHtml,
+  decouperTexte,
+  deduireIntervalle,
+  libelleCourt,
+  libelleIntervalle,
+  retirerMarqueurs,
+  texteAvecMarqueursPages,
+  unionIntervalles,
+} from "@/lib/import/decoupage";
 
 describe("decouperHtml (Word)", () => {
   it("découpe Titre 1 → modules et Titre 2 → leçons, avec le contenu", () => {
@@ -103,5 +112,84 @@ describe("decouperTexte (PDF)", () => {
   it("texte vide (PDF scanné) : signalé clairement", () => {
     const r = decouperTexte("");
     expect(r.warnings.some((w) => w.includes("Aucun texte"))).toBe(true);
+  });
+});
+
+describe("positions dans le document (lot 21)", () => {
+  it("decouperTexte attribue à chaque leçon ses pages à partir des repères", () => {
+    const texte = texteAvecMarqueursPages([
+      { num: 1, text: "1. Introduction\nLe management consiste à…" },
+      { num: 2, text: "1.1 Définitions\nQuelques définitions." },
+      { num: 3, text: "Suite des définitions.\n1.2 Enjeux\nLes enjeux." },
+      { num: 4, text: "2. La délégation\nDéléguer, c'est…" },
+    ]);
+    const r = decouperTexte(texte);
+    const lecons = r.modules.flatMap((m) => m.lessons);
+    expect(lecons.map((l) => l.title)).toEqual([
+      "1. Introduction",
+      "1.1 Définitions",
+      "1.2 Enjeux",
+      "2. La délégation",
+    ]);
+    expect(lecons[0].range).toEqual({ kind: "pages", from: 1, to: 1 });
+    // Page frontière partagée : la leçon 1.1 finit page 3, 1.2 commence page 3.
+    expect(lecons[1].range).toEqual({ kind: "pages", from: 2, to: 3 });
+    expect(lecons[2].range).toEqual({ kind: "pages", from: 3, to: 3 });
+    expect(lecons[3].range).toEqual({ kind: "pages", from: 4, to: 4 });
+    // Les repères ne sont jamais du contenu.
+    expect(lecons.every((l) => !l.text.includes("[[PAGE"))).toBe(true);
+  });
+
+  it("sans repère, aucune position n'est inventée", () => {
+    const r = decouperTexte("1. Un\ntexte\n2. Deux\nautre");
+    expect(r.modules.flatMap((m) => m.lessons).every((l) => l.range === undefined)).toBe(true);
+  });
+
+  it("un PDF sans structure garde l'intervalle complet", () => {
+    const r = decouperTexte(texteAvecMarqueursPages([{ num: 1, text: "a" }, { num: 2, text: "b" }]));
+    expect(r.modules[0].lessons[0].range).toEqual({ kind: "pages", from: 1, to: 2 });
+  });
+
+  it("deduireIntervalle retrouve les pages d'un texte par son début et sa fin", () => {
+    const pages = [
+      "Première page sans rapport avec le reste du document.",
+      "La délégation consiste à confier une mission à un collaborateur en lui laissant une marge de manœuvre.",
+      "Elle suppose de définir le résultat attendu, le délai et les moyens accordés.",
+      "Dernière page : conclusion générale et remerciements.",
+    ];
+    const texte =
+      "La délégation consiste à confier une mission à un collaborateur en lui laissant une marge de manœuvre. " +
+      "Elle suppose de définir le résultat attendu, le délai et les moyens accordés.";
+    expect(deduireIntervalle(texte, pages, "pages")).toEqual({ kind: "pages", from: 2, to: 3 });
+    expect(
+      deduireIntervalle("Texte absent du document, suffisamment long pour être cherché.", pages, "pages")
+    ).toBeNull();
+    expect(deduireIntervalle("court", pages, "pages")).toBeNull();
+  });
+
+  it("libellés et réunion d'intervalles", () => {
+    expect(libelleIntervalle({ kind: "pages", from: 12, to: 18 })).toBe("Pages 12 à 18");
+    expect(libelleIntervalle({ kind: "pages", from: 7, to: 7 })).toBe("Page 7");
+    expect(libelleIntervalle({ kind: "slides", from: 20, to: 31 })).toBe("Diapositives 20 à 31");
+    expect(libelleCourt({ kind: "pages", from: 12, to: 18 })).toBe("p. 12–18");
+    expect(libelleCourt({ kind: "slides", from: 4, to: 4 })).toBe("diapo 4");
+    expect(unionIntervalles({ kind: "pages", from: 1, to: 3 }, { kind: "pages", from: 4, to: 6 })).toEqual({
+      kind: "pages",
+      from: 1,
+      to: 6,
+    });
+    expect(unionIntervalles({ kind: "pages", from: 1, to: 3 }, { kind: "pages", from: 3, to: 5 })).toEqual({
+      kind: "pages",
+      from: 1,
+      to: 5,
+    });
+    expect(unionIntervalles({ kind: "pages", from: 1, to: 3 }, { kind: "pages", from: 5, to: 6 })).toBeNull();
+    expect(unionIntervalles({ kind: "pages", from: 1, to: 3 }, { kind: "slides", from: 4, to: 6 })).toBeNull();
+  });
+
+  it("retirerMarqueurs nettoie un texte recopié par l'IA", () => {
+    expect(retirerMarqueurs("[[PAGE 3]]\nTexte utile\n[[DIAPOSITIVE 4 : Titre]]\nSuite")).toBe(
+      "Texte utile\n\nSuite"
+    );
   });
 });

@@ -9,7 +9,7 @@
  */
 
 export const PROMPT_VERSION = "plan-formation/v1";
-export const PROMPT_VERSION_IMPORT = "structuration-document/v1";
+export const PROMPT_VERSION_IMPORT = "structuration-document/v2";
 
 /** Contexte système commun (workflows IA §8), complété par le format de sortie. */
 export const SYSTEM_PROMPT = `Tu es un assistant pédagogique pour Elite Academy, plateforme de formation professionnelle multi-domaines d'Elite Experience. Analyse toujours le sujet, le public, le contexte, les compétences, le niveau et le résultat attendu avant de choisir une méthode. Ne suppose jamais que le sujet concerne la vente, le retail ou le luxe. SONCASE, CAB, vente additionnelle et toute méthode commerciale ne doivent être utilisées que si le sujet les justifie réellement. Produis des contenus pratiques, structurés, accessibles et cohérents avec les compétences visées. Tout résultat est un brouillon jusqu'à validation selon les règles d'Elite Academy. En cas d'incertitude, ajoute une alerte dans "warnings" plutôt que d'inventer une information.
@@ -63,7 +63,8 @@ Règles :
 - si le document contient des questions, QCM, quiz, exercices d'auto-évaluation ou questions de révision, NE les laisse PAS dans le texte des leçons : convertis-les en objets "quiz" rattachés à la leçon concernée (invente des options plausibles uniquement si une question ouverte doit devenir un QCM, et signale-le dans "warnings") ;
 - les sommaires, pages de garde et tables des matières ne deviennent pas des leçons ;
 - identifie 2 à 6 compétences observables réellement couvertes par le document ;
-- en cas de doute ou de passage illisible, ajoute une alerte dans "warnings" plutôt que d'inventer.
+- en cas de doute ou de passage illisible, ajoute une alerte dans "warnings" plutôt que d'inventer ;
+- le texte peut contenir des lignes-repères de la forme [[PAGE n]] ou [[DIAPOSITIVE n : titre]] : ce ne sont PAS du contenu, ne les recopie jamais dans les leçons. Quand ces repères existent, chaque leçon DOIT porter "source_range": {"from": n, "to": n}, les numéros inclusifs des pages ou diapositives dont elle reprend la matière — des intervalles contigus, dans l'ordre du document, sans chevauchement (une page frontière partagée entre deux leçons est tolérée). Sans repère dans le texte, omets ce champ.
 
 Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises de code. Structure exacte :
 {
@@ -87,6 +88,7 @@ Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sa
           "title": "string",
           "text": "string (contenu fidèle au document)",
           "estimated_minutes": number,
+          "source_range": { "from": number, "to": number },
           "quiz": {
             "title": "string",
             "questions": [
@@ -101,16 +103,24 @@ Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sa
   "warnings": ["string"],
   "validation_required": boolean
 }
-Le champ "quiz" est facultatif : ne le mets que si la leçon a réellement des questions dans le document.`;
+Le champ "quiz" est facultatif : ne le mets que si la leçon a réellement des questions dans le document. Le champ "source_range" n'est présent que si le texte contient des repères [[PAGE n]] ou [[DIAPOSITIVE n]].`;
 
 /** Prompt utilisateur de structuration d'un document importé. */
 export function construirePromptStructuration(
   nomFichier: string,
-  texte: string
+  texte: string,
+  unite?: { type: "page" | "diapositive"; total: number }
 ): string {
+  const reperes = unite
+    ? `
+Le document compte ${unite.total} ${unite.type}s, chacune introduite par un repère [[${
+        unite.type === "page" ? "PAGE" : "DIAPOSITIVE"
+      } n]]. Indique pour chaque leçon l'intervalle "source_range" correspondant.
+`
+    : "";
   return `Réorganise le document de cours suivant en formation structurée, en respectant strictement les règles du système.
 
-Nom du fichier : ${nomFichier}
+Nom du fichier : ${nomFichier}${reperes}
 
 ===== DÉBUT DU DOCUMENT =====
 ${texte}

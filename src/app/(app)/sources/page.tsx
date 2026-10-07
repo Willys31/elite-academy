@@ -47,9 +47,15 @@ const FORMATS: Record<string, string> = {
  * se fait alors depuis l'éditeur de la formation, qui supprime les deux
  * ensemble.
  */
-export default async function SourcesPage() {
+export default async function SourcesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ extraits?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
+  const { extraits } = await searchParams;
+  const afficherExtraits = extraits === "1";
 
   /* La bibliothèque de sources appartient à la conception, pas à la
      création : un formateur crée ses formations depuis la migration
@@ -62,7 +68,9 @@ export default async function SourcesPage() {
   if (!gestionnaire) redirect("/sans-acces");
 
   const supabase = await createClient();
-  const { data: sources } = await supabase
+  // Les extraits de leçons (lot 21) peuvent décupler la liste : masqués
+  // par défaut, affichés à la demande (?extraits=1).
+  let requeteSources = supabase
     .from("sources")
     .select(
       `id, organization_id, title, mime_type, source_type, status, created_at,
@@ -72,6 +80,22 @@ export default async function SourcesPage() {
     )
     .order("created_at", { ascending: false })
     .limit(100);
+  if (!afficherExtraits) requeteSources = requeteSources.neq("source_type", "extrait_import");
+  const [{ data: sources }, { count: nbExtraits }, { data: leconsSourcees }] = await Promise.all([
+    requeteSources,
+    supabase
+      .from("sources")
+      .select("id", { count: "exact", head: true })
+      .eq("source_type", "extrait_import"),
+    supabase.from("lessons").select("content").not("content->source", "is", null),
+  ]);
+
+  // Nombre de leçons qui renvoient à chaque document d'import.
+  const leconsParSource = new Map<string, number>();
+  for (const l of leconsSourcees ?? []) {
+    const id = (l.content as { source?: { source_id?: string } } | null)?.source?.source_id;
+    if (id) leconsParSource.set(id, (leconsParSource.get(id) ?? 0) + 1);
+  }
 
   // Jauges de stockage : une par organisation gérée (toutes pour
   // l'admin Elite). Le quota se mesure sur les fichiers prêts et les
@@ -120,6 +144,20 @@ export default async function SourcesPage() {
         de leçon. {sources?.length ?? 0} document
         {(sources?.length ?? 0) > 1 ? "s" : ""} affiché
         {(sources?.length ?? 0) > 1 ? "s" : ""}.
+        {(nbExtraits ?? 0) > 0 ? (
+          <>
+            {" "}
+            {afficherExtraits ? (
+              <Link href="/sources" className="text-brand-700 underline">
+                Masquer les {nbExtraits} extraits de leçons
+              </Link>
+            ) : (
+              <Link href="/sources?extraits=1" className="text-brand-700 underline">
+                Afficher les {nbExtraits} extraits de leçons
+              </Link>
+            )}
+          </>
+        ) : null}
       </p>
 
       {organisationsGerees.length > 0 ? (
@@ -152,6 +190,8 @@ export default async function SourcesPage() {
               ? s.organization[0]
               : s.organization;
             const estUtilisee = utilisees.has(s.id);
+            const nbLecons = leconsParSource.get(s.id) ?? 0;
+            const estSourceDeLecons = nbLecons > 0;
             const peutSupprimer = canDesignForOrganization(user.memberships, s.organization_id);
 
             return (
@@ -173,13 +213,27 @@ export default async function SourcesPage() {
                     ) : s.upload_status === "failed" ? (
                       <Badge ton="alerte">Échec du téléversement</Badge>
                     ) : null}
+                    {s.source_type === "document_import" ? <Badge ton="succes">Document d&apos;import</Badge> : null}
+                    {s.source_type === "extrait_import" ? <Badge>Extrait</Badge> : null}
+                    {estSourceDeLecons ? (
+                      <Badge ton="or">
+                        Source de {nbLecons} leçon{nbLecons > 1 ? "s" : ""}
+                      </Badge>
+                    ) : null}
                     {estUtilisee ? <Badge>Utilisé dans une leçon</Badge> : null}
                   </div>
                 </div>
 
                 {peutSupprimer ? (
                   <div className="mt-3 border-t border-slate-100 pt-3">
-                    {estUtilisee ? (
+                    {estSourceDeLecons ? (
+                      <p className="text-sm text-slate-500">
+                        Ce document est la source des extraits de {nbLecons} leçon
+                        {nbLecons > 1 ? "s" : ""}. Il reste nécessaire pour régénérer ces
+                        extraits : supprimez la formation, ou retirez l&apos;extrait de chaque
+                        leçon depuis l&apos;éditeur, avant de le supprimer.
+                      </p>
+                    ) : estUtilisee ? (
                       <p className="text-sm text-slate-500">
                         Ce document sert de support à une leçon. Retirez-le
                         depuis l&apos;

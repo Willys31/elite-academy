@@ -8,9 +8,16 @@ import { canCreateCourse, slugify } from "@/lib/courses/statuts";
 import {
   decouperHtml,
   decouperTexte,
+  deduireIntervalle,
   htmlVersTexte,
+  libelleIntervalle,
+  texteAvecMarqueursPages,
   type Decoupage,
+  type Intervalle,
+  type UniteSource,
 } from "@/lib/import/decoupage";
+import { ouvrirDecoupeurPdf, ouvrirDecoupeurPptx } from "@/lib/import/extraits";
+import { rattacherExtrait } from "@/lib/import/rattachement";
 import { appelerLlm, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
 import {
   construirePromptStructuration,
@@ -18,7 +25,6 @@ import {
   SYSTEM_IMPORT,
 } from "@/lib/ai/prompts";
 import { extraireJson, validerResultat, type ResultatGeneration } from "@/lib/ai/schema";
-import { creerActiviteSupport } from "@/lib/stockage/activites";
 import { verifierEdition } from "@/lib/stockage/edition";
 import {
   extensionDe,
@@ -51,24 +57,70 @@ function loguer(contexte: string, error: unknown) {
 // (next.config.ts) : webpack casse le worker pdfjs minifié.
 // ------------------------------------------------------------
 
+/**
+ * Résultat d'une analyse : texte balisé pour l'IA, découpage par
+ * titres, et — pour les formats paginés — le texte de chaque unité
+ * (page ou diapositive) pour retrouver les positions des leçons.
+ */
+interface Analyse {
+  texte: string;
+  decoupage: Decoupage;
+  unites: string[];
+  kind: UniteSource | null;
+  total: number;
+}
+
 async function chargerAnalyseurDocx() {
   const mammoth = (await import("mammoth")).default;
-  return async (contenu: Buffer) => {
+  return async (contenu: Buffer): Promise<Analyse> => {
     const { value: html } = await mammoth.convertToHtml({ buffer: contenu });
-    return { texte: htmlVersTexte(html), decoupage: decouperHtml(html) };
+    return {
+      texte: htmlVersTexte(html),
+      decoupage: decouperHtml(html),
+      unites: [],
+      kind: null,
+      total: 0,
+    };
   };
 }
 
 async function chargerAnalyseurPdf() {
   const { PDFParse } = await import("pdf-parse");
-  return async (contenu: Buffer) => {
+  return async (contenu: Buffer): Promise<Analyse> => {
     const analyseur = new PDFParse({ data: contenu });
     try {
-      const { text } = await analyseur.getText();
-      return { texte: text, decoupage: decouperTexte(text) };
+      const resultat = await analyseur.getText();
+      const pages = resultat.pages.map((p) => ({ num: p.num, text: p.text }));
+      // Texte reconstruit page par page, avec repères : les leçons
+      // connaissent ainsi leurs pages, et les séparateurs « -- 3 of 12 -- »
+      // de pdf-parse ne polluent plus leur contenu.
+      const texte = texteAvecMarqueursPages(pages);
+      return {
+        texte,
+        decoupage: decouperTexte(texte),
+        unites: pages.map((p) => p.text),
+        kind: "pages",
+        total: resultat.total || pages.length,
+      };
     } finally {
       await analyseur.destroy();
     }
+  };
+}
+
+async function chargerAnalyseurPptx(nomFichier: string) {
+  const { lirePresentation, diapositivesVersTexte, decouperDiapositives } = await import(
+    "@/lib/import/pptx"
+  );
+  return async (contenu: Buffer): Promise<Analyse> => {
+    const presentation = await lirePresentation(new Uint8Array(contenu));
+    return {
+      texte: diapositivesVersTexte(presentation),
+      decoupage: decouperDiapositives(presentation, nomFichier),
+      unites: presentation.diapositives.map((d) => [d.titre, d.texte, d.notes].join("\n")),
+      kind: "slides",
+      total: presentation.total,
+    };
   };
 }
 
@@ -116,10 +168,10 @@ export async function importerDocument(
 
   const fichier = { name: source.title };
   const ext = extensionDe(fichier.name);
-  if (ext !== ".docx" && ext !== ".pdf") {
+  if (ext !== ".docx" && ext !== ".pdf" && ext !== ".pptx") {
     return {
       error:
-        "Formats acceptés pour l'import automatique : Word (.docx) ou PDF. Les autres formats peuvent être ajoutés comme supports dans l'éditeur.",
+        "Formats acceptés pour l'import automatique : Word (.docx), PDF ou PowerPoint (.pptx). Les autres formats peuvent être ajoutés comme supports dans l'éditeur.",
     };
   }
 
@@ -150,13 +202,21 @@ export async function importerDocument(
   const contenu = Buffer.from(await blob.arrayBuffer());
   let texteBrut = "";
   let decoupage: Decoupage;
+  let unites: string[] = [];
+  let kind: UniteSource | null = null;
+  let total = 0;
 
   // Chargement de l'analyseur, séparé de l'analyse elle-même : un
   // module indisponible et un fichier illisible n'ont ni la même cause
   // ni le même remède, ils ne doivent pas donner le même message.
-  let analyser: (contenu: Buffer) => Promise<{ texte: string; decoupage: Decoupage }>;
+  let analyser: (contenu: Buffer) => Promise<Analyse>;
   try {
-    analyser = ext === ".docx" ? await chargerAnalyseurDocx() : await chargerAnalyseurPdf();
+    analyser =
+      ext === ".docx"
+        ? await chargerAnalyseurDocx()
+        : ext === ".pptx"
+          ? await chargerAnalyseurPptx(fichier.name)
+          : await chargerAnalyseurPdf();
   } catch (e) {
     loguer("chargement de l'analyseur de documents", e);
     return {
@@ -171,6 +231,9 @@ export async function importerDocument(
     const resultat = await analyser(contenu);
     texteBrut = resultat.texte;
     decoupage = resultat.decoupage;
+    unites = resultat.unites;
+    kind = resultat.kind;
+    total = resultat.total;
   } catch (e) {
     loguer("analyse du document", e);
     return {
@@ -181,8 +244,12 @@ export async function importerDocument(
 
   // 2. Le document original est déjà stocké et tracé dans `sources`
   // (traçabilité, PRD §17) : la finalisation du téléversement s'en est
-  // chargée avant l'appel de cette action.
+  // chargée avant l'appel de cette action. Il devient « document
+  // d'import » : il n'est plus joint tel quel aux leçons (lot 21), ce
+  // sont ses extraits qui le sont ; `supprimerSource` le protège tant
+  // que des leçons y renvoient.
   const stocke = { chemin: source.file_path, sourceId: source.id };
+  await supabase.from("sources").update({ source_type: "document_import" }).eq("id", source.id);
 
   // 2 bis. Structuration par IA (mode recommandé) : réorganisation
   // fidèle du contenu + extraction des QCM/exercices, tracée dans
@@ -216,7 +283,7 @@ export async function importerDocument(
         organization_id: organizationId,
         requested_by: user.id,
         generation_type: "document_structuring",
-        brief: { fichier: fichier.name, mode: "import_ia" },
+        brief: { fichier: fichier.name, mode: "import_ia", unite: kind, total },
         context: { source: "import_document" },
         source_ids: [stocke.sourceId],
         prompt_version: PROMPT_VERSION_IMPORT,
@@ -243,9 +310,15 @@ export async function importerDocument(
     try {
       const reponse = await appelerLlm(
         SYSTEM_IMPORT,
-        construirePromptStructuration(fichier.name, texte)
+        construirePromptStructuration(
+          fichier.name,
+          texte,
+          kind ? { type: kind === "pages" ? "page" : "diapositive", total } : undefined
+        )
       );
-      const analyse = validerResultat(extraireJson(reponse.texte));
+      const analyse = validerResultat(extraireJson(reponse.texte), {
+        totalUnites: kind ? total : undefined,
+      });
       if (!analyse.ok) {
         await echecIa(analyse.erreur);
         return {
@@ -278,7 +351,7 @@ export async function importerDocument(
   const titre =
     titreSaisi ||
     resultatIa?.course.title ||
-    fichier.name.replace(/\.(docx|pdf)$/i, "").replace(/[-_]+/g, " ").trim();
+    fichier.name.replace(/\.(docx|pdf|pptx)$/i, "").replace(/[-_]+/g, " ").trim();
   const base = slugify(titre);
   let slug = base;
   for (let i = 2; i <= 20; i++) {
@@ -355,12 +428,30 @@ export async function importerDocument(
     .single();
 
   // 4. Modules, leçons — et, en mode IA, QCM extraits du document.
-  let premiereLecon: string | null = null;
+  const leconsAvecExtrait: Array<{ id: string; range: Intervalle }> = [];
+  const avertissementsExtraits: string[] = [];
   if (version) {
     await supabase
       .from("courses")
       .update({ current_version_id: version.id })
       .eq("id", course.id);
+
+    /* Position de chaque leçon dans le document : fournie par l'IA
+       (`source_range`), sinon retrouvée en cherchant le début et la fin
+       de son texte dans les pages ou diapositives ; sinon la leçon n'a
+       pas d'extrait et on le dit. */
+    const intervalleIa = (l: { title: string; text: string; source_range: { from: number; to: number } | null }): Intervalle | undefined => {
+      if (!kind) return undefined;
+      if (l.source_range) return { kind, from: l.source_range.from, to: l.source_range.to };
+      const deduit = deduireIntervalle(l.text, unites, kind);
+      if (!deduit) {
+        avertissementsExtraits.push(
+          `${kind === "pages" ? "Pages" : "Diapositives"} non identifiées pour la leçon « ${l.title} » : aucun extrait joint. Indiquez-les depuis l'éditeur.`
+        );
+        return undefined;
+      }
+      return deduit;
+    };
 
     const modulesACreer = resultatIa
       ? resultatIa.modules.map((m) => ({
@@ -371,6 +462,7 @@ export async function importerDocument(
             text: l.text,
             estimated_minutes: l.estimated_minutes,
             quiz: l.quiz,
+            range: intervalleIa(l),
           })),
         }))
       : decoupage.modules.map((m) => ({
@@ -381,6 +473,7 @@ export async function importerDocument(
             text: l.text,
             estimated_minutes: null as number | null,
             quiz: null,
+            range: l.range,
           })),
         }));
 
@@ -404,7 +497,22 @@ export async function importerDocument(
           .insert({
             module_id: moduleCree.id,
             title: lecon.title,
-            content: { type: "text", text: lecon.text, imported: true },
+            content: {
+              type: "text",
+              text: lecon.text,
+              imported: true,
+              ...(lecon.range && kind
+                ? {
+                    source: {
+                      source_id: source.id,
+                      kind,
+                      from: lecon.range.from,
+                      to: lecon.range.to,
+                      total,
+                    },
+                  }
+                : {}),
+            },
             position: j + 1,
             estimated_minutes: lecon.estimated_minutes,
             status: "draft",
@@ -412,7 +520,7 @@ export async function importerDocument(
           .select("id")
           .single();
         if (!leconCreee) continue;
-        if (!premiereLecon) premiereLecon = leconCreee.id;
+        if (lecon.range) leconsAvecExtrait.push({ id: leconCreee.id, range: lecon.range });
 
         // QCM détecté dans le document → activité quiz + questions.
         if (lecon.quiz) {
@@ -480,15 +588,79 @@ export async function importerDocument(
     }
   }
 
-  // 5. Le document original reste joint en support de la première leçon.
-  if (premiereLecon) {
-    await creerActiviteSupport(supabase, {
-      lessonId: premiereLecon,
-      titre: `Document original — ${fichier.name}`,
-      chemin: stocke.chemin,
-      mime: source.mime_type,
-      sourceId: stocke.sourceId,
-    });
+  // 5. Chaque leçon reçoit l'extrait du document qui la concerne
+  // (pages du PDF, diapositives du PowerPoint). Le découpeur est ouvert
+  // une seule fois ; un extrait qui échoue (quota, fichier protégé)
+  // n'empêche pas l'import : la leçon garde sa position et l'éditeur
+  // propose de régénérer l'extrait.
+  if (kind && leconsAvecExtrait.length > 0) {
+    const octets = new Uint8Array(contenu);
+    let decoupeur: Awaited<ReturnType<typeof ouvrirDecoupeurPdf>> | null = null;
+    try {
+      decoupeur = kind === "pages" ? await ouvrirDecoupeurPdf(octets) : await ouvrirDecoupeurPptx(octets);
+    } catch (e) {
+      loguer("ouverture du document pour les extraits", e);
+      avertissementsExtraits.push(
+        "Le document n'a pas pu être découpé en extraits (fichier protégé ou corrompu ?) : les leçons sont créées sans pièce jointe."
+      );
+    }
+    if (decoupeur) {
+      const ctx = {
+        supabase,
+        userId: user.id,
+        organizationId,
+        courseId: course.id,
+      };
+      const original = {
+        id: source.id,
+        title: source.title,
+        file_path: source.file_path,
+        mime_type: source.mime_type,
+        kind,
+      };
+      let quotaDepasse = false;
+      for (const lecon of leconsAvecExtrait) {
+        if (quotaDepasse) break;
+        if (lecon.range.to > decoupeur.total) {
+          avertissementsExtraits.push(
+            `${libelleIntervalle(lecon.range)} : hors du document (${decoupeur.total} au total), extrait non joint.`
+          );
+          continue;
+        }
+        try {
+          const extrait = await decoupeur.extraire(lecon.range.from, lecon.range.to);
+          const resultat = await rattacherExtrait(ctx, {
+            lessonId: lecon.id,
+            original,
+            range: lecon.range,
+            octets: extrait,
+          });
+          if (!resultat.ok) {
+            avertissementsExtraits.push(resultat.erreur);
+            if (resultat.quota) {
+              quotaDepasse = true;
+              avertissementsExtraits.push(
+                "Quota de stockage atteint : les extraits restants n'ont pas été générés. Libérez de l'espace puis utilisez « Régénérer l'extrait » sur chaque leçon."
+              );
+            }
+          }
+        } catch (e) {
+          loguer("génération d'un extrait", e);
+          avertissementsExtraits.push(`${libelleIntervalle(lecon.range)} : extrait non généré.`);
+        }
+      }
+    }
+  }
+
+  if (avertissementsExtraits.length > 0) {
+    await supabase
+      .from("courses")
+      .update({
+        description: `${description}\n\nExtraits du document :\n${avertissementsExtraits
+          .map((w) => `- ${w}`)
+          .join("\n")}`,
+      })
+      .eq("id", course.id);
   }
 
   revalidatePath("/catalogue");

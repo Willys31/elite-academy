@@ -213,3 +213,46 @@ describe("validerResultat", () => {
     if (analyse.ok) expect(analyse.resultat.warnings.length).toBeLessThanOrEqual(20);
   });
 });
+
+describe("validerResultat – intervalles source_range (lot 21)", () => {
+  const avecIntervalles = {
+    ...RESULTAT_VALIDE,
+    modules: [
+      {
+        title: "Module",
+        description: "",
+        lessons: [
+          { title: "Dans les bornes", text: "a", source_range: { from: 2, to: 5 } },
+          { title: "Hors bornes", text: "b", source_range: { from: 9, to: 12 } },
+          { title: "Inversé", text: "c", source_range: { from: 4, to: 2 } },
+          { title: "Absent", text: "d" },
+          { title: "Recopie", text: "[[PAGE 3]]\nTexte\n\n\n[[PAGE 4]]\nSuite" },
+        ],
+      },
+    ],
+  };
+
+  it("garde un intervalle valide, rejette hors bornes et inversé, tolère l'absence", () => {
+    const analyse = validerResultat(avecIntervalles, { totalUnites: 8 });
+    expect(analyse.ok).toBe(true);
+    if (!analyse.ok) return;
+    const lecons = analyse.resultat.modules[0].lessons;
+    expect(lecons[0].source_range).toEqual({ from: 2, to: 5 });
+    expect(lecons[1].source_range).toBeNull();
+    expect(lecons[2].source_range).toBeNull();
+    expect(lecons[3].source_range).toBeNull();
+    expect(analyse.resultat.warnings.some((w) => w.includes("Hors bornes"))).toBe(true);
+  });
+
+  it("retire les repères de page qu'un modèle aurait recopiés", () => {
+    const analyse = validerResultat(avecIntervalles, { totalUnites: 8 });
+    if (!analyse.ok) throw new Error("attendu : ok");
+    expect(analyse.resultat.modules[0].lessons[4].text).toBe("Texte\n\nSuite");
+  });
+
+  it("sans total connu, un intervalle cohérent est conservé tel quel", () => {
+    const analyse = validerResultat(avecIntervalles);
+    if (!analyse.ok) throw new Error("attendu : ok");
+    expect(analyse.resultat.modules[0].lessons[1].source_range).toEqual({ from: 9, to: 12 });
+  });
+});

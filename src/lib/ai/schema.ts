@@ -22,11 +22,18 @@ export interface QuizGenere {
   questions: QuestionGeneree[];
 }
 
+/** Pages ou diapositives du document source dont la leçon reprend la matière. */
+export interface IntervalleGenere {
+  from: number;
+  to: number;
+}
+
 export interface LeconGeneree {
   title: string;
   text: string;
   estimated_minutes: number | null;
   quiz: QuizGenere | null;
+  source_range: IntervalleGenere | null;
 }
 
 export interface ModuleGenere {
@@ -132,16 +139,58 @@ function validerQuiz(brut: unknown): QuizGenere | null {
   };
 }
 
+/** Lignes-repères [[PAGE n]] / [[DIAPOSITIVE n]] qu'un modèle aurait recopiées. */
+const MARQUEUR_RECOPIE = /^\s*\[\[(?:PAGE|DIAPOSITIVE) \d+[^\]]*\]\]\s*$/gm;
+
+function nettoyerTexteLecon(v: unknown): string {
+  return texteOuVide(v).replace(MARQUEUR_RECOPIE, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Intervalle de pages/diapositives d'une leçon : entiers, ordonnés,
+ * dans les bornes du document. Hors bornes → `null` et un avertissement
+ * est ajouté, la leçon restera simplement sans extrait.
+ */
+function validerIntervalle(
+  brut: unknown,
+  titre: string,
+  totalUnites: number | undefined,
+  avertissements: string[]
+): IntervalleGenere | null {
+  if (brut === null || typeof brut !== "object") return null;
+  const i = brut as Record<string, unknown>;
+  const from = Number(i.from);
+  const to = Number(i.to);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  const total = totalUnites ?? Number.MAX_SAFE_INTEGER;
+  if (from < 1 || to < from || to > total) {
+    avertissements.push(
+      `Intervalle ignoré pour la leçon « ${titre} » : ${from}–${to} est hors du document${
+        totalUnites ? ` (${totalUnites} au total)` : ""
+      }.`
+    );
+    return null;
+  }
+  return { from, to };
+}
+
 /**
  * Valide et normalise le résultat brut du LLM.
  * Rejette si les éléments indispensables manquent (titre, au moins
  * une compétence, au moins un module avec au moins une leçon rédigée).
+ *
+ * `totalUnites` : nombre de pages ou de diapositives du document,
+ * pour borner les intervalles `source_range` renvoyés par le modèle.
  */
-export function validerResultat(brut: unknown): Analyse {
+export function validerResultat(
+  brut: unknown,
+  options: { totalUnites?: number } = {}
+): Analyse {
   if (brut === null || typeof brut !== "object") {
     return { ok: false, erreur: "La réponse de l'IA n'est pas un objet JSON valide." };
   }
   const r = brut as Record<string, unknown>;
+  const avertissementsIntervalles: string[] = [];
 
   const courseBrut = (r.course ?? {}) as Record<string, unknown>;
   const title = texteOuVide(courseBrut.title);
@@ -175,11 +224,18 @@ export function validerResultat(brut: unknown): Analyse {
       const lessons: LeconGeneree[] = tableau(mm.lessons)
         .map((l) => {
           const ll = (l ?? {}) as Record<string, unknown>;
+          const title = texteOuVide(ll.title);
           return {
-            title: texteOuVide(ll.title),
-            text: texteOuVide(ll.text),
+            title,
+            text: nettoyerTexteLecon(ll.text),
             estimated_minutes: nombreOuNull(ll.estimated_minutes),
             quiz: validerQuiz(ll.quiz),
+            source_range: validerIntervalle(
+              ll.source_range,
+              title,
+              options.totalUnites,
+              avertissementsIntervalles
+            ),
           };
         })
         .filter((l) => l.title.length > 0)
@@ -217,7 +273,10 @@ export function validerResultat(brut: unknown): Analyse {
       competencies,
       modules,
       methods_rationale: texteOuVide(r.methods_rationale),
-      warnings: tableau(r.warnings).map(texteOuVide).filter(Boolean).slice(0, 20),
+      warnings: [
+        ...tableau(r.warnings).map(texteOuVide).filter(Boolean),
+        ...avertissementsIntervalles,
+      ].slice(0, 20),
       validation_required:
         typeof r.validation_required === "boolean" ? r.validation_required : true,
     },

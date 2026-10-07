@@ -57,6 +57,21 @@ export async function supprimerSource(
     };
   }
 
+  // Document d'import (lot 21) : des leçons y renvoient pour régénérer
+  // leurs extraits de pages ou de diapositives.
+  const { data: lecons } = await supabase
+    .from("lessons")
+    .select("id")
+    .filter("content->source->>source_id", "eq", sourceId)
+    .limit(1);
+  if (lecons && lecons.length > 0) {
+    return {
+      error:
+        "Ce document est la source d'extraits de leçons (pages ou diapositives). " +
+        "Supprimez la formation, ou retirez l'extrait de chaque leçon depuis l'éditeur, avant de le supprimer.",
+    };
+  }
+
   const { error, count } = await supabase
     .from("sources")
     .delete({ count: "exact" })

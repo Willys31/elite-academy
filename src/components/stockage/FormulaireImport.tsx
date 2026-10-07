@@ -71,8 +71,8 @@ export function FormulaireImport({ organisations }: { organisations: Organisatio
         organizationId={orgId}
         destination={{ type: "import" }}
         accept={ACCEPT_IMPORT}
-        libelle={`Document de cours (.docx ou .pdf, ${formaterTaille(TAILLE_MAX_EXTRACTION)} max pour l'analyse automatique)`}
-        aide="Word (.docx) donne le meilleur résultat. Pour un PDF scanné (images), aucun texte n'est extractible."
+        libelle={`Document de cours (.docx, .pdf ou .pptx, ${formaterTaille(TAILLE_MAX_EXTRACTION)} max pour l'analyse automatique)`}
+        aide="Word (.docx) donne le meilleur résultat. PDF et PowerPoint : chaque leçon reçoit en pièce jointe les pages ou diapositives qui la concernent. Pour un PDF scanné (images), aucun texte n'est extractible."
         usageOctets={org?.usage}
         quotaOctets={org?.quota}
         surDebut={() => setVerrouille(true)}

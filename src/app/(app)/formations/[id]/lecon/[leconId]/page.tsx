@@ -6,7 +6,8 @@ import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
 import { obtenirUrlLecture, type UrlLecture } from "@/lib/stockage/fournisseur";
-import { formaterTaille } from "@/lib/stockage/limites";
+import { formaterTaille, nomSur } from "@/lib/stockage/limites";
+import { libelleIntervalle, type Intervalle } from "@/lib/import/decoupage";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Badge, Card, PageTitle } from "@/components/ui";
 
@@ -110,7 +111,12 @@ export default async function LeconPage({
 
   const supports = await Promise.all(
     fichiers.map(async (a) => {
-      const c = (a.content ?? {}) as { file_path?: string; mime_type?: string; source_id?: string };
+      const c = (a.content ?? {}) as {
+        file_path?: string;
+        mime_type?: string;
+        source_id?: string;
+        range?: Intervalle;
+      };
       const source = c.source_id ? sourceParId.get(c.source_id) : undefined;
       const chemin = source?.file_path ?? c.file_path;
       if (!chemin) return null;
@@ -119,7 +125,7 @@ export default async function LeconPage({
         mime_type: source?.mime_type ?? c.mime_type ?? "application/octet-stream",
         storage_provider: source?.storage_provider,
         provider_ref: source?.provider_ref,
-      });
+      }, { nomTelechargement: nomSur(chemin.slice(chemin.lastIndexOf("/") + 1).replace(/^[0-9a-f-]{36}-/, "")) });
       if (!lecture) return null;
       return {
         id: a.id,
@@ -127,6 +133,7 @@ export default async function LeconPage({
         lecture,
         mime: source?.mime_type ?? c.mime_type ?? "application/octet-stream",
         taille: source?.size_bytes ? Number(source.size_bytes) : null,
+        range: c.range ?? null,
       };
     })
   ).then((liste) => liste.filter(Boolean) as Array<{
@@ -135,6 +142,7 @@ export default async function LeconPage({
     lecture: UrlLecture;
     mime: string;
     taille: number | null;
+    range: Intervalle | null;
   }>);
 
   return (
@@ -213,6 +221,13 @@ export default async function LeconPage({
                 />
               ) : s.mime.startsWith("audio/") ? (
                 <audio src={s.lecture.url} controls preload="metadata" className="w-full px-4 py-3" />
+              ) : s.range ? (
+                /* Extrait d'un PowerPoint : les diapositives de la leçon,
+                   à ouvrir dans PowerPoint ou LibreOffice. */
+                <p className="px-4 py-3 text-sm text-slate-600">
+                  {libelleIntervalle(s.range)} du support d&apos;origine, à télécharger
+                  pour les consulter dans PowerPoint.
+                </p>
               ) : (
                 <p className="px-4 py-3 text-sm text-slate-500">
                   Ce format (Word, PowerPoint…) s&apos;ouvre via le bouton

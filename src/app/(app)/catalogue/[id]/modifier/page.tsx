@@ -28,6 +28,15 @@ import {
   supprimerModule,
 } from "@/app/(app)/catalogue/actions";
 import { supprimerSupport } from "@/app/(app)/catalogue/importer/actions";
+import {
+  changerModuleLecon,
+  deplacerLecon,
+  deplacerModule,
+  fusionnerAvecSuivante,
+  mettreAJourModule,
+} from "@/app/(app)/catalogue/decoupage/actions";
+import { libelleCourt } from "@/lib/import/decoupage";
+import { sourceDeLecon } from "@/lib/import/rattachement";
 import { TeleverseurFichier } from "@/components/stockage/TeleverseurFichier";
 import { lireUsageStockage } from "@/lib/stockage/usage";
 import { ACCEPT_SUPPORTS, formaterTaille, TAILLE_MAX_FICHIER } from "@/lib/stockage/limites";
@@ -36,6 +45,12 @@ import { DangerForm } from "@/components/ui/DangerForm";
 import { Alert, Badge, Card, Input, Label, LienTexte, PageTitle, Retour, SecondaryLink, Select, Textarea } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Éditeur de formation" };
+
+/**
+ * Durée maximale (Vercel Pro) : fusionner deux leçons peut régénérer
+ * un extrait, donc relire le document d'origine depuis Storage.
+ */
+export const maxDuration = 300;
 
 /**
  * Éditeur de formation (UX/UI §5.3) : fiche, modules, leçons,
@@ -91,7 +106,7 @@ export default async function EditeurFormationPage({
         ? supabase
             .from("modules")
             .select(
-              "id, title, description, position, lessons(id, title, position, estimated_minutes, activities(id, title, type, content))"
+              "id, title, description, position, lessons(id, title, position, estimated_minutes, content, activities(id, title, type, content))"
             )
             .eq("course_version_id", formation.current_version_id)
             .order("position")
@@ -325,7 +340,10 @@ export default async function EditeurFormationPage({
           <section aria-label="Modules et leçons">
             <h2 className="mb-3 text-lg font-semibold">Modules et leçons</h2>
             <div className="space-y-4">
-              {(modules ?? []).map((m, i) => (
+              {(modules ?? []).map((m, i) => {
+                const leconsTriees = [...(m.lessons ?? [])].sort((a, b) => a.position - b.position);
+                const autresModules = (modules ?? []).filter((autre) => autre.id !== m.id);
+                return (
                 <Card key={m.id}>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="min-w-0">
@@ -337,43 +355,129 @@ export default async function EditeurFormationPage({
                       ) : null}
                     </div>
                     {editable ? (
-                      <AuthForm
-                        action={supprimerModule}
-                        submitLabel="Supprimer"
-                        pendingLabel="Suppression…"
-                      >
-                        <input type="hidden" name="course_id" value={formation.id} />
-                        <input type="hidden" name="module_id" value={m.id} />
-                      </AuthForm>
+                      <div className="flex shrink-0 flex-wrap items-start gap-1.5">
+                        {i > 0 ? (
+                          <AuthForm action={deplacerModule} submitLabel="↑" pendingLabel="…" compact titre="Monter le module">
+                            <input type="hidden" name="course_id" value={formation.id} />
+                            <input type="hidden" name="module_id" value={m.id} />
+                            <input type="hidden" name="direction" value="haut" />
+                          </AuthForm>
+                        ) : null}
+                        {i < (modules?.length ?? 0) - 1 ? (
+                          <AuthForm action={deplacerModule} submitLabel="↓" pendingLabel="…" compact titre="Descendre le module">
+                            <input type="hidden" name="course_id" value={formation.id} />
+                            <input type="hidden" name="module_id" value={m.id} />
+                            <input type="hidden" name="direction" value="bas" />
+                          </AuthForm>
+                        ) : null}
+                        <AuthForm action={supprimerModule} submitLabel="Supprimer" pendingLabel="…" compact>
+                          <input type="hidden" name="course_id" value={formation.id} />
+                          <input type="hidden" name="module_id" value={m.id} />
+                        </AuthForm>
+                      </div>
                     ) : null}
                   </div>
 
-                  {m.lessons && m.lessons.length > 0 ? (
+                  {editable ? (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-medium text-slate-600 transition duration-200 hover:text-ink-900">
+                        Renommer le module
+                      </summary>
+                      <div className="mt-2">
+                        <AuthForm action={mettreAJourModule} submitLabel="Enregistrer le module" pendingLabel="Enregistrement…" ton="sobre">
+                          <input type="hidden" name="course_id" value={formation.id} />
+                          <input type="hidden" name="module_id" value={m.id} />
+                          <div>
+                            <Label htmlFor={`titre-module-${m.id}`}>Titre</Label>
+                            <Input id={`titre-module-${m.id}`} name="title" required defaultValue={m.title} />
+                          </div>
+                          <div>
+                            <Label htmlFor={`description-module-${m.id}`}>Description</Label>
+                            <Textarea id={`description-module-${m.id}`} name="description" rows={2} defaultValue={m.description ?? ""} />
+                          </div>
+                        </AuthForm>
+                      </div>
+                    </details>
+                  ) : null}
+
+                  {leconsTriees.length > 0 ? (
                     <ul className="mt-3 space-y-2">
-                      {[...m.lessons]
-                        .sort((a, b) => a.position - b.position)
-                        .map((l) => (
+                      {leconsTriees.map((l, j) => {
+                          const sourceLecon = sourceDeLecon(l.content);
+                          return (
                           <li key={l.id} className="rounded-xl bg-sand-50 px-3.5 py-2.5 text-sm">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                               <span className="min-w-0">
-                                {l.title}
+                                <Link
+                                  href={`/catalogue/${formation.id}/lecon/${l.id}`}
+                                  className="font-medium text-ink-900 underline decoration-brand-700/30 underline-offset-[3px] transition duration-200 hover:decoration-brand-800"
+                                >
+                                  {l.title}
+                                </Link>
                                 {l.estimated_minutes ? (
                                   <span className="ml-2 text-xs text-slate-400">
                                     {l.estimated_minutes} min
                                   </span>
                                 ) : null}
+                                {sourceLecon ? (
+                                  <span className="ml-2 align-middle">
+                                    <Badge ton="or">{libelleCourt(sourceLecon)}</Badge>
+                                  </span>
+                                ) : null}
                               </span>
                               {editable ? (
-                                <AuthForm
-                                  action={supprimerLecon}
-                                  submitLabel="Retirer"
-                                  pendingLabel="…"
-                                >
-                                  <input type="hidden" name="course_id" value={formation.id} />
-                                  <input type="hidden" name="lesson_id" value={l.id} />
-                                </AuthForm>
+                                <div className="flex shrink-0 flex-wrap items-start gap-1.5">
+                                  {j > 0 ? (
+                                    <AuthForm action={deplacerLecon} submitLabel="↑" pendingLabel="…" compact titre="Monter la leçon">
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                      <input type="hidden" name="direction" value="haut" />
+                                    </AuthForm>
+                                  ) : null}
+                                  {j < leconsTriees.length - 1 ? (
+                                    <AuthForm action={deplacerLecon} submitLabel="↓" pendingLabel="…" compact titre="Descendre la leçon">
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                      <input type="hidden" name="direction" value="bas" />
+                                    </AuthForm>
+                                  ) : null}
+                                  {j < leconsTriees.length - 1 ? (
+                                    <AuthForm action={fusionnerAvecSuivante} submitLabel="Fusionner avec la suivante" pendingLabel="Fusion…" compact>
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                    </AuthForm>
+                                  ) : null}
+                                  <AuthForm action={supprimerLecon} submitLabel="Retirer" pendingLabel="…" compact>
+                                    <input type="hidden" name="course_id" value={formation.id} />
+                                    <input type="hidden" name="lesson_id" value={l.id} />
+                                  </AuthForm>
+                                </div>
                               ) : null}
                             </div>
+
+                            {editable && autresModules.length > 0 ? (
+                              <details className="mt-2">
+                                <summary className="cursor-pointer text-xs font-medium text-slate-600 transition duration-200 hover:text-ink-900">
+                                  Déplacer vers un autre module
+                                </summary>
+                                <div className="mt-2">
+                                  <AuthForm action={changerModuleLecon} submitLabel="Déplacer la leçon" pendingLabel="Déplacement…" ton="sobre">
+                                    <input type="hidden" name="course_id" value={formation.id} />
+                                    <input type="hidden" name="lesson_id" value={l.id} />
+                                    <div>
+                                      <Label htmlFor={`module-cible-${l.id}`}>Module de destination</Label>
+                                      <Select id={`module-cible-${l.id}`} name="module_id" required>
+                                        {autresModules.map((autre) => (
+                                          <option key={autre.id} value={autre.id}>
+                                            {autre.title}
+                                          </option>
+                                        ))}
+                                      </Select>
+                                    </div>
+                                  </AuthForm>
+                                </div>
+                              </details>
+                            ) : null}
 
                             {/* QCM de la leçon */}
                             {(l.activities ?? []).filter((a) => a.type === "quiz").length > 0 ? (
@@ -475,7 +579,8 @@ export default async function EditeurFormationPage({
                               </div>
                             ) : null}
                           </li>
-                        ))}
+                          );
+                        })}
                     </ul>
                   ) : (
                     <p className="mt-2 text-sm text-slate-400">Aucune leçon.</p>
@@ -516,7 +621,8 @@ export default async function EditeurFormationPage({
                     </details>
                   ) : null}
                 </Card>
-              ))}
+                );
+              })}
 
               {editable ? (
                 <Card>

@@ -9,13 +9,19 @@ export type ContexteEdition =
   | {
       user: CurrentUser;
       supabase: Awaited<ReturnType<typeof createClient>>;
-      course: { id: string; organization_id: string; status: string };
+      course: {
+        id: string;
+        organization_id: string;
+        status: string;
+        current_version_id: string | null;
+      };
     };
 
 /**
  * Contexte d'édition d'une formation : utilisateur connecté, client
  * Supabase et formation lisible, à condition qu'elle soit encore en
- * brouillon. Partagé par le téléversement et le retrait des supports.
+ * brouillon. Partagé par le téléversement, le retrait des supports et
+ * la retouche du découpage (lot 21).
  *
  * Le type de retour est annoté explicitement : laissé à l'inférence,
  * TypeScript fusionne les deux formes en un seul objet aux propriétés
@@ -27,14 +33,14 @@ export async function verifierEdition(courseId: string): Promise<ContexteEdition
   const supabase = await createClient();
   const { data: course } = await supabase
     .from("courses")
-    .select("id, organization_id, status")
+    .select("id, organization_id, status, current_version_id")
     .eq("id", courseId)
     .maybeSingle();
   if (!course) return { erreur: "Formation introuvable ou non autorisée." };
   if (!isContentEditable(course.status as CourseStatus)) {
     return {
       erreur:
-        "Les supports ne sont modifiables qu'en brouillon : repassez la formation en brouillon d'abord.",
+        "Le contenu n'est modifiable qu'en brouillon : repassez la formation en brouillon d'abord.",
     };
   }
   return { user, supabase, course };

@@ -6,6 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Crée une activité « support » (type `file`) rattachée à une leçon.
  * Le contenu reprend le chemin et le type du fichier pour que la page
  * de la leçon s'affiche même sans jointure sur `sources`.
+ *
+ * `extra` : champs supplémentaires fusionnés dans `content` — pour un
+ * extrait d'import (lot 21) : `derived_from` (source originale) et
+ * `range` (pages ou diapositives).
  */
 export async function creerActiviteSupport(
   supabase: SupabaseClient,
@@ -15,6 +19,7 @@ export async function creerActiviteSupport(
     chemin: string;
     mime: string;
     sourceId: string;
+    extra?: Record<string, unknown>;
   }
 ) {
   const { count } = await supabase
@@ -30,8 +35,11 @@ export async function creerActiviteSupport(
       file_path: params.chemin,
       mime_type: params.mime,
       source_id: params.sourceId,
+      ...(params.extra ?? {}),
     },
     position: (count ?? 0) + 1,
     status: "draft",
-  });
+  })
+    .select("id")
+    .single();
 }

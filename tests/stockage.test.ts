@@ -73,6 +73,17 @@ describe("cheminPour", () => {
     expect(chemin).toBe("org/org-1/courses/c-9/uuid-2-video.mp4");
   });
 
+  it("range les extraits d'import sous la formation", () => {
+    expect(
+      cheminPour({
+        organizationId: "org-1",
+        destination: { type: "extrait", courseId: "c-9" },
+        uuid: "uuid-3",
+        nom: "Cours-p12-18.pdf",
+      })
+    ).toBe("org/org-1/courses/c-9/extraits/uuid-3-Cours-p12-18.pdf");
+  });
+
   it("borne un nom trop long à 100 signes", () => {
     expect(nomSur("a".repeat(300) + ".pdf")).toHaveLength(100);
   });
@@ -99,12 +110,15 @@ describe("validerDemande", () => {
     expect(message).toMatch(/Go/);
   });
 
-  it("n'accepte que Word et PDF pour l'import automatique", () => {
+  it("n'accepte que Word, PDF et PowerPoint pour l'import automatique", () => {
     expect(
       validerDemande({ ...base, destination: { type: "import" }, nom: "cours.mp4", taille: 10 })
     ).toMatch(/Word/);
     expect(
       validerDemande({ ...base, destination: { type: "import" }, nom: "cours.pdf", taille: 10 })
+    ).toBeNull();
+    expect(
+      validerDemande({ ...base, destination: { type: "import" }, nom: "cours.pptx", taille: 10 })
     ).toBeNull();
   });
 

@@ -63,10 +63,11 @@ export default async function ImporterPage() {
       <Retour href="/catalogue" ton="sobre" />
       <PageTitle>Importer un document de cours</PageTitle>
       <p className="-mt-4 mb-6 text-sm text-slate-500">
-        Votre document devient une formation structurée en modules et
-        leçons, créée en <strong>brouillon</strong> : vous relisez, ajustez,
-        puis soumettez à validation. Le document original reste joint en
-        support.
+        Votre document (Word, PDF ou PowerPoint) devient une formation
+        structurée en modules et leçons, créée en <strong>brouillon</strong> :
+        vous relisez, ajustez le découpage, puis soumettez à validation.
+        Chaque leçon reçoit les pages ou diapositives du document qui la
+        concernent ; le document original reste dans vos Sources.
       </p>
 
       {modeSimulation() ? (

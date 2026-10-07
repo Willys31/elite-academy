@@ -54,15 +54,19 @@ export const MIMES_SUPPORTS: Record<string, string> = {
 export const ACCEPT_SUPPORTS = Object.keys(MIMES_SUPPORTS).join(",");
 
 /** Formats acceptés pour l'import automatique (texte extractible). */
-export const EXTENSIONS_IMPORT = [".docx", ".pdf"] as const;
+export const EXTENSIONS_IMPORT = [".docx", ".pdf", ".pptx"] as const;
 
 /** Liste `accept` d'un champ fichier pour l'import automatique. */
 export const ACCEPT_IMPORT = EXTENSIONS_IMPORT.join(",");
 
-/** Où va le fichier : import de cours, ou support d'une leçon précise. */
+/**
+ * Où va le fichier : import de cours, support d'une leçon précise, ou
+ * extrait d'un document d'import généré par le serveur (lot 21).
+ */
 export type Destination =
   | { type: "import" }
-  | { type: "lecon"; courseId: string; lessonId: string };
+  | { type: "lecon"; courseId: string; lessonId: string }
+  | { type: "extrait"; courseId: string };
 
 export function extensionDe(nom: string): string {
   const i = nom.lastIndexOf(".");
@@ -119,7 +123,11 @@ export function cheminPour(p: {
   nom: string;
 }): string {
   const dossier =
-    p.destination.type === "import" ? "imports" : `courses/${p.destination.courseId}`;
+    p.destination.type === "import"
+      ? "imports"
+      : p.destination.type === "extrait"
+        ? `courses/${p.destination.courseId}/extraits`
+        : `courses/${p.destination.courseId}`;
   return `org/${p.organizationId}/${dossier}/${p.uuid}-${nomSur(p.nom)}`;
 }
 
@@ -145,7 +153,7 @@ export function validerDemande(d: {
   const ext = extensionDe(d.nom);
   if (d.destination.type === "import") {
     if (!(EXTENSIONS_IMPORT as readonly string[]).includes(ext)) {
-      return "Formats acceptés pour l'import automatique : Word (.docx) ou PDF. Les autres formats peuvent être ajoutés comme supports dans l'éditeur.";
+      return "Formats acceptés pour l'import automatique : Word (.docx), PDF ou PowerPoint (.pptx). Les autres formats peuvent être ajoutés comme supports dans l'éditeur.";
     }
   } else if (!MIMES_SUPPORTS[ext]) {
     return "Format non pris en charge. Acceptés : PDF, Word, PowerPoint, Excel, texte, images (PNG/JPG/WebP), vidéo (MP4, WebM, MOV), audio (MP3, M4A).";
