@@ -173,6 +173,18 @@ async function appelerOpenAiCompatible(
   if (!reponse.ok) {
     const corps = await reponse.text();
     console.error(`[ia] ${fournisseur} en échec :`, reponse.status, corps.slice(0, 500));
+    /* Gemini répond 400 « Please pass a valid API key » quand la clé
+       n'est pas une clé AI Studio. Cas fréquent : une clé « AQ.… »
+       créée depuis Vertex AI (mode express), qui ne vaut que pour
+       l'API Vertex, pas pour generativelanguage.googleapis.com. */
+    if (fournisseur === "gemini" && reponse.status === 400 && /api key/i.test(corps)) {
+      const indice = apiKey.startsWith("AQ.")
+        ? " Cette clé (« AQ.… ») vient de Vertex AI ; elle n'est pas acceptée ici."
+        : "";
+      throw new Error(
+        `La clé Gemini est refusée.${indice} Créez une clé sur https://aistudio.google.com/apikey (elle commence par « AIza ») et placez-la dans LLM_API_KEY.`
+      );
+    }
     throw erreurHttp(reponse.status, fournisseur);
   }
 
