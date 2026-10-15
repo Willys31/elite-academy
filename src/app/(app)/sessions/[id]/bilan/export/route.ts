@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [{ data: participants }, { data: feedbacks }, { data: tentatives }] = await Promise.all([
     supabase
       .from("session_participants")
-      .select("user_id, presence_status, punctuality_status, presence_seconds, xp_awarded, profile:profiles(full_name, email)")
+      .select("user_id, presence_status, punctuality_status, presence_seconds, xp_awarded, profile:profiles!session_participants_user_id_fkey(full_name, email)")
       .eq("session_id", session.id)
       .order("joined_at"),
     supabase.from("session_feedbacks").select("satisfaction_score, clarity_score, usefulness_score").eq("session_id", session.id),

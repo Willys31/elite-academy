@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { calculerCompletion } from "@/lib/courses/progression";
 import { donneAcces, peutSeDesinscrire } from "@/lib/courses/inscriptions";
+import { estTestDePositionnement, positionnementAFaire } from "@/lib/courses/positionnement";
 import { seDesinscrireFormation } from "@/app/(app)/formations/actions";
 import { DangerForm } from "@/components/ui/DangerForm";
 import { Badge, Card, EmptyState, PageTitle, Retour } from "@/components/ui";
@@ -52,7 +53,7 @@ export default async function LecteurFormationPage({
   const { data: modules } = formation.current_version_id
     ? await supabase
         .from("modules")
-        .select("id, title, position, lessons(id, title, position, estimated_minutes)")
+        .select("id, title, position, lessons(id, title, position, estimated_minutes, activities(id, type, content))")
         .eq("course_version_id", formation.current_version_id)
         .order("position")
     : { data: [] };
@@ -68,6 +69,30 @@ export default async function LecteurFormationPage({
   const toutesLecons = (modules ?? []).flatMap((m) =>
     [...(m.lessons ?? [])].sort((a, b) => a.position - b.position)
   );
+
+  /* Test de positionnement (PRD §9) : s'il existe et n'a pas encore été
+     passé, il passe avant les leçons. Une seule passation est demandée. */
+  const testsPlacement = toutesLecons.flatMap((l) =>
+    (l.activities ?? [])
+      .filter((a) => a.type === "quiz" && estTestDePositionnement(a.content))
+      .map((a) => ({ id: a.id, lessonId: l.id }))
+  );
+  let testAFaire: { id: string; lessonId: string } | null = null;
+  if (testsPlacement.length > 0) {
+    const { data: tentees } = await supabase
+      .from("attempts")
+      .select("activity_id")
+      .eq("user_id", user.id)
+      .in(
+        "activity_id",
+        testsPlacement.map((t) => t.id)
+      );
+    const aFaire = positionnementAFaire(
+      testsPlacement,
+      (tentees ?? []).map((t) => t.activity_id as string)
+    );
+    testAFaire = aFaire ? (testsPlacement.find((t) => t.id === aFaire.id) ?? null) : null;
+  }
   const completion = calculerCompletion(
     toutesLecons.filter((l) => terminees.has(l.id)).length,
     toutesLecons.length
@@ -78,6 +103,33 @@ export default async function LecteurFormationPage({
     <div>
       <Retour href="/formations" ton="sobre" />
       <PageTitle>{formation.title}</PageTitle>
+
+      {testAFaire ? (
+        <Card className="mb-6 border-gold-400 bg-gold-50/40">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Avant de commencer
+              </p>
+              <h2 className="mt-1 font-semibold text-ink-900">
+                Faites le test de positionnement
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Quelques questions pour mesurer votre niveau de départ,
+                compétence par compétence. Sans XP, sans note : il sert à
+                vous dire par où commencer et ce que vous pouvez parcourir
+                plus vite.
+              </p>
+            </div>
+            <Link
+              href={`/formations/${formation.id}/activite/${testAFaire.id}`}
+              className="inline-flex min-h-11 items-center rounded-lg bg-ink-950 px-4 py-2 text-sm font-medium text-white hover:bg-ink-900"
+            >
+              Passer le test
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

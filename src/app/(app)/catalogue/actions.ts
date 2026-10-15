@@ -399,13 +399,23 @@ export async function creerQcm(
     .select("id", { count: "exact", head: true })
     .eq("lesson_id", lessonId);
 
+  /* Test de positionnement (PRD §9) : un QCM marqué `placement`, proposé
+     avant les leçons, sans XP, avec un bilan par compétence. Voir
+     src/lib/courses/positionnement.ts. */
+  const placement = formData.get("placement") === "on";
+
   const { data: activite, error } = await supabase
     .from("activities")
     .insert({
       lesson_id: lessonId,
       type: "quiz",
       title,
-      instructions: String(formData.get("instructions") ?? "").trim() || null,
+      instructions:
+        String(formData.get("instructions") ?? "").trim() ||
+        (placement
+          ? "Ce test mesure votre niveau de départ, compétence par compétence. Répondez sans vous documenter : il n'y a ni bonne ni mauvaise note, seulement un point de départ."
+          : null),
+      content: placement ? { placement: true } : {},
       difficulty: 1,
       position: (count ?? 0) + 1,
       status: "draft",

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
+import { estTestDePositionnement } from "@/lib/courses/positionnement";
 import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
 import { obtenirUrlLecture, type UrlLecture } from "@/lib/stockage/fournisseur";
 import { formaterTaille, nomSur } from "@/lib/stockage/limites";
@@ -249,9 +250,12 @@ export default async function LeconPage({
                 href={`/formations/${formation.id}/activite/${a.id}`}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm transition hover:border-brand-300"
               >
-                <span>📝 QCM — {a.title}</span>
+                <span>
+                  {estTestDePositionnement(a.content) ? "🧭 Test de positionnement — " : "📝 QCM — "}
+                  {a.title}
+                </span>
                 <span className="text-xs text-slate-400">
-                  Difficulté {a.difficulty}/5
+                  {estTestDePositionnement(a.content) ? "Sans XP" : `Difficulté ${a.difficulty}/5`}
                 </span>
               </Link>
             ))}

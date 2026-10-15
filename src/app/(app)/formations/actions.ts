@@ -3,15 +3,18 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/profile";
 import {
   calculerCompletion,
   corrigerQcm,
   meilleursScoresParActivite,
   niveauDepuisScores,
+  scorePourCompetence,
   type QuestionQcm,
 } from "@/lib/courses/progression";
-import { peutSeDesinscrire } from "@/lib/courses/inscriptions";
+import { donneAcces, peutSeDesinscrire } from "@/lib/courses/inscriptions";
+import { estTestDePositionnement } from "@/lib/courses/positionnement";
 import { calculerXpQcm, serieBonnesReponses, XP_FIXES } from "@/lib/gamification/xp";
 import {
   attribuerXp,
@@ -235,6 +238,26 @@ export async function marquerLeconTerminee(
   const lessonId = String(formData.get("lesson_id") ?? "");
   const supabase = await createClient();
 
+  /* Les preuves (leçon terminée, inscription terminée) s'écrivent avec le
+     client d'administration depuis la migration 0019 : l'apprenant n'a
+     plus de droit d'écriture direct. Les droits se vérifient donc ICI,
+     avec le client de l'utilisateur (RLS) : inscription donnant accès,
+     et leçon appartenant bien à la version courante de la formation. */
+  const { data: inscription } = await supabase
+    .from("enrollments")
+    .select("organization_id, status")
+    .eq("course_id", courseId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!inscription || !donneAcces(inscription.status)) {
+    return { error: "Vous n'êtes pas inscrit à cette formation." };
+  }
+  const toutes = await leconsDeLaFormation(supabase, courseId);
+  if (!toutes.includes(lessonId)) {
+    return { error: "Cette leçon n'appartient pas à la formation." };
+  }
+  const admin = createAdminClient();
+
   // Enregistrer (ou confirmer) la leçon terminée.
   const { data: existant } = await supabase
     .from("progress_records")
@@ -245,7 +268,7 @@ export async function marquerLeconTerminee(
 
   let xpGagne = 0;
   if (!existant) {
-    const { error } = await supabase.from("progress_records").insert({
+    const { error } = await admin.from("progress_records").insert({
       user_id: user.id,
       course_id: courseId,
       lesson_id: lessonId,
@@ -257,28 +280,19 @@ export async function marquerLeconTerminee(
     }
 
     // Gamification : la première fois seulement (référence = leçon).
-    const { data: inscription } = await supabase
-      .from("enrollments")
-      .select("organization_id")
-      .eq("course_id", courseId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (inscription) {
-      xpGagne = await attribuerXp({
-        userId: user.id,
-        organizationId: inscription.organization_id,
-        type: "lecon_terminee",
-        montant: XP_FIXES.lecon_terminee,
-        referenceId: lessonId,
-        courseId,
-      });
-      await mettreAJourSerie(user.id, inscription.organization_id);
-      await verifierBadges(user.id, inscription.organization_id);
-    }
+    xpGagne = await attribuerXp({
+      userId: user.id,
+      organizationId: inscription.organization_id,
+      type: "lecon_terminee",
+      montant: XP_FIXES.lecon_terminee,
+      referenceId: lessonId,
+      courseId,
+    });
+    await mettreAJourSerie(user.id, inscription.organization_id);
+    await verifierBadges(user.id, inscription.organization_id);
   }
 
   // Mettre à jour la complétion de l'inscription.
-  const toutes = await leconsDeLaFormation(supabase, courseId);
   const { data: faites } = await supabase
     .from("progress_records")
     .select("lesson_id")
@@ -291,7 +305,7 @@ export async function marquerLeconTerminee(
     toutes.length
   );
   if (completion === 100) {
-    await supabase
+    await admin
       .from("enrollments")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("course_id", courseId)
@@ -329,8 +343,35 @@ export async function soumettreQcm(
       : null;
   const supabase = await createClient();
 
+  /* L'activité doit être visible de l'appelant (politique
+     `activities_select`, RLS) et, si une formation est indiquée, lui
+     appartenir : c'est elle qui reçoit la maîtrise. Les corrigés, eux,
+     ne sont lisibles que par le client d'administration (migration
+     0019) ; la tentative et la maîtrise s'écrivent de même. */
+  const { data: activiteVisible } = await supabase
+    .from("activities")
+    .select("id, content, lesson:lessons(module:modules(version:course_versions(course_id)))")
+    .eq("id", activityId)
+    .maybeSingle();
+  if (!activiteVisible) {
+    return { error: "Ce QCM est introuvable ou ne vous est pas accessible." };
+  }
+  // Test de positionnement (PRD §9) : mesure sans récompense.
+  const placement = estTestDePositionnement(activiteVisible.content);
+  if (courseId) {
+    const premierDe = <T,>(v: T | T[] | null | undefined): T | null =>
+      Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+    const coursDeLActivite = premierDe(
+      premierDe(premierDe(activiteVisible.lesson)?.module)?.version
+    )?.course_id;
+    if (coursDeLActivite !== courseId) {
+      return { error: "Ce QCM n'appartient pas à cette formation." };
+    }
+  }
+  const admin = createAdminClient();
+
   // Les bonnes réponses ne quittent jamais le serveur avant soumission.
-  const { data: questionsBrutes, error: erreurQuestions } = await supabase
+  const { data: questionsBrutes, error: erreurQuestions } = await admin
     .from("questions")
     .select("id, prompt, options, expected_answer, explanation, competency_id")
     .eq("activity_id", activityId)
@@ -377,7 +418,7 @@ export async function soumettreQcm(
     null
   );
 
-  const { data: tentative, error: erreurTentative } = await supabase
+  const { data: tentative, error: erreurTentative } = await admin
     .from("attempts")
     .insert({
       activity_id: activityId,
@@ -428,16 +469,30 @@ export async function soumettreQcm(
     const ids = (activitesLiees ?? []).map((a) => a.activity_id);
     if (ids.length === 0) continue;
 
-    const { data: tentatives } = await supabase
-      .from("attempts")
-      .select("activity_id, score")
-      .eq("user_id", user.id)
-      .in("activity_id", ids);
+    /* Score PAR COMPÉTENCE : seules les questions rattachées à la
+       compétence comptent (document global §23 : « ne pas confondre note
+       globale et maîtrise réelle ») ; à défaut, le score global de la
+       tentative. `competency_id` des questions reste lisible par
+       l'apprenant après la migration 0019 ; les corrigés, non. */
+    const [{ data: tentatives }, { data: questionsLiees }] = await Promise.all([
+      supabase
+        .from("attempts")
+        .select("activity_id, score, feedback")
+        .eq("user_id", user.id)
+        .in("activity_id", ids),
+      supabase.from("questions").select("id, competency_id").in("activity_id", ids),
+    ]);
+    const competenceParQuestion: Record<string, string | null> = {};
+    for (const q of questionsLiees ?? []) competenceParQuestion[q.id] = (q.competency_id as string | null) ?? null;
 
     const scores = meilleursScoresParActivite(
       (tentatives ?? []).map((t) => ({
         activityId: t.activity_id,
-        score: t.score === null ? null : Number(t.score),
+        score: scorePourCompetence(
+          { score: t.score === null ? null : Number(t.score), feedback: t.feedback },
+          lien.competency_id,
+          competenceParQuestion
+        ),
       }))
     );
     const niveau = niveauDepuisScores(scores);
@@ -463,13 +518,20 @@ export async function soumettreQcm(
     const valeurs = {
       mastery_level: niveau,
       score: moyenne,
-      evidence: { activites: scores.length, source: "qcm" },
+      evidence:
+        placement && !progres
+          ? {
+              activites: scores.length,
+              source: "positionnement",
+              initial: { score: correction.scorePourcent, date: new Date().toISOString() },
+            }
+          : { activites: scores.length, source: placement ? "positionnement" : "qcm" },
       updated_at: new Date().toISOString(),
     };
     if (progres) {
-      await supabase.from("progress_records").update(valeurs).eq("id", progres.id);
+      await admin.from("progress_records").update(valeurs).eq("id", progres.id);
     } else {
-      await supabase.from("progress_records").insert({
+      await admin.from("progress_records").insert({
         user_id: user.id,
         course_id: courseId,
         competency_id: lien.competency_id,
@@ -479,6 +541,17 @@ export async function soumettreQcm(
   }
 
   // ---------- Gamification (lot 14) ----------
+  // Un test de positionnement mesure, il ne récompense pas : ni XP, ni
+  // badge, ni série — sinon on inciterait à le « réussir » plutôt qu'à
+  // répondre sincèrement.
+  if (placement) {
+    revalidatePath(`/formations/${courseId}/activite/${activityId}`);
+    revalidatePath(`/formations/${courseId}`);
+    revalidatePath("/progression");
+    return {
+      success: `Test de positionnement enregistré : ${correction.scorePourcent} % (${correction.nbCorrectes}/${correction.nbQuestions}). Votre point de départ par compétence s'affiche ci-dessous.`,
+    };
+  }
   const xpGagne = await gamifierTentative({
     supabase,
     userId: user.id,
@@ -529,7 +602,10 @@ async function gamifierTentative(params: {
   const [{ data: activite }, { data: inscription }] = await Promise.all([
     supabase
       .from("activities")
-      .select("difficulty, lesson:lessons(module:modules(version:course_versions(course:courses(id, organization_id))))")
+      /* Clé étrangère explicite : deux relations existent entre versions et
+         formations ; sans elle PostgREST répond PGRST201 et la difficulté
+         comme l'organisation étaient perdues (XP sous-évalués). */
+      .select("difficulty, lesson:lessons(module:modules(version:course_versions(course:courses!course_versions_course_id_fkey(id, organization_id))))")
       .eq("id", activityId)
       .maybeSingle(),
     courseId

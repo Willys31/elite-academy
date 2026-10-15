@@ -4,6 +4,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
+import {
+  bilanPositionnement,
+  estTestDePositionnement,
+  VERDICT_CONSEILS,
+  VERDICT_LABELS,
+} from "@/lib/courses/positionnement";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
@@ -53,18 +59,31 @@ export default async function ActivitePage({
   const { data: activite } = await supabase
     .from("activities")
     .select(
-      "id, title, type, instructions, difficulty, lesson_id, activity_competencies(competency:competencies(name))"
+      "id, title, type, instructions, difficulty, lesson_id, content, activity_competencies(competency:competencies(name))"
     )
     .eq("id", activiteId)
     .maybeSingle();
   if (!activite) notFound();
+  const placement = estTestDePositionnement(activite.content);
 
-  // IMPORTANT : expected_answer et explanation ne sont PAS sélectionnés ici.
+  // IMPORTANT : expected_answer et explanation ne sont PAS sélectionnés ici
+  // (et, depuis la migration 0019, ne sont plus lisibles par l'apprenant).
   const { data: questions } = await supabase
     .from("questions")
-    .select("id, prompt, options, position")
+    .select("id, prompt, options, position, competency_id")
     .eq("activity_id", activite.id)
     .order("position");
+
+  // Bilan du test de positionnement : compétence de chaque question, et
+  // nom des compétences concernées.
+  const competenceParQuestion: Record<string, string | null> = {};
+  for (const q of questions ?? []) competenceParQuestion[q.id] = (q.competency_id as string | null) ?? null;
+  const idsCompetences = [...new Set(Object.values(competenceParQuestion).filter((v): v is string => Boolean(v)))];
+  const { data: competencesBilan } =
+    placement && idsCompetences.length > 0
+      ? await supabase.from("competencies").select("id, name").in("id", idsCompetences)
+      : { data: [] as Array<{ id: string; name: string }> };
+  const nomCompetence = new Map((competencesBilan ?? []).map((c) => [c.id as string, c.name as string]));
 
   // Dernière tentative de l'apprenant (feedback corrigé).
   const { data: derniereTentative } = await supabase
@@ -110,7 +129,7 @@ export default async function ActivitePage({
       <PageTitle>{activite.title}</PageTitle>
 
       <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Badge>Difficulté {activite.difficulty}/5</Badge>
+        {placement ? <Badge>🧭 Test de positionnement · sans XP</Badge> : <Badge>Difficulté {activite.difficulty}/5</Badge>}
         {competences.map((c) => (
           <Badge key={c}>{c}</Badge>
         ))}
@@ -143,10 +162,33 @@ export default async function ActivitePage({
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-slate-500">
-            Vous pouvez refaire le QCM : seul votre meilleur score compte pour
-            la maîtrise de la compétence.
-          </p>
+          {placement ? (
+            <div className="mt-4 border-t border-sand-200 pt-4">
+              <h3 className="font-semibold text-ink-900">Votre point de départ, compétence par compétence</h3>
+              <ul className="mt-2 space-y-2 text-sm">
+                {bilanPositionnement(feedback.details, competenceParQuestion).map((b) => (
+                  <li key={b.competencyId} className="rounded-lg border border-sand-200 bg-sand-50 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{nomCompetence.get(b.competencyId) ?? "Compétence"}</span>
+                      <span className="text-xs text-slate-500">
+                        {b.nbCorrectes}/{b.nbQuestions} · {b.pourcent} % · {VERDICT_LABELS[b.verdict]}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-slate-600">{VERDICT_CONSEILS[b.verdict]}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-slate-500">
+                Ce test fixe votre niveau initial ; il ne rapporte pas d&apos;XP. Les leçons et
+                les QCM de la formation feront évoluer votre maîtrise.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-slate-500">
+              Vous pouvez refaire le QCM : seul votre meilleur score compte pour
+              la maîtrise de la compétence.
+            </p>
+          )}
           {/* Entraide (lot 15) : après une tentative, l'apprenant peut
               partager son blocage, anonymement, avec ses pairs. */}
           {Number(derniereTentative.score) < 80 ? (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { isEliteAdmin } from "@/lib/auth/roles";
 import {
@@ -63,8 +64,12 @@ export default async function EditeurQcmPage({
     .maybeSingle();
   if (!activite) notFound();
 
+  /* Les corrigés ne sont plus lisibles par les rôles applicatifs
+     (migration 0019) : le concepteur, dont le droit d'édition vient
+     d'être vérifié (`peutModifier`) et dont l'activité est visible par
+     RLS, les lit via le client d'administration. */
   const [{ data: questions }, { data: competences }] = await Promise.all([
-    supabase
+    createAdminClient()
       .from("questions")
       .select(
         "id, prompt, options, expected_answer, explanation, difficulty, position, competency:competencies(name)"

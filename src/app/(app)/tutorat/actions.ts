@@ -66,7 +66,10 @@ async function contexteActivite(
   const { data } = await supabase
     .from("activities")
     .select(
-      "id, title, lesson:lessons(content, module:modules(version:course_versions(course:courses(id, title, organization_id, sector)))), activity_competencies(competency:competencies(id, name))"
+      /* Clé étrangère explicite (deux relations versions ↔ formations) :
+         sans elle, PostgREST refusait l'embed et toute aide répondait
+         « Activité introuvable ». */
+      "id, title, lesson:lessons(content, module:modules(version:course_versions(course:courses!course_versions_course_id_fkey(id, title, organization_id, sector)))), activity_competencies(competency:competencies(id, name))"
     )
     .eq("id", activityId)
     .maybeSingle();
@@ -125,9 +128,16 @@ export async function demanderAide(
     return { error: "L'explication détaillée n'est disponible qu'après une première tentative : essayez d'abord de répondre." };
   }
 
-  // Énoncé et options ; la correction seulement si elle est autorisée.
-  const colonnes = type === "detailed_explanation" ? "id, prompt, options, competency_id, expected_answer, explanation" : "id, prompt, options, competency_id";
-  const { data: question } = await supabase.from("questions").select(colonnes).eq("id", questionId).eq("activity_id", activityId).maybeSingle();
+  // Énoncé et options (RLS) ; la correction seulement si elle est
+  // autorisée, et alors par le client d'administration : depuis la
+  // migration 0019, `expected_answer` et `explanation` ne sont plus
+  // lisibles par les rôles applicatifs.
+  const { data: question } = await supabase
+    .from("questions")
+    .select("id, prompt, options, competency_id")
+    .eq("id", questionId)
+    .eq("activity_id", activityId)
+    .maybeSingle();
   if (!question) return { error: "Question introuvable." };
   const q = question as unknown as {
     id: string;
@@ -137,6 +147,15 @@ export async function demanderAide(
     expected_answer?: { index?: number } | null;
     explanation?: string | null;
   };
+  if (type === "detailed_explanation" && derniere) {
+    const { data: corrige } = await createAdminClient()
+      .from("questions")
+      .select("expected_answer, explanation")
+      .eq("id", q.id)
+      .maybeSingle();
+    q.expected_answer = (corrige?.expected_answer as { index?: number } | null) ?? null;
+    q.explanation = corrige?.explanation ?? null;
+  }
   const competencyId = q.competency_id ?? ctx.competences[0]?.id ?? null;
   const competenceNom = ctx.competences.find((c) => c.id === competencyId)?.name ?? null;
 

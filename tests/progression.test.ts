@@ -4,6 +4,7 @@ import {
   corrigerQcm,
   meilleursScoresParActivite,
   niveauDepuisScores,
+  scorePourCompetence,
   type QuestionQcm,
 } from "@/lib/courses/progression";
 
@@ -54,7 +55,10 @@ describe("corrigerQcm", () => {
 describe("niveauDepuisScores", () => {
   it("applique le barème documenté", () => {
     expect(niveauDepuisScores([95, 92])).toBe("advanced");
-    expect(niveauDepuisScores([80, 75])).toBe("operational");
+    expect(niveauDepuisScores([85, 80])).toBe("operational");
+    // 77,5 % de moyenne : Fondamentaux, pas Opérationnel (seuil 80 %,
+    // dossier fonctionnel §4.2 — l'ancien barème v1 disait 75 %).
+    expect(niveauDepuisScores([80, 75])).toBe("fundamentals");
     expect(niveauDepuisScores([65, 60])).toBe("fundamentals");
     expect(niveauDepuisScores([40, 50])).toBeNull();
   });
@@ -101,5 +105,27 @@ describe("meilleursScoresParActivite", () => {
       ])
     );
     expect(apres).toBe(avant);
+  });
+});
+
+describe("scorePourCompetence", () => {
+  const feedback = {
+    details: [
+      { questionId: "q1", correcte: true },
+      { questionId: "q2", correcte: false },
+      { questionId: "q3", correcte: true },
+    ],
+  };
+  const comp = { q1: "A", q2: "A", q3: "B" };
+
+  it("ne retient que les questions de la compétence", () => {
+    expect(scorePourCompetence({ score: 67, feedback }, "A", comp)).toBe(50);
+    expect(scorePourCompetence({ score: 67, feedback }, "B", comp)).toBe(100);
+  });
+
+  it("retombe sur le score global quand aucune question n'est rattachée", () => {
+    expect(scorePourCompetence({ score: 67, feedback }, "C", comp)).toBe(67);
+    expect(scorePourCompetence({ score: 67, feedback: null }, "A", comp)).toBe(67);
+    expect(scorePourCompetence({ score: null, feedback: null }, "A", comp)).toBeNull();
   });
 });

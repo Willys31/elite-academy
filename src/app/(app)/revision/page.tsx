@@ -132,7 +132,11 @@ export default async function RevisionPage({
     const { data: questions } = await supabase
       .from("questions")
       .select(
-        "id, prompt, options, activity_id, activity:activities(id, title, lesson:lessons(id, title, module:modules(id, course_version:course_versions(course_id, course:courses(id, title)))))"
+        /* `courses!course_versions_course_id_fkey` : deux clés étrangères
+           relient versions et formations (course_id, et en retour
+           current_version_id) ; sans préciser laquelle, PostgREST refuse
+           l'embed (PGRST201) et la liste restait vide. */
+        "id, prompt, options, activity_id, activity:activities(id, title, lesson:lessons(id, title, module:modules(id, course_version:course_versions(course_id, course:courses!course_versions_course_id_fkey(id, title)))))"
       )
       .in(
         "id",

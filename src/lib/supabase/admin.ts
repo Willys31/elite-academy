@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { fetchRobuste } from "@/lib/supabase/fetch-robuste";
 
 /**
  * Client d'administration Supabase (clé service_role).
@@ -23,5 +24,6 @@ export function createAdminClient() {
 
   return createSupabaseClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: fetchRobuste },
   });
 }

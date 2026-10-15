@@ -8,11 +8,15 @@
  *   une validation humaine (document global §19). Le calcul
  *   automatique plafonne donc à « advanced ».
  *
- * Barème v1 (décision temporaire signalée, affinable) : à partir des
- * meilleurs scores obtenus par activité liée à la compétence,
- * moyenne >= 60 % → fundamentals, >= 75 % → operational,
- * >= 90 % → advanced. En dessous, la compétence reste « en cours »
- * (aucun niveau attribué).
+ * Barème : à partir des meilleurs scores obtenus par activité liée à
+ * la compétence, moyenne >= 60 % → fundamentals, >= 80 % →
+ * operational, >= 90 % → advanced. En dessous, la compétence reste
+ * « en cours » (aucun niveau attribué).
+ *
+ * Le seuil Opérationnel était à 75 % (barème v1 du lot 4, « décision
+ * temporaire signalée ») ; il est aligné le 15 octobre 2026 sur le
+ * dossier fonctionnel (§4.2 et §9.4 : Fondamentaux 60 %, Opérationnel
+ * 80 %, Avancé 90 %, Elite 95 % + validation formateur).
  */
 
 export interface QuestionQcm {
@@ -85,7 +89,7 @@ export function niveauDepuisScores(scores: number[]): NiveauCalcule {
   if (scores.length === 0) return null;
   const moyenne = scores.reduce((a, b) => a + b, 0) / scores.length;
   if (moyenne >= 90) return "advanced";
-  if (moyenne >= 75) return "operational";
+  if (moyenne >= 80) return "operational";
   if (moyenne >= 60) return "fundamentals";
   return null;
 }
@@ -98,6 +102,38 @@ export function calculerCompletion(
   if (totalLecons <= 0) return 0;
   const pct = Math.round((leconsTerminees / totalLecons) * 100);
   return Math.max(0, Math.min(100, pct));
+}
+
+/**
+ * Score d'une tentative POUR UNE COMPÉTENCE donnée.
+ *
+ * Principe non négociable du dossier fonctionnel (§23) : « ne pas
+ * confondre note globale et maîtrise réelle ». Un QCM peut évaluer
+ * deux compétences ; réussir toutes les questions de l'une et rater
+ * celles de l'autre donnait auparavant le même score aux deux. Quand
+ * les questions sont rattachées à des compétences, on ne retient que
+ * celles de la compétence considérée. Si aucune question de la
+ * tentative ne lui est rattachée (QCM lié à la compétence au niveau
+ * de l'activité seulement, ou tentative ancienne sans détail), le
+ * score global reste la seule preuve disponible.
+ */
+export function scorePourCompetence(
+  tentative: { score: number | null; feedback: unknown },
+  competencyId: string,
+  competenceParQuestion: Record<string, string | null | undefined>
+): number | null {
+  const feedback = tentative.feedback as { details?: unknown } | null;
+  const details = Array.isArray(feedback?.details)
+    ? (feedback!.details as Array<{ questionId?: unknown; correcte?: unknown }>)
+    : [];
+  const concernees = details.filter(
+    (d) => typeof d.questionId === "string" && competenceParQuestion[d.questionId] === competencyId
+  );
+  if (concernees.length === 0) {
+    return tentative.score === null || !Number.isFinite(tentative.score) ? null : tentative.score;
+  }
+  const correctes = concernees.filter((d) => d.correcte === true).length;
+  return Math.round((correctes / concernees.length) * 100);
 }
 
 /**

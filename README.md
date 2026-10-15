@@ -58,8 +58,12 @@ Dans l'éditeur SQL de Supabase, exécuter dans l'ordre :
     le Dashboard Supabase, Project Settings → Storage → **Global file
     size limit : 5 GB** (plan Pro requis pour dépasser 50 Mo). Le lot 21
     (import PowerPoint, extraits par leçon) n'ajoute aucune migration.
-19. Créer votre compte via l'écran d'inscription de l'application
-20. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
+19. `supabase/migrations/0019_verrouillage_preuves.sql` — **à appliquer
+    sans attendre** : corrigés des QCM, tentatives, maîtrise et complétion
+    d'inscription ne sont plus accessibles en écriture ou en lecture à
+    l'apprenant par appel direct à l'API (lot 22).
+20. Créer votre compte via l'écran d'inscription de l'application
+21. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
     pour devenir administrateur Elite Experience
 
 ### 4. Lancer
@@ -116,3 +120,4 @@ docs/               Documentation des lots livrés
 - [Lot 10 – Responsivité et confort tactile](docs/lot-10-responsivite.md)
 - [Lot 11 – Suppression d'éléments](docs/lot-11-suppressions.md)
 - [Lot 12 – Désinscription d'un apprenant](docs/lot-12-desinscription.md)
+- [Lot 22 – Audit contre le dossier fonctionnel : failles, bugs, test de positionnement](docs/lot-22-audit-dossier-fonctionnel.md)

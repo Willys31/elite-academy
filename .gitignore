@@ -22,3 +22,4 @@ docs/
 .mcp.json
 # Captures Playwright (aperçus locaux)
 .playwright-mcp/
+comptes_playwright.local.json

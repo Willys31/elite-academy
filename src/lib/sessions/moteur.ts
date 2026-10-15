@@ -272,7 +272,7 @@ export async function analyserTranscription(
   const [{ data: participants }, { data: formateur }] = await Promise.all([
     client
       .from("session_participants")
-      .select("user_id, profile:profiles(full_name)")
+      .select("user_id, profile:profiles!session_participants_user_id_fkey(full_name)")
       .eq("session_id", session.id),
     client.from("profiles").select("id, full_name").eq("id", session.trainer_id).maybeSingle(),
   ]);

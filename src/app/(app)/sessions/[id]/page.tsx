@@ -74,7 +74,11 @@ export default async function SessionDirectePage({
   const [{ data: participants }, { data: tentatives }] = await Promise.all([
     supabase
       .from("session_participants")
-      .select("id, joined_at, left_at, recording_consent, profile:profiles(full_name, email)")
+      /* `profiles!session_participants_user_id_fkey` : depuis le lot 17,
+         `validated_by` est une seconde clé vers `profiles` ; sans la
+         nommer, PostgREST refuse l'embed (PGRST201) et la liste des
+         présents restait vide. */
+      .select("id, joined_at, left_at, recording_consent, profile:profiles!session_participants_user_id_fkey(full_name, email)")
       .eq("session_id", session.id)
       .order("joined_at"),
     session.current_activity_id

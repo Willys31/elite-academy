@@ -61,7 +61,7 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
     await Promise.all([
       supabase
         .from("session_participants")
-        .select("id, user_id, joined_at, left_at, presence_status, punctuality_status, presence_seconds, xp_awarded, recording_consent, justification, justification_status, profile:profiles(full_name, email)")
+        .select("id, user_id, joined_at, left_at, presence_status, punctuality_status, presence_seconds, xp_awarded, recording_consent, justification, justification_status, profile:profiles!session_participants_user_id_fkey(full_name, email)")
         .eq("session_id", session.id)
         .order("joined_at"),
       supabase.from("session_feedbacks").select("satisfaction_score, clarity_score, usefulness_score, comment").eq("session_id", session.id),

@@ -37,6 +37,7 @@ import {
 } from "@/app/(app)/catalogue/decoupage/actions";
 import { libelleCourt } from "@/lib/import/decoupage";
 import { sourceDeLecon } from "@/lib/import/rattachement";
+import { estTestDePositionnement } from "@/lib/courses/positionnement";
 import { TeleverseurFichier } from "@/components/stockage/TeleverseurFichier";
 import { lireUsageStockage } from "@/lib/stockage/usage";
 import { ACCEPT_SUPPORTS, formaterTaille, TAILLE_MAX_FICHIER } from "@/lib/stockage/limites";
@@ -490,7 +491,8 @@ export default async function EditeurFormationPage({
                                       href={`/catalogue/${formation.id}/qcm/${a.id}`}
                                       className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-medium text-ink-900 transition duration-200 hover:bg-brand-100"
                                     >
-                                      📝 {a.title}
+                                      {estTestDePositionnement(a.content) ? "🧭 Positionnement — " : "📝 "}
+                                      {a.title}
                                     </Link>
                                   ))}
                               </div>
@@ -549,6 +551,14 @@ export default async function EditeurFormationPage({
                                         <Label htmlFor={`titre-qcm-${l.id}`}>Titre du QCM</Label>
                                         <Input id={`titre-qcm-${l.id}`} name="title" required />
                                       </div>
+                                      <label className="mt-2 flex items-start gap-2 text-xs text-slate-600">
+                                        <input type="checkbox" name="placement" className="mt-0.5 size-4 accent-brand-700" />
+                                        <span>
+                                          <span className="font-medium text-ink-900">Test de positionnement</span>
+                                          {" "}— proposé avant les leçons, sans XP ; le bilan est rendu
+                                          compétence par compétence (reliez chaque question à sa compétence).
+                                        </span>
+                                      </label>
                                     </AuthForm>
                                   </div>
                                 </details>

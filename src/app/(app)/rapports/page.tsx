@@ -113,7 +113,10 @@ export default async function RapportsPage({
   const [{ data: inscriptions }, { data: certificats }] = await Promise.all([
     supabase
       .from("enrollments")
-      .select("user_id, course_id, status, course:courses(title), profile:profiles(full_name, email)")
+      /* `profiles!enrollments_user_id_fkey` : `assigned_by` est une
+         seconde clé vers `profiles` ; PostgREST exige de nommer la
+         relation (PGRST201), sinon le rapport restait vide. */
+      .select("user_id, course_id, status, course:courses(title), profile:profiles!enrollments_user_id_fkey(full_name, email)")
       .eq("organization_id", orgId),
     supabase
       .from("certificates")
