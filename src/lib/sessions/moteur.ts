@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { appelerLlm, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlmJson, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
 import { extraireJson } from "@/lib/ai/schema";
 import {
   construirePromptAnalyseSession,
@@ -317,21 +317,21 @@ export async function analyserTranscription(
     return message;
   };
 
-  let texteReponse: string;
+  let jsonReponse: unknown | null;
   let modele = modeleConfigure();
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
   try {
     if (modeSimulation()) {
-      texteReponse = simulerAnalyseSession({
+      jsonReponse = extraireJson(simulerAnalyseSession({
         titre: session.title as string,
         formateur: formateurPersonne?.fullName ?? "Formateur",
         locuteurs: [...new Set(segments.map((s) => s.locuteur))],
         extraits: segments.slice(0, 6).map((s) => ({ locuteur: s.locuteur, texte: s.texte })),
-      });
+      }));
     } else {
       const texte = (transcript.transcript_text as string).slice(0, MAX_TEXTE_IA);
-      const reponse = await appelerLlm(
+      const reponse = await appelerLlmJson(
         SYSTEM_ANALYSE_SESSION,
         construirePromptAnalyseSession({
           titre: session.title as string,
@@ -343,7 +343,7 @@ export async function analyserTranscription(
           anonymiser: Boolean(options.anonymiser),
         })
       );
-      texteReponse = reponse.texte;
+      jsonReponse = reponse.json;
       modele = reponse.modele;
       inputTokens = reponse.inputTokens;
       outputTokens = reponse.outputTokens;
@@ -353,7 +353,7 @@ export async function analyserTranscription(
     return echec(erreur instanceof Error ? erreur.message : "L'analyse a échoué.");
   }
 
-  const analyse = validerAnalyseSession(extraireJson(texteReponse));
+  const analyse = validerAnalyseSession(jsonReponse);
   if (!analyse.ok) return echec(analyse.erreur);
   const r = analyse.resultat;
 

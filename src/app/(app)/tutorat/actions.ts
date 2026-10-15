@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/profile";
-import { appelerLlm, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlm, appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
 import {
   construirePromptAide,
   construirePromptExercices,
@@ -103,7 +103,7 @@ export async function demanderAide(
   if (!activityId || !questionId) return { error: "Choisissez la question qui vous bloque." };
   if (!typeAideValide(type)) return { error: "Type d'aide inconnu." };
   if (!iaConfiguree() && !modeSimulation()) {
-    return { error: "Le tuteur IA n'est pas configuré sur cette installation (voir .env.example)." };
+    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa() ?? ""}`.trim() };
   }
 
   const dejaAujourdhui = await generationsDuJour(user.id, ["tutor_help"]);
@@ -276,7 +276,7 @@ export async function genererExercices(
   const nb = Math.min(5, Math.max(1, parseInt(String(formData.get("nb") ?? "2"), 10) || 2));
   if (!courseId || !competencyId) return { error: "Choisissez une compétence." };
   if (!iaConfiguree() && !modeSimulation()) {
-    return { error: "Le tuteur IA n'est pas configuré sur cette installation (voir .env.example)." };
+    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa() ?? ""}`.trim() };
   }
 
   const dejaAujourdhui = await generationsDuJour(user.id, ["tutor_exercises"]);
@@ -344,12 +344,12 @@ export async function genererExercices(
     return { error: message };
   };
 
-  let texte: string;
+  let json: unknown | null;
   try {
-    texte = modeSimulation()
-      ? simulerExercices(competence.name as string, typeExercice, nb)
+    json = modeSimulation()
+      ? extraireJson(simulerExercices(competence.name as string, typeExercice, nb))
       : (
-          await appelerLlm(
+          await appelerLlmJson(
             SYSTEM_EXERCICES,
             construirePromptExercices({
               competence: competence.name as string,
@@ -364,13 +364,13 @@ export async function genererExercices(
               extraitsLecons: extraits,
             })
           )
-        ).texte;
+        ).json;
   } catch (erreur) {
     loguer("appel LLM", erreur);
     return echec(erreur instanceof Error ? erreur.message : "La génération a échoué.");
   }
 
-  const validation = validerExercicesGeneres(extraireJson(texte));
+  const validation = validerExercicesGeneres(json);
   if (!validation.ok) return echec(validation.erreur);
 
   try {

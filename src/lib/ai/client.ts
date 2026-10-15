@@ -1,21 +1,40 @@
 import "server-only";
 import { lireEnv } from "@/lib/ai/env";
+import {
+  decrireConfiguration,
+  resoudreConfiguration,
+  type ConfigurationIa,
+  type Fournisseur,
+} from "@/lib/ai/fournisseurs";
+import { extraireJson } from "@/lib/ai/json";
+import {
+  appelerChatCompletions,
+  erreurHttp,
+  erreurReseau,
+  type ReponseLlm,
+} from "@/lib/ai/openai-compatible";
 
 /**
- * Appel du LLM (API Anthropic) — STRICTEMENT côté serveur.
+ * Appel du LLM — STRICTEMENT côté serveur.
  * L'import de "server-only" fait échouer la compilation si ce
  * module est importé depuis du code client : la clé API ne peut
  * pas fuiter vers le navigateur.
  *
- * Appel direct de l'API HTTP (pas de dépendance supplémentaire).
+ * Ce fichier ne contient que le « câblage » : la résolution de la
+ * configuration (`fournisseurs.ts`), l'appel compatible OpenAI
+ * (`openai-compatible.ts`) et l'extraction JSON (`json.ts`) sont des
+ * modules purs, testés sans réseau.
+ *
+ * Fournisseurs (LLM_PROVIDER) :
+ * - anthropic (ANTHROPIC_API_KEY) — API Anthropic ;
+ * - deepseek, openai, gemini, groq, openrouter — services en ligne,
+ *   protocole OpenAI compatible, clé LLM_API_KEY ;
+ * - ollama, vllm, compatible — serveur local ou auto-hébergé, sans clé
+ *   obligatoire, URL via LLM_BASE_URL.
+ * Appel direct de l'API HTTP : aucune dépendance supplémentaire.
  */
 
-export interface ReponseLlm {
-  texte: string;
-  modele: string;
-  inputTokens: number | null;
-  outputTokens: number | null;
-}
+export type { ReponseLlm };
 
 /**
  * Mode simulation : ELITE_IA_MODE=simulation dans .env.local.
@@ -26,100 +45,82 @@ export function modeSimulation(): boolean {
   return lireEnv("ELITE_IA_MODE").toLowerCase() === "simulation";
 }
 
-/**
- * Fournisseurs pris en charge, réglables sans toucher au code :
- * - LLM_PROVIDER=anthropic  (clé ANTHROPIC_API_KEY)
- * - LLM_PROVIDER=gemini     (GRATUIT — clé LLM_API_KEY via aistudio.google.com)
- * - LLM_PROVIDER=groq       (GRATUIT — clé LLM_API_KEY via console.groq.com)
- * - LLM_PROVIDER=openrouter (modèles ':free' — clé LLM_API_KEY)
- * Gemini/Groq/OpenRouter parlent le protocole « OpenAI compatible ».
- * Sans LLM_PROVIDER : anthropic si ANTHROPIC_API_KEY est définie.
- */
-type Fournisseur = "anthropic" | "gemini" | "groq" | "openrouter";
+/** Configuration résolue depuis l'environnement (ou l'erreur à afficher). */
+export function configurationIa() {
+  return resoudreConfiguration(lireEnv);
+}
 
-const PRESETS: Record<
-  Exclude<Fournisseur, "anthropic">,
-  { baseUrl: string; modeleDefaut: string }
-> = {
-  gemini: {
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    modeleDefaut: "gemini-2.5-flash",
-  },
-  groq: {
-    baseUrl: "https://api.groq.com/openai/v1",
-    modeleDefaut: "llama-3.3-70b-versatile",
-  },
-  openrouter: {
-    baseUrl: "https://openrouter.ai/api/v1",
-    modeleDefaut: "meta-llama/llama-3.3-70b-instruct:free",
-  },
-};
-
+/** Fournisseur déclaré (anthropic par défaut, même si mal configuré). */
 export function fournisseurConfigure(): Fournisseur {
-  const f = lireEnv("LLM_PROVIDER").toLowerCase();
-  if (f === "gemini" || f === "groq" || f === "openrouter") return f;
-  return "anthropic";
+  const r = configurationIa();
+  return r.ok ? r.config.fournisseur : "anthropic";
 }
 
 /** Une configuration IA utilisable existe-t-elle (hors simulation) ? */
 export function iaConfiguree(): boolean {
-  if (fournisseurConfigure() === "anthropic") {
-    return Boolean(lireEnv("ANTHROPIC_API_KEY"));
-  }
-  return Boolean(lireEnv("LLM_API_KEY"));
+  return configurationIa().ok;
+}
+
+/**
+ * Pourquoi l'IA n'est pas utilisable, en français, sans secret ;
+ * null si tout va bien ou en simulation.
+ */
+export function erreurConfigurationIa(): string | null {
+  if (modeSimulation()) return null;
+  const r = configurationIa();
+  return r.ok ? null : r.erreur;
 }
 
 export function modeleConfigure(): string {
   if (modeSimulation()) return "simulation-locale";
-  const fournisseur = fournisseurConfigure();
-  if (lireEnv("LLM_MODEL")) return lireEnv("LLM_MODEL");
-  if (fournisseur === "anthropic") {
-    return lireEnv("ANTHROPIC_MODEL") || "claude-sonnet-4-5";
-  }
-  return PRESETS[fournisseur].modeleDefaut;
+  const r = configurationIa();
+  if (r.ok) return r.config.modele;
+  // Mal configuré : on renvoie quand même le modèle demandé, pour la
+  // traçabilité (`ai_generations.model_name`).
+  return lireEnv("LLM_MODEL") || lireEnv("ANTHROPIC_MODEL") || "non-configure";
 }
 
-function erreurHttp(status: number, fournisseur: string): Error {
-  if (status === 401 || status === 403) {
-    return new Error(`La clé API ${fournisseur} est invalide ou expirée.`);
-  }
-  if (status === 429) {
-    return new Error(
-      "Limite d'utilisation de l'API atteinte (quota gratuit épuisé ?). Réessayez dans quelques minutes."
-    );
-  }
-  return new Error("Le service de génération est indisponible. Réessayez plus tard.");
+/** Libellé lisible (« DeepSeek — modèle deepseek-chat ») pour les écrans. */
+export function descriptionIa(): string {
+  if (modeSimulation()) return "Simulation locale (sans IA)";
+  const r = configurationIa();
+  return r.ok ? decrireConfiguration(r.config) : "IA non configurée";
+}
+
+function exigerConfiguration(): ConfigurationIa {
+  const r = configurationIa();
+  if (!r.ok) throw new Error(r.erreur);
+  return r.config;
 }
 
 /** Appel via l'API Anthropic. */
-async function appelerAnthropic(system: string, prompt: string): Promise<ReponseLlm> {
-  const apiKey = lireEnv("ANTHROPIC_API_KEY");
-  if (!apiKey) {
-    throw new Error(
-      "Aucune configuration IA : renseignez ANTHROPIC_API_KEY, ou un fournisseur gratuit via LLM_PROVIDER + LLM_API_KEY (voir .env.example)."
-    );
+async function appelerAnthropic(config: ConfigurationIa, system: string, prompt: string): Promise<ReponseLlm> {
+  let reponse: Response;
+  try {
+    reponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: config.modele,
+        max_tokens: config.maxTokens,
+        ...(config.temperature !== null ? { temperature: config.temperature } : {}),
+        system,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+  } catch (e) {
+    throw erreurReseau(e, config);
   }
-
-  const modele = modeleConfigure();
-  const reponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: modele,
-      max_tokens: 16000,
-      system,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
 
   if (!reponse.ok) {
     const corps = await reponse.text();
     console.error("[ia] anthropic en échec :", reponse.status, corps.slice(0, 500));
-    throw erreurHttp(reponse.status, "Anthropic");
+    throw erreurHttp(reponse.status, config, corps);
   }
 
   const donnees = (await reponse.json()) as {
@@ -132,80 +133,67 @@ async function appelerAnthropic(system: string, prompt: string): Promise<Reponse
       .filter((b) => b.type === "text" && typeof b.text === "string")
       .map((b) => b.text)
       .join("\n"),
-    modele: donnees.model ?? modele,
+    modele: donnees.model ?? config.modele,
     inputTokens: donnees.usage?.input_tokens ?? null,
     outputTokens: donnees.usage?.output_tokens ?? null,
   };
 }
 
-/** Appel via un fournisseur « OpenAI compatible » (Gemini, Groq, OpenRouter). */
-async function appelerOpenAiCompatible(
-  fournisseur: Exclude<Fournisseur, "anthropic">,
-  system: string,
-  prompt: string
-): Promise<ReponseLlm> {
-  const apiKey = lireEnv("LLM_API_KEY");
-  if (!apiKey) {
-    throw new Error(
-      `Clé manquante pour ${fournisseur} : renseignez LLM_API_KEY dans .env.local (voir .env.example).`
-    );
-  }
-
-  const baseUrl = lireEnv("LLM_BASE_URL") || PRESETS[fournisseur].baseUrl;
-  const modele = modeleConfigure();
-
-  const reponse = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: modele,
-      max_tokens: 16000,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
-  if (!reponse.ok) {
-    const corps = await reponse.text();
-    console.error(`[ia] ${fournisseur} en échec :`, reponse.status, corps.slice(0, 500));
-    /* Gemini répond 400 « Please pass a valid API key » quand la clé
-       n'est pas une clé AI Studio. Cas fréquent : une clé « AQ.… »
-       créée depuis Vertex AI (mode express), qui ne vaut que pour
-       l'API Vertex, pas pour generativelanguage.googleapis.com. */
-    if (fournisseur === "gemini" && reponse.status === 400 && /api key/i.test(corps)) {
-      const indice = apiKey.startsWith("AQ.")
-        ? " Cette clé (« AQ.… ») vient de Vertex AI ; elle n'est pas acceptée ici."
-        : "";
-      throw new Error(
-        `La clé Gemini est refusée.${indice} Créez une clé sur https://aistudio.google.com/apikey (elle commence par « AIza ») et placez-la dans LLM_API_KEY.`
-      );
-    }
-    throw erreurHttp(reponse.status, fournisseur);
-  }
-
-  const donnees = (await reponse.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    model?: string;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
-  return {
-    texte: donnees.choices?.[0]?.message?.content ?? "",
-    modele: donnees.model ?? modele,
-    inputTokens: donnees.usage?.prompt_tokens ?? null,
-    outputTokens: donnees.usage?.completion_tokens ?? null,
-  };
-}
-
+/**
+ * Appel texte libre (tuteur). `json: true` demande au serveur une
+ * sortie JSON quand il le permet ; préférer `appelerLlmJson` pour
+ * obtenir l'objet déjà extrait, avec relance.
+ */
 export async function appelerLlm(
   system: string,
-  prompt: string
+  prompt: string,
+  options: { json?: boolean } = {}
 ): Promise<ReponseLlm> {
-  const fournisseur = fournisseurConfigure();
-  if (fournisseur === "anthropic") return appelerAnthropic(system, prompt);
-  return appelerOpenAiCompatible(fournisseur, system, prompt);
+  const config = exigerConfiguration();
+  if (config.fournisseur === "anthropic") return appelerAnthropic(config, system, prompt);
+  return appelerChatCompletions(
+    config,
+    { system, prompt, json: options.json },
+    (url, init) => fetch(url, init),
+    (m) => console.error(m)
+  );
+}
+
+export interface ReponseLlmJson extends ReponseLlm {
+  /** Objet extrait de la réponse, ou null si aucun JSON exploitable. */
+  json: unknown | null;
+  /** Nombre d'appels effectués (2 si une relance a été nécessaire). */
+  tentatives: number;
+}
+
+const RAPPEL_JSON =
+  "\n\nRAPPEL IMPORTANT : ta réponse précédente n'était pas un JSON valide. Réponds UNIQUEMENT avec l'objet JSON demandé, " +
+  "sans aucun texte avant ni après, sans balise de code, sans commentaire.";
+
+/**
+ * Appel attendant un objet JSON : mode JSON du serveur quand il existe,
+ * extraction tolérante, et UNE relance avec consigne renforcée si la
+ * réponse n'est pas exploitable (modèles locaux ou raisonneurs qui
+ * n'honorent pas toujours le format). Les jetons des deux appels sont
+ * additionnés pour la traçabilité.
+ */
+export async function appelerLlmJson(system: string, prompt: string): Promise<ReponseLlmJson> {
+  const premiere = await appelerLlm(system, prompt, { json: true });
+  const json = extraireJson(premiere.texte);
+  if (json !== null) return { ...premiere, json, tentatives: 1 };
+
+  console.error(
+    `[ia] réponse sans JSON exploitable (${premiere.texte.length} caractères) : relance avec consigne renforcée.`
+  );
+  const seconde = await appelerLlm(system, prompt + RAPPEL_JSON, { json: true });
+  const additionner = (a: number | null, b: number | null) =>
+    a === null && b === null ? null : (a ?? 0) + (b ?? 0);
+  return {
+    texte: seconde.texte,
+    modele: seconde.modele,
+    inputTokens: additionner(premiere.inputTokens, seconde.inputTokens),
+    outputTokens: additionner(premiere.outputTokens, seconde.outputTokens),
+    json: extraireJson(seconde.texte),
+    tentatives: 2,
+  };
 }

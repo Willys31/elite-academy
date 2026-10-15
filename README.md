@@ -121,3 +121,4 @@ docs/               Documentation des lots livrés
 - [Lot 11 – Suppression d'éléments](docs/lot-11-suppressions.md)
 - [Lot 12 – Désinscription d'un apprenant](docs/lot-12-desinscription.md)
 - [Lot 22 – Audit contre le dossier fonctionnel : failles, bugs, test de positionnement](docs/lot-22-audit-dossier-fonctionnel.md)
+- [Lot 24 – DeepSeek et tout fournisseur compatible OpenAI derrière l'IA](docs/lot-24-ia-deepseek-compatible-openai.md)

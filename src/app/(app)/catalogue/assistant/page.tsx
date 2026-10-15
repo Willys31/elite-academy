@@ -5,7 +5,7 @@ import { isEliteAdmin } from "@/lib/auth/roles";
 import { organizationsForCourseCreation } from "@/lib/courses/statuts";
 import { createClient } from "@/lib/supabase/server";
 import { genererFormation } from "@/app/(app)/catalogue/assistant/actions";
-import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
+import { descriptionIa, erreurConfigurationIa, iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, Card, Input, Label, PageTitle, Retour, Select, Textarea } from "@/components/ui";
 
@@ -62,15 +62,18 @@ export default async function AssistantPage() {
       {!cleConfiguree ? (
         <div className="mb-6">
           <Alert kind="error">
-            Aucune IA configurée. Trois options dans <code>.env.local</code>{" "}
-            (voir <code>.env.example</code>) : un fournisseur{" "}
-            <strong>gratuit</strong> (<code>LLM_PROVIDER=gemini</code> +{" "}
-            <code>LLM_API_KEY</code>), une clé <code>ANTHROPIC_API_KEY</code>,
+            {erreurConfigurationIa() ?? "Aucune IA configurée."} Options dans{" "}
+            <code>.env.local</code> (voir <code>.env.example</code>) : un
+            fournisseur compatible OpenAI (<code>LLM_PROVIDER=deepseek</code>,{" "}
+            <code>gemini</code> gratuit, <code>ollama</code> en local…) +{" "}
+            <code>LLM_API_KEY</code>, une clé <code>ANTHROPIC_API_KEY</code>,
             ou le mode <code>ELITE_IA_MODE=simulation</code>. Redémarrez
             ensuite l&apos;application.
           </Alert>
         </div>
-      ) : null}
+      ) : (
+        <p className="mb-6 text-xs text-slate-500">IA utilisée : {descriptionIa()}.</p>
+      )}
 
       <Card>
         <AuthForm

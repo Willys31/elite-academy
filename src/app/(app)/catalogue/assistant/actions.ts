@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { canCreateCourse, slugify } from "@/lib/courses/statuts";
-import { appelerLlm, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlmJson, modeleConfigure, modeSimulation } from "@/lib/ai/client";
 import { genererSimulation } from "@/lib/ai/simulation";
 import {
   construirePromptPlan,
@@ -94,17 +94,19 @@ export async function genererFormation(
 
   // 2. Appel du LLM (ou mode simulation : contenu de démonstration
   // clairement étiqueté, sans clé API — pour tester le pipeline).
-  let texte: string;
+  let json: unknown | null;
   let modele: string;
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
   if (modeSimulation()) {
-    texte = genererSimulation(brief);
+    json = extraireJson(genererSimulation(brief));
     modele = "simulation-locale";
   } else {
     try {
-      const reponse = await appelerLlm(SYSTEM_PROMPT, construirePromptPlan(brief));
-      texte = reponse.texte;
+      // Mode JSON du fournisseur quand il existe, extraction tolérante
+      // et une relance si la réponse n'est pas exploitable.
+      const reponse = await appelerLlmJson(SYSTEM_PROMPT, construirePromptPlan(brief));
+      json = reponse.json;
       modele = reponse.modele;
       inputTokens = reponse.inputTokens;
       outputTokens = reponse.outputTokens;
@@ -114,7 +116,7 @@ export async function genererFormation(
   }
 
   // 3. Validation stricte du résultat.
-  const analyse = validerResultat(extraireJson(texte));
+  const analyse = validerResultat(json);
   if (!analyse.ok) {
     return echec(`${analyse.erreur} Relancez la génération.`);
   }

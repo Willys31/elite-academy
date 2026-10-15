@@ -18,13 +18,13 @@ import {
 } from "@/lib/import/decoupage";
 import { ouvrirDecoupeurPdf, ouvrirDecoupeurPptx } from "@/lib/import/extraits";
 import { rattacherExtrait } from "@/lib/import/rattachement";
-import { appelerLlm, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
 import {
   construirePromptStructuration,
   PROMPT_VERSION_IMPORT,
   SYSTEM_IMPORT,
 } from "@/lib/ai/prompts";
-import { extraireJson, validerResultat, type ResultatGeneration } from "@/lib/ai/schema";
+import { validerResultat, type ResultatGeneration } from "@/lib/ai/schema";
 import { verifierEdition } from "@/lib/stockage/edition";
 import {
   extensionDe,
@@ -266,7 +266,8 @@ export async function importerDocument(
     if (!iaConfiguree()) {
       return {
         error:
-          "Aucune IA configurée. Dans .env.local : LLM_PROVIDER=gemini + LLM_API_KEY (gratuit), ou ANTHROPIC_API_KEY, ou ELITE_IA_MODE=simulation — ou choisissez le découpage par titres ci-dessous.",
+          `${erreurConfigurationIa() ?? "Aucune IA configurée."} ` +
+          "Dans .env.local : LLM_PROVIDER=deepseek (ou gemini, ollama…) + LLM_API_KEY, ou ANTHROPIC_API_KEY, ou ELITE_IA_MODE=simulation — ou choisissez le découpage par titres ci-dessous.",
       };
     }
     let texte = texteBrut;
@@ -308,7 +309,7 @@ export async function importerDocument(
     };
 
     try {
-      const reponse = await appelerLlm(
+      const reponse = await appelerLlmJson(
         SYSTEM_IMPORT,
         construirePromptStructuration(
           fichier.name,
@@ -316,7 +317,7 @@ export async function importerDocument(
           kind ? { type: kind === "pages" ? "page" : "diapositive", total } : undefined
         )
       );
-      const analyse = validerResultat(extraireJson(reponse.texte), {
+      const analyse = validerResultat(reponse.json, {
         totalUnites: kind ? total : undefined,
       });
       if (!analyse.ok) {

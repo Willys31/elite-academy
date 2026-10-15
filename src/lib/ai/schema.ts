@@ -70,30 +70,11 @@ export type Analyse =
   | { ok: false; erreur: string };
 
 /**
- * Extrait l'objet JSON d'une réponse LLM, en tolérant les balises
- * de code et le texte parasite avant/après.
+ * Extraction JSON tolérante (balises de code, prose, blocs <think>,
+ * virgules finales) : implémentée dans `json.ts`, ré-exportée ici pour
+ * les appelants historiques.
  */
-export function extraireJson(texte: string): unknown | null {
-  const nettoye = texte
-    .replace(/```json/gi, "```")
-    .replace(/```/g, "")
-    .trim();
-
-  // Essai direct.
-  try {
-    return JSON.parse(nettoye);
-  } catch {
-    // Repli : premier « { » jusqu'au dernier « } ».
-    const debut = nettoye.indexOf("{");
-    const fin = nettoye.lastIndexOf("}");
-    if (debut === -1 || fin <= debut) return null;
-    try {
-      return JSON.parse(nettoye.slice(debut, fin + 1));
-    } catch {
-      return null;
-    }
-  }
-}
+export { extraireJson } from "@/lib/ai/json";
 
 function texteOuVide(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
