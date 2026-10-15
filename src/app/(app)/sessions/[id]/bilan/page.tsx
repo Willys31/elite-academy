@@ -86,7 +86,11 @@ export default async function BilanSessionPage({ params }: { params: Promise<{ i
   const cloturee = session.status === "closed";
   const nbParticipants = (participants ?? []).length;
   const repondants = new Set((tentatives ?? []).map((t) => t.user_id as string));
-  const scores = (tentatives ?? []).map((t) => Number(t.score)).filter((s) => Number.isFinite(s));
+  // Une copie en attente de correction (score null, lot 23) n'est pas un zéro.
+  const scores = (tentatives ?? [])
+    .filter((t) => t.score !== null)
+    .map((t) => Number(t.score))
+    .filter((s) => Number.isFinite(s));
   const tauxReussite = scores.length > 0 ? scores.filter((s) => s >= 80).length / scores.length : null;
   const moyennes = moyennesFeedback(feedbacks ?? []);
   const feedbackMoyen =

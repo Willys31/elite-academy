@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
-import { activeMemberships, isEliteAdmin } from "@/lib/auth/roles";
+import { activeMemberships, isEliteAdmin, ROLES_ENCADREMENT } from "@/lib/auth/roles";
 import { NIVEAU_CALCULE_LABELS } from "@/lib/courses/progression";
 import {
   moyenneGroupe,
@@ -49,7 +49,7 @@ export default async function ResultatsPage({
   const actives = activeMemberships(user.memberships);
   const elite = isEliteAdmin(user.memberships);
   const orgsEncadrees = actives
-    .filter((m) => ["admin", "designer", "trainer", "manager"].includes(m.role))
+    .filter((m) => ROLES_ENCADREMENT.includes(m.role))
     .map((m) => m.organization_id);
 
   if (!elite && orgsEncadrees.length === 0) {
@@ -119,7 +119,7 @@ export default async function ResultatsPage({
   }
 
   const idsActivites = activites.map((a) => a.id);
-  const [{ data: tentatives }, { data: competences }, { data: blocages }] = await Promise.all([
+  const [{ data: tentatives }, { data: competences }, { data: blocages }, { count: nbCopies }] = await Promise.all([
     idsActivites.length > 0
       ? supabase
           .from("attempts")
@@ -138,6 +138,14 @@ export default async function ResultatsPage({
       .eq("course_id", choisie.id)
       .gte("score", SEUIL_ALERTE)
       .order("score", { ascending: false }),
+    /* Copies à corriger (lot 23) : toutes formations encadrées confondues,
+       la RLS (`oversees_activity`) fait le tri ; on exclut ses propres
+       tentatives, qu'elle laisse passer aussi. */
+    supabase
+      .from("attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending_review")
+      .neq("user_id", user.id),
   ]);
 
   /* Noms des apprenants. `profiles_select` autorise la lecture des
@@ -239,6 +247,24 @@ export default async function ResultatsPage({
           </button>
         </form>
       </Panneau>
+
+      {/* ---------- Copies à corriger (lot 23) ---------- */}
+      {(nbCopies ?? 0) > 0 ? (
+        <Panneau ton="or" className="mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="min-w-0">
+              <p className="font-display text-base font-semibold text-ink-900">
+                {nbCopies} copie{(nbCopies ?? 0) > 1 ? "s" : ""} à corriger
+              </p>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Des apprenants ont répondu à des questions ouvertes. Leur score, leur
+                maîtrise et leurs points attendent votre note.
+              </p>
+            </div>
+            <LienSobre href="/resultats/corrections">Corriger</LienSobre>
+          </div>
+        </Panneau>
+      ) : null}
 
       {/* ---------- Alertes de blocage (lot 18) ---------- */}
       {(blocages ?? []).length > 0 ? (

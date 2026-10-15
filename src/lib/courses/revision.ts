@@ -18,13 +18,23 @@
  *    la liste. Rien à réviser n'est un résultat, pas un écran vide.
  */
 
-/** Détail d'une question tel qu'il est stocké dans `attempts.feedback`. */
+/**
+ * Détail d'une question tel qu'il est stocké dans `attempts.feedback`.
+ * Depuis le lot 23, la réponse peut être un texte (réponse courte,
+ * question ouverte) et `correcte` vaut `null` pour une question ouverte
+ * que le formateur n'a pas encore notée.
+ */
 export interface DetailTentative {
   questionId: string;
-  reponseDonnee: number | null;
-  correcte: boolean;
+  type: string;
+  reponseDonnee: number | string | null;
+  correcte: boolean | null;
   bonneReponse: number;
+  /** Réponse attendue d'une réponse courte, montrée après correction. */
+  reponseAttendue: string | null;
   explication: string | null;
+  /** Commentaire du correcteur d'une question ouverte. */
+  commentaire: string | null;
 }
 
 export interface TentativeBrute {
@@ -39,9 +49,25 @@ export interface TentativeBrute {
 export interface QuestionARevoir {
   activityId: string;
   questionId: string;
-  reponseDonnee: number | null;
+  type: string;
+  reponseDonnee: number | string | null;
   bonneReponse: number;
+  reponseAttendue: string | null;
   explication: string | null;
+  commentaire: string | null;
+}
+
+function versQuestionARevoir(activityId: string, d: DetailTentative): QuestionARevoir {
+  return {
+    activityId,
+    questionId: d.questionId,
+    type: d.type,
+    reponseDonnee: d.reponseDonnee,
+    bonneReponse: d.bonneReponse,
+    reponseAttendue: d.reponseAttendue,
+    explication: d.explication,
+    commentaire: d.commentaire,
+  };
 }
 
 /**
@@ -73,7 +99,9 @@ function plusRecente(a: TentativeBrute, b: TentativeBrute): boolean {
 /**
  * Questions ratées à la dernière tentative de chaque activité.
  * Une question laissée sans réponse compte comme ratée : ne pas savoir
- * répondre et répondre faux se révisent de la même façon.
+ * répondre et répondre faux se révisent de la même façon. Une question
+ * ouverte pas encore notée n'est ni ratée ni acquise : elle n'apparaît
+ * dans aucun des deux volets tant que le formateur n'a pas tranché.
  */
 export function questionsARevoir(
   tentatives: TentativeBrute[]
@@ -81,14 +109,8 @@ export function questionsARevoir(
   const aRevoir: QuestionARevoir[] = [];
   for (const t of dernieresTentatives(tentatives).values()) {
     for (const d of t.details) {
-      if (d.correcte) continue;
-      aRevoir.push({
-        activityId: t.activityId,
-        questionId: d.questionId,
-        reponseDonnee: d.reponseDonnee,
-        bonneReponse: d.bonneReponse,
-        explication: d.explication,
-      });
+      if (d.correcte !== false) continue;
+      aRevoir.push(versQuestionARevoir(t.activityId, d));
     }
   }
   return aRevoir;
@@ -109,14 +131,8 @@ export function questionsAcquises(
   const acquises: QuestionARevoir[] = [];
   for (const t of dernieresTentatives(tentatives).values()) {
     for (const d of t.details) {
-      if (!d.correcte) continue;
-      acquises.push({
-        activityId: t.activityId,
-        questionId: d.questionId,
-        reponseDonnee: d.reponseDonnee,
-        bonneReponse: d.bonneReponse,
-        explication: d.explication,
-      });
+      if (d.correcte !== true) continue;
+      acquises.push(versQuestionARevoir(t.activityId, d));
     }
   }
   return acquises;
@@ -173,11 +189,18 @@ export function lireTentative(ligne: {
     if (typeof o.questionId !== "string") continue;
     details.push({
       questionId: o.questionId,
+      type: typeof o.type === "string" ? o.type : "qcm",
       reponseDonnee:
-        typeof o.reponseDonnee === "number" ? o.reponseDonnee : null,
-      correcte: o.correcte === true,
+        typeof o.reponseDonnee === "number" || typeof o.reponseDonnee === "string"
+          ? o.reponseDonnee
+          : null,
+      // `null` (en attente) n'est conservé que s'il est explicite : une
+      // tentative ancienne sans ce champ est une tentative corrigée.
+      correcte: o.correcte === null ? null : o.correcte === true,
       bonneReponse: typeof o.bonneReponse === "number" ? o.bonneReponse : -1,
+      reponseAttendue: typeof o.reponseAttendue === "string" ? o.reponseAttendue : null,
       explication: typeof o.explication === "string" ? o.explication : null,
+      commentaire: typeof o.commentaire === "string" ? o.commentaire : null,
     });
   }
 

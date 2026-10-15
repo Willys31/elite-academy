@@ -11,6 +11,12 @@ import {
   slugify,
   type CourseStatus,
 } from "@/lib/courses/statuts";
+import {
+  lireReponsesAcceptees,
+  lireTypeQuestion,
+  OPTIONS_VRAI_FAUX,
+  TYPE_QUESTION_LABELS,
+} from "@/lib/courses/questions";
 
 export interface ActionState {
   error?: string;
@@ -456,22 +462,47 @@ export async function ajouterQuestion(
 ): Promise<ActionState> {
   const courseId = String(formData.get("course_id") ?? "");
   const activityId = String(formData.get("activity_id") ?? "");
+  const type = lireTypeQuestion(String(formData.get("type") ?? "qcm"));
   const prompt = String(formData.get("prompt") ?? "").trim();
   const explication = String(formData.get("explanation") ?? "").trim();
   const competencyId = String(formData.get("competency_id") ?? "");
   const difficulty = parseInt(String(formData.get("difficulty") ?? "1"), 10);
   const bonne = parseInt(String(formData.get("bonne") ?? "-1"), 10);
 
-  const options = [0, 1, 2, 3]
-    .map((i) => String(formData.get(`opt_${i}`) ?? "").trim())
-    .filter(Boolean);
-
   if (!prompt) return { error: "Veuillez saisir l'énoncé de la question." };
-  if (options.length < 2) {
-    return { error: "Une question doit proposer au moins deux options." };
-  }
-  if (!Number.isInteger(bonne) || bonne < 0 || bonne >= options.length) {
-    return { error: "Indiquez quelle option est la bonne réponse." };
+
+  /* Options et corrigé selon le type (PRD §14, lot 23). Le corrigé est
+     illisible par les rôles applicatifs (migration 0019) : seule sa
+     forme change ici, jamais son exposition. */
+  let options: string[] = [];
+  let expectedAnswer: Record<string, unknown> = {};
+
+  if (type === "qcm") {
+    options = [0, 1, 2, 3]
+      .map((i) => String(formData.get(`opt_${i}`) ?? "").trim())
+      .filter(Boolean);
+    if (options.length < 2) {
+      return { error: "Une question doit proposer au moins deux options." };
+    }
+    if (!Number.isInteger(bonne) || bonne < 0 || bonne >= options.length) {
+      return { error: "Indiquez quelle option est la bonne réponse." };
+    }
+    expectedAnswer = { index: bonne };
+  } else if (type === "true_false") {
+    options = [...OPTIONS_VRAI_FAUX];
+    if (bonne !== 0 && bonne !== 1) {
+      return { error: "Indiquez si l'affirmation est vraie ou fausse." };
+    }
+    expectedAnswer = { index: bonne };
+  } else if (type === "short_answer") {
+    const acceptees = lireReponsesAcceptees(String(formData.get("accepted") ?? ""));
+    if (acceptees.length === 0) {
+      return { error: "Indiquez au moins une réponse acceptée (une par ligne)." };
+    }
+    expectedAnswer = { accepted: acceptees };
+  } else {
+    const grille = String(formData.get("rubric") ?? "").trim();
+    expectedAnswer = grille ? { rubric: grille } : {};
   }
 
   const ctx = await verifierEditionContenu(courseId);
@@ -485,10 +516,10 @@ export async function ajouterQuestion(
 
   const { error } = await supabase.from("questions").insert({
     activity_id: activityId,
-    type: "qcm",
+    type,
     prompt,
     options,
-    expected_answer: { index: bonne },
+    expected_answer: expectedAnswer,
     explanation: explication || null,
     difficulty: Number.isFinite(difficulty) ? Math.min(5, Math.max(1, difficulty)) : 1,
     competency_id: competencyId || null,
@@ -509,7 +540,7 @@ export async function ajouterQuestion(
   }
 
   revalidatePath(`/catalogue/${courseId}/qcm/${activityId}`);
-  return { success: "Question ajoutée." };
+  return { success: `${TYPE_QUESTION_LABELS[type]} ajoutée.` };
 }
 
 export async function supprimerQuestion(

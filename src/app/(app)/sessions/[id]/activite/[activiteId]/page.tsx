@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
+import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, Card, PageTitle } from "@/components/ui";
 
@@ -51,7 +52,7 @@ export default async function ActiviteSessionPage({
   // IMPORTANT : pas de expected_answer ni explanation côté navigateur.
   const { data: questions } = await supabase
     .from("questions")
-    .select("id, prompt, options, position")
+    .select("id, type, prompt, options, position")
     .eq("activity_id", activite.id)
     .order("position");
 
@@ -90,22 +91,13 @@ export default async function ActiviteSessionPage({
       {derniereTentative && feedback ? (
         <Card className="mb-6 border-brand-200">
           <h2 className="font-semibold">
-            Votre réponse : {Number(derniereTentative.score)} % (
-            {feedback.nbCorrectes}/{feedback.nbQuestions})
+            {derniereTentative.score === null
+              ? "Votre réponse : en attente de la note du formateur"
+              : `Votre réponse : ${Number(derniereTentative.score)} % (${feedback.nbCorrectes}/${feedback.nbQuestions})`}
           </h2>
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
-              <li
-                key={d.questionId}
-                className={`rounded-lg px-3 py-2 ${
-                  d.correcte ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"
-                }`}
-              >
-                Question {i + 1} : {d.correcte ? "correcte ✓" : "incorrecte ✗"}
-                {d.explication ? (
-                  <span className="mt-1 block text-slate-600">{d.explication}</span>
-                ) : null}
-              </li>
+              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} />
             ))}
           </ul>
           <p className="mt-3 text-sm text-slate-500">
@@ -139,22 +131,7 @@ export default async function ActiviteSessionPage({
                   <legend className="mb-2 text-sm font-medium text-slate-900">
                     {i + 1}. {q.prompt}
                   </legend>
-                  <div className="space-y-1.5">
-                    {((q.options as string[]) ?? []).map((opt, j) => (
-                      <label
-                        key={j}
-                        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50 has-checked:border-brand-400 has-checked:bg-brand-50"
-                      >
-                        <input
-                          type="radio"
-                          name={`q_${q.id}`}
-                          value={j}
-                          className="mt-0.5 h-5 w-5 shrink-0 accent-brand-600"
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
+                  <ChampReponse question={q} />
                 </fieldset>
               ))}
             </div>

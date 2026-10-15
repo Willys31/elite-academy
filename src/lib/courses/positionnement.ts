@@ -77,13 +77,15 @@ export function verdictPour(pourcent: number): Verdict {
  * celle par laquelle commencer.
  */
 export function bilanPositionnement(
-  details: CorrectionQuestion[],
+  details: Array<Pick<CorrectionQuestion, "questionId" | "correcte">>,
   competenceParQuestion: Record<string, string | null | undefined>
 ): BilanCompetence[] {
   const parCompetence = new Map<string, { nb: number; ok: number }>();
   for (const d of details) {
     const competencyId = competenceParQuestion[d.questionId];
     if (!competencyId) continue;
+    // Une question ouverte pas encore notée (lot 23) n'est pas une preuve.
+    if (d.correcte === null) continue;
     const c = parCompetence.get(competencyId) ?? { nb: 0, ok: 0 };
     c.nb += 1;
     if (d.correcte) c.ok += 1;

@@ -40,6 +40,9 @@ export const TYPE_LABELS = {
   exercices_prets: "Tutorat IA",
   recommandation: "Tutorat IA",
   deblocage: "Tutorat IA",
+  // Types de questions (lot 23)
+  copie_a_corriger: "Correction",
+  copie_notee: "Correction",
   // Divers
   information: "Information",
 } as const;

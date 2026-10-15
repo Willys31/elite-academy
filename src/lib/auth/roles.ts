@@ -56,6 +56,18 @@ export function isEliteAdmin(memberships: Membership[]): boolean {
   );
 }
 
+/** Rôles qui encadrent une formation : lisent les résultats, corrigent les copies. */
+export const ROLES_ENCADREMENT: MemberRole[] = ["admin", "designer", "trainer", "manager"];
+
+/**
+ * L'utilisateur encadre-t-il au moins une organisation (ou est-il
+ * administrateur Elite Experience) ? Confort d'interface : le droit sur
+ * une formation précise reste décidé par la RLS (`oversees_course`).
+ */
+export function encadreUneOrganisation(memberships: Membership[]): boolean {
+  return isEliteAdmin(memberships) || hasAnyRole(memberships, ROLES_ENCADREMENT);
+}
+
 /** L'utilisateur possède-t-il l'un des rôles donnés (toutes organisations) ? */
 export function hasAnyRole(
   memberships: Membership[],

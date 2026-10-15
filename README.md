@@ -62,8 +62,12 @@ Dans l'éditeur SQL de Supabase, exécuter dans l'ordre :
     sans attendre** : corrigés des QCM, tentatives, maîtrise et complétion
     d'inscription ne sont plus accessibles en écriture ou en lecture à
     l'apprenant par appel direct à l'API (lot 22).
-20. Créer votre compte via l'écran d'inscription de l'application
-21. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
+20. `supabase/migrations/0020_types_de_questions.sql` — vrai/faux,
+    réponse courte et question ouverte corrigée par un formateur (statut
+    de tentative `pending_review`, lot 23). Sans elle, une copie
+    comportant une question ouverte ne peut pas être enregistrée.
+21. Créer votre compte via l'écran d'inscription de l'application
+22. `supabase/seed/bootstrap_admin.sql` (après avoir remplacé l'e-mail)
     pour devenir administrateur Elite Experience
 
 ### 4. Lancer
@@ -121,3 +125,4 @@ docs/               Documentation des lots livrés
 - [Lot 11 – Suppression d'éléments](docs/lot-11-suppressions.md)
 - [Lot 12 – Désinscription d'un apprenant](docs/lot-12-desinscription.md)
 - [Lot 22 – Audit contre le dossier fonctionnel : failles, bugs, test de positionnement](docs/lot-22-audit-dossier-fonctionnel.md)
+- [Lot 23 – Types de questions : vrai/faux, réponse courte, question ouverte corrigée par un formateur](docs/lot-23-types-de-questions.md)

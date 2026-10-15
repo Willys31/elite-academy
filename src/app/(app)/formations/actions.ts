@@ -5,35 +5,21 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/profile";
+import { calculerCompletion, corrigerQcm, tentativeEnAttente } from "@/lib/courses/progression";
 import {
-  calculerCompletion,
-  corrigerQcm,
-  meilleursScoresParActivite,
-  niveauDepuisScores,
-  scorePourCompetence,
-  type QuestionQcm,
-} from "@/lib/courses/progression";
+  lireQuestion,
+  lireReponse,
+  type QuestionCorrigeable,
+  type ReponseDonnee,
+} from "@/lib/courses/questions";
 import { donneAcces, peutSeDesinscrire } from "@/lib/courses/inscriptions";
 import { estTestDePositionnement } from "@/lib/courses/positionnement";
-import { calculerXpQcm, serieBonnesReponses, XP_FIXES } from "@/lib/gamification/xp";
-import {
-  attribuerXp,
-  decernerBadge,
-  fixerCompteurs,
-  incrementerCompteurs,
-  mettreAJourSerie,
-  recalculerMaitriseCompteurs,
-  verifierBadges,
-} from "@/lib/gamification/moteur";
+import { mettreAJourMaitrise } from "@/lib/courses/maitrise";
+import { XP_FIXES } from "@/lib/gamification/xp";
+import { attribuerXp, mettreAJourSerie, verifierBadges } from "@/lib/gamification/moteur";
+import { gamifierTentative, tentativesPrecedentes } from "@/lib/gamification/tentative";
+import { notifierEncadrementFormation } from "@/lib/notifications/emettre";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
-
-/** Rang numérique des niveaux de maîtrise, pour détecter une montée. */
-const RANG_MAITRISE: Record<string, number> = {
-  fundamentals: 1,
-  operational: 2,
-  advanced: 3,
-  elite: 4,
-};
 
 function loguer(contexte: string, error: { message?: string } | null) {
   if (error) console.error(`[formations] ${contexte} :`, error.message ?? error);
@@ -320,7 +306,7 @@ export async function marquerLeconTerminee(
 }
 
 // ------------------------------------------------------------
-// Soumission d'un QCM : correction serveur, tentative, progression
+// Soumission d'une activité : correction serveur, tentative, progression
 // ------------------------------------------------------------
 
 export async function soumettreQcm(
@@ -350,7 +336,7 @@ export async function soumettreQcm(
      0019) ; la tentative et la maîtrise s'écrivent de même. */
   const { data: activiteVisible } = await supabase
     .from("activities")
-    .select("id, content, lesson:lessons(module:modules(version:course_versions(course_id)))")
+    .select("id, title, content, lesson:lessons(module:modules(version:course_versions(course_id)))")
     .eq("id", activityId)
     .maybeSingle();
   if (!activiteVisible) {
@@ -370,10 +356,28 @@ export async function soumettreQcm(
   }
   const admin = createAdminClient();
 
+  /* Une copie déjà entre les mains d'un correcteur (lot 23) : on ne
+     relance pas tant qu'elle n'est pas notée, sinon le formateur
+     corrigerait des copies périmées. */
+  const { data: enAttente } = await supabase
+    .from("attempts")
+    .select("id")
+    .eq("activity_id", activityId)
+    .eq("user_id", user.id)
+    .eq("status", "pending_review")
+    .limit(1)
+    .maybeSingle();
+  if (enAttente) {
+    return {
+      error:
+        "Votre précédente réponse attend encore la correction d'un formateur. Vous pourrez retenter une fois la note reçue.",
+    };
+  }
+
   // Les bonnes réponses ne quittent jamais le serveur avant soumission.
   const { data: questionsBrutes, error: erreurQuestions } = await admin
     .from("questions")
-    .select("id, prompt, options, expected_answer, explanation, competency_id")
+    .select("id, type, prompt, options, expected_answer, explanation, competency_id")
     .eq("activity_id", activityId)
     .order("position");
 
@@ -381,42 +385,24 @@ export async function soumettreQcm(
     return { error: "Ce QCM est introuvable ou ne contient aucune question." };
   }
 
-  const questions: QuestionQcm[] = questionsBrutes.map((q) => ({
-    id: q.id,
-    prompt: q.prompt,
-    options: (q.options as string[]) ?? [],
-    bonneReponse: Number((q.expected_answer as { index?: number })?.index ?? -1),
-    explication: q.explanation,
-    competencyId: q.competency_id,
-  }));
+  const questions: QuestionCorrigeable[] = questionsBrutes.map(lireQuestion);
 
-  const reponses: Record<string, number> = {};
+  // Réponses selon le type : index d'option ou texte (lot 23).
+  const reponses: Record<string, ReponseDonnee> = {};
   for (const q of questions) {
-    const valeur = formData.get(`q_${q.id}`);
-    if (valeur !== null) reponses[q.id] = parseInt(String(valeur), 10);
+    const valeur = lireReponse(q.type, formData.get(`q_${q.id}`));
+    if (valeur !== null) reponses[q.id] = valeur;
   }
   if (Object.keys(reponses).length === 0) {
     return { error: "Répondez à au moins une question avant de soumettre." };
   }
 
   const correction = corrigerQcm(questions, reponses);
+  const attenteCorrecteur = tentativeEnAttente(correction);
 
   // Tentatives précédentes : série de bonnes réponses et meilleur score
   // avant celle-ci (pour l'XP et le badge Comeback).
-  const { data: precedentes } = await supabase
-    .from("attempts")
-    .select("score, submitted_at")
-    .eq("activity_id", activityId)
-    .eq("user_id", user.id)
-    .order("submitted_at", { ascending: true })
-    .limit(10);
-  const scoresPrecedents = (precedentes ?? []).map((t) => ({
-    score: t.score === null ? null : Number(t.score),
-  }));
-  const meilleurAvant = scoresPrecedents.reduce<number | null>(
-    (m, t) => (t.score !== null && (m === null || t.score > m) ? t.score : m),
-    null
-  );
+  const { scoresPrecedents, meilleurAvant } = await tentativesPrecedentes(admin, user.id, activityId);
 
   const { data: tentative, error: erreurTentative } = await admin
     .from("attempts")
@@ -427,7 +413,7 @@ export async function soumettreQcm(
       answers: reponses,
       score: correction.scorePourcent,
       feedback: correction as unknown as Record<string, unknown>,
-      status: "graded",
+      status: attenteCorrecteur ? "pending_review" : "graded",
       submitted_at: new Date().toISOString(),
     })
     .select("id")
@@ -442,7 +428,7 @@ export async function soumettreQcm(
     const { error: erreurEvenement } = await supabase.from("live_events").insert({
       session_id: sessionId,
       type: "attempt_submitted",
-      payload: { activity_id: activityId, score: correction.scorePourcent },
+      payload: { activity_id: activityId, score: correction.scorePourcent, en_attente: attenteCorrecteur },
       created_by: user.id,
     });
     loguer("événement de session", erreurEvenement);
@@ -450,116 +436,66 @@ export async function soumettreQcm(
     revalidatePath(`/sessions/${sessionId}/activite/${activityId}`);
   }
 
-  // Mise à jour de la maîtrise pour chaque compétence liée à l'activité.
-  // (uniquement si l'activité est rattachée à une formation connue)
-  const { data: liens } = courseId
-    ? await supabase
-        .from("activity_competencies")
-        .select("competency_id")
-        .eq("activity_id", activityId)
-    : { data: [] };
+  // Maîtrise par compétence : les questions notées comptent dès
+  // maintenant, les questions ouvertes attendront leur note.
+  const competencesMontees = await mettreAJourMaitrise({
+    admin,
+    userId: user.id,
+    courseId,
+    activityId,
+    placement,
+    scoreTentative: correction.scorePourcent,
+  });
 
-  const competencesMontees: string[] = [];
-  for (const lien of liens ?? []) {
-    // Activités de cette formation liées à la même compétence.
-    const { data: activitesLiees } = await supabase
-      .from("activity_competencies")
-      .select("activity_id")
-      .eq("competency_id", lien.competency_id);
-    const ids = (activitesLiees ?? []).map((a) => a.activity_id);
-    if (ids.length === 0) continue;
+  revalidatePath(`/formations/${courseId}/activite/${activityId}`);
+  revalidatePath("/progression");
 
-    /* Score PAR COMPÉTENCE : seules les questions rattachées à la
-       compétence comptent (document global §23 : « ne pas confondre note
-       globale et maîtrise réelle ») ; à défaut, le score global de la
-       tentative. `competency_id` des questions reste lisible par
-       l'apprenant après la migration 0019 ; les corrigés, non. */
-    const [{ data: tentatives }, { data: questionsLiees }] = await Promise.all([
-      supabase
-        .from("attempts")
-        .select("activity_id, score, feedback")
-        .eq("user_id", user.id)
-        .in("activity_id", ids),
-      supabase.from("questions").select("id, competency_id").in("activity_id", ids),
-    ]);
-    const competenceParQuestion: Record<string, string | null> = {};
-    for (const q of questionsLiees ?? []) competenceParQuestion[q.id] = (q.competency_id as string | null) ?? null;
-
-    const scores = meilleursScoresParActivite(
-      (tentatives ?? []).map((t) => ({
-        activityId: t.activity_id,
-        score: scorePourCompetence(
-          { score: t.score === null ? null : Number(t.score), feedback: t.feedback },
-          lien.competency_id,
-          competenceParQuestion
-        ),
-      }))
-    );
-    const niveau = niveauDepuisScores(scores);
-    const moyenne =
-      scores.length > 0
-        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        : null;
-
-    const { data: progres } = await supabase
-      .from("progress_records")
-      .select("id, mastery_level")
-      .eq("user_id", user.id)
-      .eq("course_id", courseId)
-      .eq("competency_id", lien.competency_id)
-      .maybeSingle();
-
-    // Une montée de niveau (jamais le niveau Elite, réservé à la
-    // validation humaine) vaut un badge Progression et 100 XP.
-    const rangAvant = progres?.mastery_level ? (RANG_MAITRISE[progres.mastery_level] ?? 0) : 0;
-    const rangApres = niveau ? (RANG_MAITRISE[niveau] ?? 0) : 0;
-    if (rangApres > rangAvant && rangAvant < 4) competencesMontees.push(lien.competency_id);
-
-    const valeurs = {
-      mastery_level: niveau,
-      score: moyenne,
-      evidence:
-        placement && !progres
-          ? {
-              activites: scores.length,
-              source: "positionnement",
-              initial: { score: correction.scorePourcent, date: new Date().toISOString() },
-            }
-          : { activites: scores.length, source: placement ? "positionnement" : "qcm" },
-      updated_at: new Date().toISOString(),
-    };
-    if (progres) {
-      await admin.from("progress_records").update(valeurs).eq("id", progres.id);
-    } else {
-      await admin.from("progress_records").insert({
-        user_id: user.id,
-        course_id: courseId,
-        competency_id: lien.competency_id,
-        ...valeurs,
-      });
+  // ---------- Copie à corriger (lot 23) ----------
+  // Pas de score, donc ni XP ni badge pour l'instant : tout cela vient
+  // avec la note du correcteur (`noterTentative`).
+  if (attenteCorrecteur) {
+    if (courseId) {
+      const pluriel = correction.nbEnAttente > 1 ? "s" : "";
+      await notifierEncadrementFormation(
+        courseId,
+        {
+          type: "copie_a_corriger",
+          title: `Copie à corriger : ${activiteVisible.title}`,
+          body: `${user.fullName || "Un apprenant"} a répondu à ${correction.nbEnAttente} question${pluriel} ouverte${pluriel}.`,
+          href: `/resultats/corrections/${tentative.id}`,
+        },
+        user.id
+      );
     }
+    revalidatePath("/resultats/corrections");
+    const notees = correction.nbQuestions - correction.nbEnAttente;
+    return {
+      success: `Réponses enregistrées${
+        notees > 0 ? ` : ${correction.nbCorrectes}/${notees} sur les questions corrigées automatiquement` : ""
+      }. ${correction.nbEnAttente > 1 ? `${correction.nbEnAttente} questions ouvertes attendent` : "Votre question ouverte attend"} la note d'un formateur : vous serez prévenu.`,
+    };
   }
+
+  const score = correction.scorePourcent ?? 0;
 
   // ---------- Gamification (lot 14) ----------
   // Un test de positionnement mesure, il ne récompense pas : ni XP, ni
   // badge, ni série — sinon on inciterait à le « réussir » plutôt qu'à
   // répondre sincèrement.
   if (placement) {
-    revalidatePath(`/formations/${courseId}/activite/${activityId}`);
     revalidatePath(`/formations/${courseId}`);
-    revalidatePath("/progression");
     return {
-      success: `Test de positionnement enregistré : ${correction.scorePourcent} % (${correction.nbCorrectes}/${correction.nbQuestions}). Votre point de départ par compétence s'affiche ci-dessous.`,
+      success: `Test de positionnement enregistré : ${score} % (${correction.nbCorrectes}/${correction.nbQuestions}). Votre point de départ par compétence s'affiche ci-dessous.`,
     };
   }
   const xpGagne = await gamifierTentative({
-    supabase,
+    admin,
     userId: user.id,
     courseId,
     activityId,
     sessionId: sessionId || null,
     attemptId: tentative.id as string,
-    scorePourcent: correction.scorePourcent,
+    scorePourcent: score,
     nbQuestions: questions.length,
     dureeSecondes,
     scoresPrecedents,
@@ -567,149 +503,10 @@ export async function soumettreQcm(
     competencesMontees,
   });
 
-  revalidatePath(`/formations/${courseId}/activite/${activityId}`);
-  revalidatePath("/progression");
   revalidatePath("/badges");
   return {
-    success: `Score : ${correction.scorePourcent} % (${correction.nbCorrectes}/${correction.nbQuestions}).${
+    success: `Score : ${score} % (${correction.nbCorrectes}/${correction.nbQuestions}).${
       xpGagne > 0 ? ` +${xpGagne} XP.` : ""
     } Le détail corrigé s'affiche ci-dessous.`,
   };
-}
-
-/**
- * Points, compteurs et badges d'une tentative. Tout est idempotent par
- * référence de tentative ; une panne ici n'annule jamais la correction.
- */
-async function gamifierTentative(params: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
-  courseId: string;
-  activityId: string;
-  sessionId: string | null;
-  attemptId: string;
-  scorePourcent: number;
-  nbQuestions: number;
-  dureeSecondes: number | null;
-  scoresPrecedents: Array<{ score: number | null }>;
-  meilleurAvant: number | null;
-  competencesMontees: string[];
-}): Promise<number> {
-  const { supabase, userId, courseId, activityId } = params;
-
-  // Organisation : celle de l'activité (via la formation), sinon celle
-  // de l'inscription — une session d'atelier peut se passer d'inscription.
-  const [{ data: activite }, { data: inscription }] = await Promise.all([
-    supabase
-      .from("activities")
-      /* Clé étrangère explicite : deux relations existent entre versions et
-         formations ; sans elle PostgREST répond PGRST201 et la difficulté
-         comme l'organisation étaient perdues (XP sous-évalués). */
-      .select("difficulty, lesson:lessons(module:modules(version:course_versions(course:courses!course_versions_course_id_fkey(id, organization_id))))")
-      .eq("id", activityId)
-      .maybeSingle(),
-    courseId
-      ? supabase
-          .from("enrollments")
-          .select("organization_id")
-          .eq("course_id", courseId)
-          .eq("user_id", userId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
-
-  const premier = <T,>(v: T | T[] | null | undefined): T | null =>
-    Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
-  const coursActivite = premier(premier(premier(premier(activite?.lesson)?.module)?.version)?.course) as
-    | { id: string; organization_id: string }
-    | null;
-  const organizationId = coursActivite?.organization_id ?? inscription?.organization_id ?? null;
-  if (!organizationId) return 0;
-  const courseIdEffectif = courseId || coursActivite?.id || null;
-
-  const xp = calculerXpQcm({
-    scorePourcent: params.scorePourcent,
-    difficulte: Number(activite?.difficulty ?? 1),
-    nbQuestions: params.nbQuestions,
-    dureeSecondes: params.dureeSecondes,
-    serieAvant: serieBonnesReponses(params.scoresPrecedents),
-  });
-
-  let total = await attribuerXp({
-    userId,
-    organizationId,
-    type: "qcm",
-    montant: xp.total,
-    referenceId: params.attemptId,
-    courseId: courseIdEffectif,
-    activityId,
-    sessionId: params.sessionId,
-    details: { ...xp, duree_secondes: params.dureeSecondes, score: params.scorePourcent },
-  });
-
-  // En session : participation à l'activité (plafond 10 par session).
-  if (params.sessionId) {
-    const { count } = await supabase
-      .from("xp_events")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("session_id", params.sessionId)
-      .eq("xp_type", "session_activite");
-    if ((count ?? 0) < 10) {
-      total += await attribuerXp({
-        userId,
-        organizationId,
-        type: "session_activite",
-        montant: XP_FIXES.session_activite,
-        referenceId: params.attemptId,
-        courseId: courseIdEffectif,
-        activityId,
-        sessionId: params.sessionId,
-      });
-    }
-  }
-
-  // Compteurs de performance.
-  const increments: Record<string, number> = {};
-  if (xp.rapiditeActivee) increments.reflexe = 1;
-  if (params.scorePourcent === 100) increments.sans_faute = 1;
-  await incrementerCompteurs(userId, increments);
-
-  // Compétences dont la moyenne des meilleurs scores atteint 90 %
-  // (`progress_records.score` est cette moyenne), puis niveaux de maîtrise.
-  const { data: progres } = await supabase
-    .from("progress_records")
-    .select("score")
-    .eq("user_id", userId)
-    .not("competency_id", "is", null);
-  const expertes = (progres ?? []).filter((p) => p.score !== null && Number(p.score) >= 90).length;
-  await fixerCompteurs(userId, { expert_competences: expertes });
-  await recalculerMaitriseCompteurs(userId);
-
-  // Badges événementiels.
-  for (const competencyId of params.competencesMontees) {
-    await decernerBadge(userId, organizationId, "progression", competencyId, {
-      course_id: courseIdEffectif,
-    });
-    total += await attribuerXp({
-      userId,
-      organizationId,
-      type: "niveau_competence",
-      montant: XP_FIXES.niveau_competence,
-      referenceId: competencyId,
-      courseId: courseIdEffectif,
-      details: { attempt_id: params.attemptId },
-    });
-  }
-  if (params.meilleurAvant !== null && params.meilleurAvant < 50 && params.scorePourcent > 80) {
-    await decernerBadge(userId, organizationId, "comeback", activityId, {
-      course_id: courseIdEffectif,
-      de: params.meilleurAvant,
-      a: params.scorePourcent,
-    });
-  }
-
-  await mettreAJourSerie(userId, organizationId);
-  await verifierBadges(userId, organizationId);
-  return total;
 }
