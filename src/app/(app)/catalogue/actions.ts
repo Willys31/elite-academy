@@ -540,7 +540,7 @@ export async function ajouterQuestion(
   }
 
   revalidatePath(`/catalogue/${courseId}/qcm/${activityId}`);
-  return { success: `${TYPE_QUESTION_LABELS[type]} ajoutée.` };
+  return { success: `Question ajoutée (${TYPE_QUESTION_LABELS[type]}).` };
 }
 
 export async function supprimerQuestion(

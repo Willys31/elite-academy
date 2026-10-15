@@ -159,6 +159,13 @@ export default async function ActivitePage({
           </h2>
           {enAttente ? (
             <p className="mt-1 text-sm text-slate-600">
+              {/* Le message de l'action est perdu au rechargement (le
+                  formulaire qui le porte est masqué tant que la copie
+                  attend) : le bilan des questions corrigées
+                  automatiquement est donc redit ici. */}
+              {feedback.nbQuestions - feedback.nbEnAttente > 0
+                ? `Réponses enregistrées : ${feedback.nbCorrectes}/${feedback.nbQuestions - feedback.nbEnAttente} sur les questions corrigées automatiquement. `
+                : "Réponses enregistrées. "}
               Un formateur doit encore noter {feedback.nbEnAttente > 1 ? `${feedback.nbEnAttente} questions ouvertes` : "votre question ouverte"}.
               Vous recevrez une notification dès que la note sera posée.
             </p>
@@ -194,7 +201,7 @@ export default async function ActivitePage({
                 les QCM de la formation feront évoluer votre maîtrise.
               </p>
             </div>
-          ) : (
+          ) : enAttente ? null : (
             <p className="mt-3 text-xs text-slate-500">
               Vous pouvez refaire le QCM : seul votre meilleur score compte pour
               la maîtrise de la compétence.
