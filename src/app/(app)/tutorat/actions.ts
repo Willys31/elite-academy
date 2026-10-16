@@ -480,7 +480,9 @@ export async function repondreExercice(
 
   const dureeSecondes = Number.isFinite(affichageMs) && affichageMs > 0 ? (Date.now() - affichageMs) / 1000 : null;
   const rapide = dureeSecondes !== null && dureeSecondes <= content.questions.length * 20;
-  const gain = xpExercice(exercice.exercise_type as TypeExercice, correction.scorePourcent, rapide);
+  // Les exercices personnalisés sont des QCM : le score est toujours calculé.
+  const scoreExercice = correction.scorePourcent ?? 0;
+  const gain = xpExercice(exercice.exercise_type as TypeExercice, scoreExercice, rapide);
   let credite = 0;
   if (gain > 0) {
     credite = await attribuerXp({
@@ -490,7 +492,7 @@ export async function repondreExercice(
       montant: gain,
       referenceId: exerciseId,
       courseId: exercice.course_id as string,
-      details: { type: exercice.exercise_type, score: correction.scorePourcent },
+      details: { type: exercice.exercise_type, score: scoreExercice },
     });
   }
 
@@ -506,7 +508,7 @@ export async function repondreExercice(
   revalidatePath(`/tutorat/exercice/${exerciseId}`);
   revalidatePath("/tutorat");
   return {
-    success: `Score : ${correction.scorePourcent} % (${correction.nbCorrectes}/${correction.nbQuestions}).${credite > 0 ? ` +${credite} XP.` : correction.scorePourcent < 80 ? " Un exercice compte à partir de 80 %." : ""} La correction s'affiche ci-dessous.`,
+    success: `Score : ${scoreExercice} % (${correction.nbCorrectes}/${correction.nbQuestions}).${credite > 0 ? ` +${credite} XP.` : scoreExercice < 80 ? " Un exercice compte à partir de 80 %." : ""} La correction s'affiche ci-dessous.`,
   };
 }
 

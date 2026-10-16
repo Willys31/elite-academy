@@ -28,11 +28,16 @@ interface ActiviteSituee {
 
 interface QuestionAffichee {
   questionId: string;
+  type: string;
   enonce: string;
   options: string[];
-  reponseDonnee: number | null;
+  reponseDonnee: number | string | null;
   bonneReponse: number;
+  /** Réponse attendue d'une réponse courte. */
+  reponseAttendue: string | null;
   explication: string | null;
+  /** Commentaire du formateur sur une question ouverte. */
+  commentaire: string | null;
 }
 
 interface CompetenceResumee {
@@ -178,11 +183,14 @@ export default async function RevisionPage({
     const liste = groupes.get(detail.activityId) ?? [];
     liste.push({
       questionId: q.questionId,
+      type: q.type,
       enonce: detail.enonce,
       options: detail.options,
       reponseDonnee: q.reponseDonnee,
       bonneReponse: q.bonneReponse,
+      reponseAttendue: q.reponseAttendue,
       explication: q.explication,
+      commentaire: q.commentaire,
     });
     groupes.set(detail.activityId, liste);
   }
@@ -281,23 +289,18 @@ export default async function RevisionPage({
                               <ReponseDonnee question={q} />
                             )}
 
-                            {q.options[q.bonneReponse] !== undefined ? (
-                              <p className="flex gap-2.5 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
-                                <span aria-hidden className="shrink-0 font-semibold">
-                                  ✓
-                                </span>
-                                <span>
-                                  <span className="text-xs font-medium text-emerald-700/70">
-                                    {estAcquis
-                                      ? "Votre réponse, la bonne"
-                                      : "Bonne réponse"}
-                                  </span>
-                                  <br />
-                                  {q.options[q.bonneReponse]}
-                                </span>
-                              </p>
-                            ) : null}
+                            <BonneReponse question={q} estAcquis={estAcquis} />
                           </div>
+
+                          {q.commentaire ? (
+                            <p className="mt-4 rounded-lg bg-brand-50 px-3.5 py-2.5 text-sm leading-relaxed text-brand-900">
+                              <span className="text-xs font-medium text-brand-700/80">
+                                Commentaire du formateur
+                              </span>
+                              <br />
+                              {q.commentaire}
+                            </p>
+                          ) : null}
 
                           {q.explication ? (
                             <p className="mt-4 border-l-2 border-brand-300 pl-4 text-sm leading-relaxed text-slate-600">
@@ -390,7 +393,14 @@ function ChoixVolet({
 /** Ce qui a été répondu, avant ce qu'il fallait répondre. L'ordre compte :
     on se corrige plus vite en voyant d'abord son propre raisonnement. */
 function ReponseDonnee({ question: q }: { question: QuestionAffichee }) {
-  if (q.reponseDonnee !== null && q.options[q.reponseDonnee] !== undefined) {
+  /* Réponse texte (réponse courte ou question ouverte, lot 23). */
+  const texte =
+    typeof q.reponseDonnee === "string"
+      ? q.reponseDonnee
+      : typeof q.reponseDonnee === "number" && q.options[q.reponseDonnee] !== undefined
+        ? q.options[q.reponseDonnee]
+        : null;
+  if (texte !== null) {
     return (
       <p className="flex gap-2.5 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-900">
         <span aria-hidden className="shrink-0 font-semibold">
@@ -399,7 +409,7 @@ function ReponseDonnee({ question: q }: { question: QuestionAffichee }) {
         <span>
           <span className="text-xs font-medium text-red-700/70">Votre réponse</span>
           <br />
-          {q.options[q.reponseDonnee]}
+          <span className="whitespace-pre-line">{texte}</span>
         </span>
       </p>
     );
@@ -407,6 +417,40 @@ function ReponseDonnee({ question: q }: { question: QuestionAffichee }) {
   return (
     <p className="rounded-lg bg-sand-100 px-3.5 py-2.5 text-sm text-slate-500">
       Vous n&apos;aviez pas répondu à cette question.
+    </p>
+  );
+}
+
+/**
+ * Ce qu'il fallait répondre : l'option juste (choix, vrai/faux), la
+ * réponse attendue (réponse courte). Une question ouverte n'a pas de
+ * bonne réponse unique : dans les acquises on relit sa propre réponse,
+ * le commentaire du formateur tient lieu de corrigé.
+ */
+function BonneReponse({ question: q, estAcquis }: { question: QuestionAffichee; estAcquis: boolean }) {
+  let texte: string | null = null;
+  let libelle = estAcquis ? "Votre réponse, la bonne" : "Bonne réponse";
+  if (q.type === "short_answer") {
+    texte = estAcquis && typeof q.reponseDonnee === "string" ? q.reponseDonnee : q.reponseAttendue;
+    if (!estAcquis) libelle = "Réponse attendue";
+  } else if (q.type === "open") {
+    if (!estAcquis || typeof q.reponseDonnee !== "string") return null;
+    texte = q.reponseDonnee;
+    libelle = "Votre réponse, jugée acquise";
+  } else if (q.options[q.bonneReponse] !== undefined) {
+    texte = q.options[q.bonneReponse];
+  }
+  if (texte === null) return null;
+  return (
+    <p className="flex gap-2.5 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
+      <span aria-hidden className="shrink-0 font-semibold">
+        ✓
+      </span>
+      <span>
+        <span className="text-xs font-medium text-emerald-700/70">{libelle}</span>
+        <br />
+        <span className="whitespace-pre-line">{texte}</span>
+      </span>
     </p>
   );
 }

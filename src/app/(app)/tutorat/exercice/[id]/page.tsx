@@ -61,7 +61,7 @@ export default async function ExercicePage({ params }: { params: Promise<{ id: s
                   <p className="mt-1">
                     {d?.correcte ? "Correcte ✓" : "Incorrecte ✗"}
                     {d && d.bonneReponse >= 0 ? ` · bonne réponse : ${q.options[d.bonneReponse]}` : ""}
-                    {d && d.reponseDonnee !== null && !d.correcte ? ` · votre réponse : ${q.options[d.reponseDonnee]}` : ""}
+                    {d && typeof d.reponseDonnee === "number" && !d.correcte ? ` · votre réponse : ${q.options[d.reponseDonnee]}` : ""}
                   </p>
                   {d?.explication ? <p className="mt-1 text-slate-600">{d.explication}</p> : null}
                 </li>

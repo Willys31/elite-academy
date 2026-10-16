@@ -12,6 +12,8 @@ import {
 } from "@/lib/courses/positionnement";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
+import { estEnAttenteDeCorrection, lireTypeQuestion } from "@/lib/courses/questions";
+import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { MAX_AIDES_PAR_JOUR, TYPE_AIDE_LABELS, type TypeAide } from "@/lib/tutorat/blocage";
 import { generationsDuJour } from "@/lib/tutorat/moteur";
@@ -26,6 +28,11 @@ export const metadata: Metadata = { title: "Activité" };
  * Passage d'un QCM (UX/UI §3.5) : consigne, questions, soumission,
  * feedback corrigé. Les bonnes réponses ne sont jamais envoyées au
  * navigateur avant soumission (correction côté serveur).
+ *
+ * Quatre types de questions (lot 23) : choix unique, vrai/faux et
+ * réponse courte sont corrigés à la soumission ; une question ouverte
+ * attend la note d'un formateur, et la tentative reste « en attente »
+ * jusque-là — pas de nouvel essai entre-temps.
  */
 export default async function ActivitePage({
   params,
@@ -70,9 +77,10 @@ export default async function ActivitePage({
   // (et, depuis la migration 0019, ne sont plus lisibles par l'apprenant).
   const { data: questions } = await supabase
     .from("questions")
-    .select("id, prompt, options, position, competency_id")
+    .select("id, type, prompt, options, position, competency_id")
     .eq("activity_id", activite.id)
     .order("position");
+  const nbOuvertes = (questions ?? []).filter((q) => lireTypeQuestion(q.type) === "open").length;
 
   // Bilan du test de positionnement : compétence de chaque question, et
   // nom des compétences concernées.
@@ -88,13 +96,14 @@ export default async function ActivitePage({
   // Dernière tentative de l'apprenant (feedback corrigé).
   const { data: derniereTentative } = await supabase
     .from("attempts")
-    .select("id, score, feedback, submitted_at")
+    .select("id, score, status, feedback, submitted_at, graded_at")
     .eq("activity_id", activite.id)
     .eq("user_id", user.id)
     .order("submitted_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   const feedback = (derniereTentative?.feedback ?? null) as ResultatCorrection | null;
+  const enAttente = estEnAttenteDeCorrection(derniereTentative?.status);
 
   const competences = (activite.activity_competencies ?? [])
     .map((ac) => {
@@ -144,22 +153,31 @@ export default async function ActivitePage({
       {derniereTentative && feedback ? (
         <Card className="mb-6 border-brand-200">
           <h2 className="font-semibold">
-            Dernière tentative : {Number(derniereTentative.score)} % (
-            {feedback.nbCorrectes}/{feedback.nbQuestions})
+            {enAttente || derniereTentative.score === null
+              ? "Dernière tentative : en attente de correction"
+              : `Dernière tentative : ${Number(derniereTentative.score)} % (${feedback.nbCorrectes}/${feedback.nbQuestions})`}
           </h2>
+          {enAttente ? (
+            <p className="mt-1 text-sm text-slate-600">
+              {/* Le message de l'action est perdu au rechargement (le
+                  formulaire qui le porte est masqué tant que la copie
+                  attend) : le bilan des questions corrigées
+                  automatiquement est donc redit ici. */}
+              {feedback.nbQuestions - feedback.nbEnAttente > 0
+                ? `Réponses enregistrées : ${feedback.nbCorrectes}/${feedback.nbQuestions - feedback.nbEnAttente} sur les questions corrigées automatiquement. `
+                : "Réponses enregistrées. "}
+              Un formateur doit encore noter {feedback.nbEnAttente > 1 ? `${feedback.nbEnAttente} questions ouvertes` : "votre question ouverte"}.
+              Vous recevrez une notification dès que la note sera posée.
+            </p>
+          ) : derniereTentative.graded_at ? (
+            <p className="mt-1 text-sm text-slate-600">
+              Notée par un formateur le{" "}
+              {new Date(derniereTentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
+            </p>
+          ) : null}
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
-              <li
-                key={d.questionId}
-                className={`rounded-lg px-3 py-2 ${
-                  d.correcte ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"
-                }`}
-              >
-                Question {i + 1} : {d.correcte ? "correcte ✓" : "incorrecte ✗"}
-                {d.explication ? (
-                  <span className="mt-1 block text-slate-600">{d.explication}</span>
-                ) : null}
-              </li>
+              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} />
             ))}
           </ul>
           {placement ? (
@@ -183,7 +201,7 @@ export default async function ActivitePage({
                 les QCM de la formation feront évoluer votre maîtrise.
               </p>
             </div>
-          ) : (
+          ) : enAttente ? null : (
             <p className="mt-3 text-xs text-slate-500">
               Vous pouvez refaire le QCM : seul votre meilleur score compte pour
               la maîtrise de la compétence.
@@ -191,7 +209,7 @@ export default async function ActivitePage({
           )}
           {/* Entraide (lot 15) : après une tentative, l'apprenant peut
               partager son blocage, anonymement, avec ses pairs. */}
-          {Number(derniereTentative.score) < 80 ? (
+          {derniereTentative.score !== null && Number(derniereTentative.score) < 80 ? (
             <p className="mt-3 text-sm">
               <Link
                 href={`/entraide/nouveau?formation=${formation.id}&activite=${activite.id}`}
@@ -206,39 +224,38 @@ export default async function ActivitePage({
 
       {!questions || questions.length === 0 ? (
         <Alert kind="info">Ce QCM ne contient pas encore de question.</Alert>
+      ) : enAttente ? (
+        <Alert kind="info">
+          Votre copie est entre les mains d&apos;un formateur. Vous pourrez
+          retenter cette activité une fois la note reçue.
+        </Alert>
       ) : (
         <Card>
           <AuthForm
             action={soumettreQcm}
-            submitLabel="Soumettre mes réponses"
-            pendingLabel="Correction en cours…"
+            submitLabel={nbOuvertes > 0 ? "Envoyer mes réponses" : "Soumettre mes réponses"}
+            pendingLabel={nbOuvertes > 0 ? "Envoi en cours…" : "Correction en cours…"}
           >
             <input type="hidden" name="course_id" value={formation.id} />
             <input type="hidden" name="activity_id" value={activite.id} />
             {/* Horodatage de l'affichage, pour le bonus de rapidité (lot 14). */}
             <input type="hidden" name="started_at" value={Date.now()} />
+            {nbOuvertes > 0 ? (
+              <p className="text-xs leading-relaxed text-slate-500">
+                {nbOuvertes > 1 ? `${nbOuvertes} questions ouvertes seront notées` : "Une question ouverte sera notée"} par un formateur ;
+                les autres sont corrigées immédiatement.
+              </p>
+            ) : null}
             <div className="space-y-6">
               {questions.map((q, i) => (
                 <fieldset key={q.id}>
                   <legend className="mb-2 text-sm font-medium text-slate-900">
                     {i + 1}. {q.prompt}
+                    {lireTypeQuestion(q.type) === "open" ? (
+                      <span className="ml-2 text-xs font-normal text-slate-500">(réponse rédigée, notée par un formateur)</span>
+                    ) : null}
                   </legend>
-                  <div className="space-y-1.5">
-                    {((q.options as string[]) ?? []).map((opt, j) => (
-                      <label
-                        key={j}
-                        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm hover:bg-slate-50 has-checked:border-brand-400 has-checked:bg-brand-50"
-                      >
-                        <input
-                          type="radio"
-                          name={`q_${q.id}`}
-                          value={j}
-                          className="mt-0.5 h-5 w-5 shrink-0 accent-brand-600"
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
+                  <ChampReponse question={q} />
                 </fieldset>
               ))}
             </div>

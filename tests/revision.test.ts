@@ -13,7 +13,7 @@ import {
 function tentative(
   activityId: string,
   horodatage: string | null,
-  details: Array<[string, boolean]>
+  details: Array<[string, boolean | null]>
 ): TentativeBrute {
   return {
     activityId,
@@ -21,10 +21,13 @@ function tentative(
     horodatage,
     details: details.map(([questionId, correcte]) => ({
       questionId,
+      type: "qcm",
       reponseDonnee: correcte ? 1 : 0,
       correcte,
       bonneReponse: 1,
+      reponseAttendue: null,
       explication: null,
+      commentaire: null,
     })),
   };
 }
@@ -92,10 +95,13 @@ describe("questionsARevoir", () => {
         details: [
           {
             questionId: "q1",
+            type: "qcm",
             reponseDonnee: null,
             correcte: false,
             bonneReponse: 2,
+            reponseAttendue: null,
             explication: null,
+            commentaire: null,
           },
         ],
       },
@@ -221,5 +227,34 @@ describe("competenceAcquise", () => {
     expect(competenceAcquise(null)).toBe(false);
     expect(competenceAcquise(undefined)).toBe(false);
     expect(competenceAcquise("fundamentals")).toBe(false);
+  });
+});
+
+describe("questions ouvertes en attente (lot 23)", () => {
+  it("n'apparaissent ni à retravailler ni dans les acquises tant qu'elles ne sont pas notées", () => {
+    const t = [tentative("a", "2026-01-01T10:00:00Z", [["q1", true], ["q2", null], ["q3", false]])];
+    expect(questionsARevoir(t).map((q) => q.questionId)).toEqual(["q3"]);
+    expect(questionsAcquises(t).map((q) => q.questionId)).toEqual(["q1"]);
+  });
+
+  it("lireTentative conserve la réponse texte, l'attente explicite et le commentaire", () => {
+    const t = lireTentative({
+      activity_id: "a",
+      score: null,
+      submitted_at: "2026-01-01T10:00:00Z",
+      feedback: {
+        details: [
+          { questionId: "rc", type: "short_answer", reponseDonnee: "paris", correcte: false, reponseAttendue: "Paris" },
+          { questionId: "qo", type: "open", reponseDonnee: "Texte", correcte: null },
+          { questionId: "qn", type: "open", reponseDonnee: "Texte", correcte: true, commentaire: "Bien." },
+          { questionId: "ancienne", reponseDonnee: 1 },
+        ],
+      },
+    });
+    expect(t.details[0]).toMatchObject({ type: "short_answer", reponseDonnee: "paris", correcte: false, reponseAttendue: "Paris" });
+    expect(t.details[1].correcte).toBeNull();
+    expect(t.details[2]).toMatchObject({ correcte: true, commentaire: "Bien." });
+    // Une ligne ancienne sans `correcte` est corrigée (fausse), pas en attente.
+    expect(t.details[3]).toMatchObject({ type: "qcm", correcte: false, bonneReponse: -1 });
   });
 });
