@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/profile";
-import { appelerLlm, appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlm, appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation, traceIa } from "@/lib/ai/client";
 import {
   construirePromptAide,
   construirePromptExercices,
@@ -102,8 +102,8 @@ export async function demanderAide(
   const type = String(formData.get("help_type") ?? "");
   if (!activityId || !questionId) return { error: "Choisissez la question qui vous bloque." };
   if (!typeAideValide(type)) return { error: "Type d'aide inconnu." };
-  if (!iaConfiguree() && !modeSimulation()) {
-    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa() ?? ""}`.trim() };
+  if (!iaConfiguree("tuteur") && !modeSimulation()) {
+    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa("tuteur") ?? ""}`.trim() };
   }
 
   const dejaAujourdhui = await generationsDuJour(user.id, ["tutor_help"]);
@@ -179,9 +179,9 @@ export async function demanderAide(
       requested_by: user.id,
       generation_type: "tutor_help",
       brief: { help_type: type, question_id: q.id },
-      context: { activity_id: activityId, course_id: ctx.course.id, competency_id: competencyId },
+      context: { activity_id: activityId, course_id: ctx.course.id, competency_id: competencyId, ia: traceIa("tuteur") },
       prompt_version: PROMPT_VERSION_TUTEUR,
-      model_name: modeleConfigure(),
+      model_name: modeleConfigure("tuteur"),
       status: "running",
     })
     .select("id")
@@ -201,7 +201,8 @@ export async function demanderAide(
           extraitLecon: ctx.extraitLecon || null,
           competence: competenceNom,
           tentative,
-        })
+        }),
+        { tache: "tuteur" }
       );
       texte = reponse.texte.trim();
       if (generation) {
@@ -275,8 +276,8 @@ export async function genererExercices(
   const competencyId = String(formData.get("competency_id") ?? "");
   const nb = Math.min(5, Math.max(1, parseInt(String(formData.get("nb") ?? "2"), 10) || 2));
   if (!courseId || !competencyId) return { error: "Choisissez une compétence." };
-  if (!iaConfiguree() && !modeSimulation()) {
-    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa() ?? ""}`.trim() };
+  if (!iaConfiguree("exercices") && !modeSimulation()) {
+    return { error: `Le tuteur IA n'est pas configuré sur cette installation. ${erreurConfigurationIa("exercices") ?? ""}`.trim() };
   }
 
   const dejaAujourdhui = await generationsDuJour(user.id, ["tutor_exercises"]);
@@ -326,9 +327,9 @@ export async function genererExercices(
       requested_by: user.id,
       generation_type: "tutor_exercises",
       brief: { competency_id: competencyId, nb, type: typeExercice },
-      context: { course_id: courseId, bande },
+      context: { course_id: courseId, bande, ia: traceIa("exercices") },
       prompt_version: PROMPT_VERSION_EXERCICES,
-      model_name: modeleConfigure(),
+      model_name: modeleConfigure("exercices"),
       status: "running",
     })
     .select("id")
@@ -362,7 +363,8 @@ export async function genererExercices(
               secteur: (course.sector as string) ?? null,
               nb,
               extraitsLecons: extraits,
-            })
+            }),
+            { tache: "exercices" }
           )
         ).json;
   } catch (erreur) {

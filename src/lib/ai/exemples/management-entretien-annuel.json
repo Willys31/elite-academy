@@ -1,0 +1,92 @@
+{
+  "id": "management-entretien-annuel",
+  "domaine": "management",
+  "titre": "Conduire un entretien annuel d'évaluation",
+  "source": "Rédigé le 16 octobre 2026 pour le lot 25 à partir de la méthode de structuration Elite Experience ; aucun module validé n'était disponible dans la base à cette date.",
+  "statut": "a_valider_par_yakin",
+  "confidentialite": "publiable",
+  "commercial": false,
+  "extrait": {
+    "competencies": [
+      {
+        "name": "Préparer un entretien annuel à partir des faits de l'année",
+        "domain": "management",
+        "description": "Rassemble des faits datés et observables (résultats, situations, feedbacks reçus), les relie aux objectifs fixés et prépare un déroulé en cinq étapes. Preuve : fiche de préparation complète avant l'entretien.",
+        "target_level": "operational"
+      },
+      {
+        "name": "Formuler un objectif annuel mesurable avec le collaborateur",
+        "domain": "management",
+        "description": "Rédige un objectif daté, chiffré ou observable, négocié avec le collaborateur, assorti des moyens nécessaires. Preuve : objectif conforme aux critères lors d'une simulation.",
+        "target_level": "operational"
+      }
+    ],
+    "modules": [
+      {
+        "title": "Préparer l'entretien",
+        "description": "Passer d'une impression générale à des faits datés, et construire le déroulé.",
+        "level": "fundamentals",
+        "lessons": [
+          {
+            "title": "Des impressions aux faits",
+            "text": "Un entretien annuel se juge sur la qualité de sa préparation. Le manager part des objectifs fixés l'année précédente et liste, pour chacun, deux ou trois situations datées : ce qui a été fait, dans quel contexte, avec quel résultat.\n\nExemple professionnel : Awa, responsable d'une agence de six personnes, prépare l'entretien de Koffi. Plutôt que « Koffi est peu rigoureux », elle note : « Le 12 mars, le dossier X a été transmis sans la pièce Y, ce qui a retardé la réponse au client de quatre jours ; le 3 juin, le même type de dossier était complet et transmis à l'heure. » Les deux faits serviront : l'un pour nommer un écart, l'autre pour reconnaître un progrès.\n\nPoints à retenir : un fait est daté, observable et vérifiable ; une impression ne l'est pas. Préparer, c'est aussi anticiper les réactions et prévoir le temps nécessaire (une heure au minimum, sans interruption).",
+            "estimated_minutes": 35,
+            "competency_refs": [
+              "Préparer un entretien annuel à partir des faits de l'année"
+            ],
+            "situation_type": "apport",
+            "activities": [
+              {
+                "type": "exercise",
+                "title": "Transformer trois impressions en faits",
+                "instructions": "Voici trois phrases entendues en préparation d'entretien : « Il n'est pas impliqué », « Elle est excellente avec les clients », « Il arrive souvent en retard ». Pour chacune, écrivez un fait daté et observable qui pourrait l'étayer, ou indiquez quelle information il vous manque pour le faire.",
+                "expected_outcome": "Trois formulations factuelles (date, situation, résultat) ou l'identification précise de l'information manquante.",
+                "evaluation": "Critères : présence d'une date ou d'une période, d'un comportement observable et d'un effet ; absence de jugement de personne.",
+                "difficulty": 2,
+                "competency_refs": [
+                  "Préparer un entretien annuel à partir des faits de l'année"
+                ],
+                "situation_type": "exercice_guide"
+              },
+              {
+                "type": "quiz",
+                "title": "Fait ou impression ? Objectif mesurable ou non ?",
+                "instructions": "Pour chaque énoncé, indiquez s'il s'agit d'un fait exploitable en entretien, ou si l'objectif proposé est mesurable.",
+                "expected_outcome": "Distinguer un fait daté d'un jugement général, et un objectif mesurable d'un vœu.",
+                "evaluation": "Correction automatique, une explication par question.",
+                "difficulty": 1,
+                "competency_refs": [
+                  "Préparer un entretien annuel à partir des faits de l'année",
+                  "Formuler un objectif annuel mesurable avec le collaborateur"
+                ],
+                "situation_type": "evaluation",
+                "questions": [
+                  {
+                    "prompt": "« Le 4 avril, le rapport mensuel a été remis avec deux jours d'avance et sans erreur de calcul. » Cet énoncé est :",
+                    "options": [
+                      "Un fait exploitable",
+                      "Une impression",
+                      "Un objectif"
+                    ],
+                    "correct_index": 0,
+                    "explanation": "Il est daté, décrit un comportement observable et son résultat : il peut être discuté et vérifié."
+                  },
+                  {
+                    "prompt": "Lequel de ces objectifs annuels est mesurable ?",
+                    "options": [
+                      "Être plus rigoureux dans le suivi des dossiers",
+                      "Transmettre 100 % des dossiers du type X complets, vérifiés avec la liste de contrôle, d'ici le 30 juin",
+                      "Faire des efforts sur la qualité"
+                    ],
+                    "correct_index": 1,
+                    "explanation": "Il est daté (30 juin), chiffré (100 %), observable (dossiers complets) et précise le moyen (liste de contrôle)."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

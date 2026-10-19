@@ -127,3 +127,4 @@ docs/               Documentation des lots livrés
 - [Lot 22 – Audit contre le dossier fonctionnel : failles, bugs, test de positionnement](docs/lot-22-audit-dossier-fonctionnel.md)
 - [Lot 23 – Types de questions : vrai/faux, réponse courte, question ouverte corrigée par un formateur](docs/lot-23-types-de-questions.md)
 - [Lot 24 – DeepSeek et tout fournisseur compatible OpenAI derrière l'IA](docs/lot-24-ia-deepseek-compatible-openai.md)
+- [Lot 25 – DeepSeek, moteur IA : modèles V4, un modèle par tâche, prompt v2, contrôles pédagogiques, banc d'essai](docs/lot-25-moteur-ia-deepseek.md)

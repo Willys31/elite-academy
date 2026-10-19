@@ -1,0 +1,63 @@
+{
+  "id": "vente-accueil-boutique",
+  "domaine": "vente",
+  "titre": "Accueil et découverte du client en boutique",
+  "source": "Rédigé le 16 octobre 2026 pour le lot 25 à partir de la méthode de structuration Elite Experience ; aucun module validé n'était disponible dans la base à cette date. Ne reprend aucun contenu des supports importés (Vente II, Savoir-être, Orchestra).",
+  "statut": "a_valider_par_yakin",
+  "confidentialite": "publiable",
+  "commercial": true,
+  "extrait": {
+    "competencies": [
+      {
+        "name": "Accueillir un client en boutique dans les trente premières secondes",
+        "domain": "vente",
+        "description": "Établit le contact (regard, salutation, disponibilité) dès l'entrée, adapte la prise de contact au comportement du client et évite la question fermée « je peux vous aider ? ». Preuve : observation en jeu de rôle selon une grille de cinq comportements.",
+        "target_level": "fundamentals"
+      },
+      {
+        "name": "Découvrir le besoin par des questions ouvertes et une reformulation",
+        "domain": "vente",
+        "description": "Pose au moins trois questions ouvertes (usage, contexte, contraintes), écoute sans interrompre, reformule le besoin avant toute proposition. Preuve : reformulation validée par le client lors d'une simulation.",
+        "target_level": "operational"
+      }
+    ],
+    "modules": [
+      {
+        "title": "Les trente premières secondes",
+        "description": "Créer un contact qui donne envie de rester, quel que soit le client.",
+        "level": "fundamentals",
+        "lessons": [
+          {
+            "title": "Accueillir sans forcer",
+            "text": "Un client qui entre décide en quelques secondes s'il se sent bienvenu. L'accueil tient en trois gestes : un regard et un sourire dès l'entrée, une salutation claire, puis un signal de disponibilité sans pression (« Je suis là si besoin, prenez le temps de regarder »).\n\nExemple professionnel : dans une boutique de téléphonie du Plateau, Yann voit entrer une cliente qui regarde les vitrines sans s'arrêter. Il salue, la laisse découvrir, puis, quand elle s'attarde sur un modèle, s'approche avec une question ouverte : « Vous cherchez plutôt un téléphone pour le travail ou pour la famille ? » La conversation s'engage sans la question fermée qui ferme tout.\n\nPoints à retenir : saluer tout le monde, même en pleine activité ; adapter la distance au client ; une question ouverte invite, une question fermée interrompt.",
+            "estimated_minutes": 30,
+            "competency_refs": [
+              "Accueillir un client en boutique dans les trente premières secondes"
+            ],
+            "situation_type": "apport",
+            "activities": [
+              {
+                "type": "simulation",
+                "title": "Trois clients, trois accueils",
+                "instructions": "Rôle : vendeur en boutique. Trois clients entrent successivement (joués par le formateur ou décrits en vidéo) : pressé, hésitant, accompagné d'un enfant. Objectif : établir le contact adapté à chacun en moins de trente secondes. Événements possibles : un téléphone sonne, un second client entre.",
+                "expected_outcome": "Pour chaque client : salutation, signal de disponibilité et première question ouverte adaptée au comportement observé.",
+                "evaluation": "Grille d'observation : regard et salutation (1), disponibilité sans pression (1), adaptation au profil (2), gestion de l'imprévu (1). Réussite à partir de 4 sur 5.",
+                "difficulty": 2,
+                "competency_refs": [
+                  "Accueillir un client en boutique dans les trente premières secondes",
+                  "Découvrir le besoin par des questions ouvertes et une reformulation"
+                ],
+                "situation_type": "simulation",
+                "media_brief": {
+                  "kind": "video",
+                  "purpose": "Présenter les trois clients types pour la simulation",
+                  "description": "Trois séquences de trente secondes filmées à hauteur de vendeur, à l'entrée d'une boutique : un client pressé qui regarde sa montre, une cliente hésitante qui tourne dans le magasin, un parent avec un enfant qui touche les produits. Sans dialogue."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

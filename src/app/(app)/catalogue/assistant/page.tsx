@@ -33,7 +33,7 @@ export default async function AssistantPage() {
   if (organisations.length === 0) redirect("/sans-acces");
 
   const simulation = modeSimulation();
-  const cleConfiguree = simulation || iaConfiguree();
+  const cleConfiguree = simulation || iaConfiguree("conception");
 
   return (
     <div className="max-w-2xl">
@@ -62,7 +62,7 @@ export default async function AssistantPage() {
       {!cleConfiguree ? (
         <div className="mb-6">
           <Alert kind="error">
-            {erreurConfigurationIa() ?? "Aucune IA configurée."} Options dans{" "}
+            {erreurConfigurationIa("conception") ?? "Aucune IA configurée."} Options dans{" "}
             <code>.env.local</code> (voir <code>.env.example</code>) : un
             fournisseur compatible OpenAI (<code>LLM_PROVIDER=deepseek</code>,{" "}
             <code>gemini</code> gratuit, <code>ollama</code> en local…) +{" "}
@@ -72,7 +72,7 @@ export default async function AssistantPage() {
           </Alert>
         </div>
       ) : (
-        <p className="mb-6 text-xs text-slate-500">IA utilisée : {descriptionIa()}.</p>
+        <p className="mb-6 text-xs text-slate-500">IA utilisée : {descriptionIa("conception")}.</p>
       )}
 
       <Card>

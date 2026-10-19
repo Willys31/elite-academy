@@ -5,10 +5,19 @@
  * Principe (workflows IA §28) : champs stables, et en cas de
  * structure invalide on rejette avec un message clair plutôt que
  * d'enregistrer un contenu incohérent.
+ *
+ * Lot 25 : le schéma accepte les champs du prompt v2 (compétences par
+ * leçon et par activité, type de situation, description de média,
+ * activités avec consigne et évaluation, niveau de module). Ils sont
+ * facultatifs ici — un résultat v1 reste valide — et c'est le contrôle
+ * pédagogique (`controle-pedagogique.ts`) qui exige leur présence en v2.
  */
+
+export { extraireJson } from "@/lib/ai/json";
 
 const NIVEAUX = ["fundamentals", "operational", "advanced", "elite"] as const;
 export type NiveauCible = (typeof NIVEAUX)[number];
+export const NIVEAUX_CIBLES: readonly NiveauCible[] = NIVEAUX;
 
 export interface QuestionGeneree {
   prompt: string;
@@ -28,18 +37,47 @@ export interface IntervalleGenere {
   to: number;
 }
 
+/** Description d'un média attendu (lot 25) : description seulement, aucune génération. */
+export interface MediaBriefGenere {
+  /** Conservé tel quel (en minuscules) : le contrôle pédagogique vérifie la valeur. */
+  kind: string;
+  purpose: string;
+  description: string;
+}
+
+/** Activité générée par le prompt v2 (quiz, exercice, étude de cas, simulation, question ouverte). */
+export interface ActiviteGeneree {
+  type: string;
+  title: string;
+  instructions: string;
+  expected_outcome: string;
+  evaluation: string;
+  difficulty: number;
+  competency_refs: string[];
+  situation_type: string | null;
+  media_brief: MediaBriefGenere | null;
+  questions: QuestionGeneree[];
+}
+
 export interface LeconGeneree {
   title: string;
   text: string;
   estimated_minutes: number | null;
   quiz: QuizGenere | null;
   source_range: IntervalleGenere | null;
+  /* Champs v2 (vides ou null pour un résultat v1). */
+  competency_refs: string[];
+  situation_type: string | null;
+  media_brief: MediaBriefGenere | null;
+  activities: ActiviteGeneree[];
 }
 
 export interface ModuleGenere {
   title: string;
   description: string;
   lessons: LeconGeneree[];
+  /** Niveau visé du module (v2) ; null si absent ou invalide. */
+  level: NiveauCible | null;
 }
 
 export interface CompetenceGeneree {
@@ -69,13 +107,6 @@ export type Analyse =
   | { ok: true; resultat: ResultatGeneration }
   | { ok: false; erreur: string };
 
-/**
- * Extraction JSON tolérante (balises de code, prose, blocs <think>,
- * virgules finales) : implémentée dans `json.ts`, ré-exportée ici pour
- * les appelants historiques.
- */
-export { extraireJson } from "@/lib/ai/json";
-
 function texteOuVide(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -89,15 +120,29 @@ function tableau(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
 }
 
-/**
- * Valide un quiz extrait d'un document : questions avec au moins
- * deux options et une bonne réponse valide. Retourne null si rien
- * d'exploitable (le quiz est alors simplement ignoré).
- */
-function validerQuiz(brut: unknown): QuizGenere | null {
-  if (brut === null || typeof brut !== "object") return null;
-  const q = brut as Record<string, unknown>;
-  const questions: QuestionGeneree[] = tableau(q.questions)
+function niveauOuNull(v: unknown): NiveauCible | null {
+  const n = texteOuVide(v).toLowerCase();
+  return (NIVEAUX as readonly string[]).includes(n) ? (n as NiveauCible) : null;
+}
+
+/** Noms de compétences référencés : chaînes non vides, dédoublonnées. */
+function listeNoms(v: unknown): string[] {
+  const vus = new Set<string>();
+  const noms: string[] = [];
+  for (const x of tableau(v)) {
+    const t = texteOuVide(x);
+    const cle = t.toLowerCase();
+    if (t && !vus.has(cle)) {
+      vus.add(cle);
+      noms.push(t);
+    }
+  }
+  return noms.slice(0, 10);
+}
+
+/** Questions valides : énoncé, au moins deux options, bonne réponse dans les bornes. */
+function validerQuestions(brut: unknown): QuestionGeneree[] {
+  return tableau(brut)
     .map((item) => {
       const qq = (item ?? {}) as Record<string, unknown>;
       const options = tableau(qq.options).map(texteOuVide).filter(Boolean).slice(0, 6);
@@ -112,11 +157,54 @@ function validerQuiz(brut: unknown): QuizGenere | null {
     })
     .filter((x) => x.prompt && x.options.length >= 2 && x.correct_index >= 0)
     .slice(0, 20);
+}
 
+/**
+ * Valide un quiz extrait d'un document : questions avec au moins
+ * deux options et une bonne réponse valide. Retourne null si rien
+ * d'exploitable (le quiz est alors simplement ignoré).
+ */
+function validerQuiz(brut: unknown): QuizGenere | null {
+  if (brut === null || typeof brut !== "object") return null;
+  const q = brut as Record<string, unknown>;
+  const questions = validerQuestions(q.questions);
   if (questions.length === 0) return null;
   return {
     title: texteOuVide(q.title) || "Quiz de la leçon",
     questions,
+  };
+}
+
+/** Média décrit : conservé dès qu'un objet avec au moins un champ texte existe. */
+function validerMediaBrief(brut: unknown): MediaBriefGenere | null {
+  if (brut === null || typeof brut !== "object" || Array.isArray(brut)) return null;
+  const m = brut as Record<string, unknown>;
+  const kind = texteOuVide(m.kind).toLowerCase();
+  const purpose = texteOuVide(m.purpose);
+  const description = texteOuVide(m.description);
+  if (!kind && !purpose && !description) return null;
+  return { kind, purpose, description };
+}
+
+/** Activité v2 : il faut au moins un titre ou une consigne. */
+function validerActivite(brut: unknown): ActiviteGeneree | null {
+  if (brut === null || typeof brut !== "object") return null;
+  const a = brut as Record<string, unknown>;
+  const title = texteOuVide(a.title);
+  const instructions = texteOuVide(a.instructions);
+  if (!title && !instructions) return null;
+  const difficulte = Number(a.difficulty);
+  return {
+    type: texteOuVide(a.type).toLowerCase() || "exercise",
+    title: title || instructions.slice(0, 80),
+    instructions,
+    expected_outcome: texteOuVide(a.expected_outcome),
+    evaluation: texteOuVide(a.evaluation),
+    difficulty: Number.isInteger(difficulte) && difficulte >= 1 && difficulte <= 5 ? difficulte : 2,
+    competency_refs: listeNoms(a.competency_refs),
+    situation_type: texteOuVide(a.situation_type).toLowerCase() || null,
+    media_brief: validerMediaBrief(a.media_brief),
+    questions: validerQuestions(a.questions),
   };
 }
 
@@ -182,14 +270,11 @@ export function validerResultat(
   const competencies: CompetenceGeneree[] = tableau(r.competencies)
     .map((c) => {
       const cc = (c ?? {}) as Record<string, unknown>;
-      const niveau = texteOuVide(cc.target_level);
       return {
         name: texteOuVide(cc.name),
         domain: texteOuVide(cc.domain) || "général",
         description: texteOuVide(cc.description),
-        target_level: (NIVEAUX as readonly string[]).includes(niveau)
-          ? (niveau as NiveauCible)
-          : "fundamentals",
+        target_level: niveauOuNull(cc.target_level) ?? "fundamentals",
       };
     })
     .filter((c) => c.name.length > 0)
@@ -217,6 +302,13 @@ export function validerResultat(
               options.totalUnites,
               avertissementsIntervalles
             ),
+            competency_refs: listeNoms(ll.competency_refs),
+            situation_type: texteOuVide(ll.situation_type).toLowerCase() || null,
+            media_brief: validerMediaBrief(ll.media_brief),
+            activities: tableau(ll.activities)
+              .map(validerActivite)
+              .filter((a): a is ActiviteGeneree => a !== null)
+              .slice(0, 12),
           };
         })
         .filter((l) => l.title.length > 0)
@@ -225,6 +317,7 @@ export function validerResultat(
         title: texteOuVide(mm.title),
         description: texteOuVide(mm.description),
         lessons,
+        level: niveauOuNull(mm.level),
       };
     })
     .filter((m) => m.title.length > 0)

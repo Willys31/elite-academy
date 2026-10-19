@@ -42,7 +42,7 @@ function fauxServeur(reponses: Array<{ status: number; body: unknown }>) {
 
 const REPONSE_OK = {
   id: "x",
-  model: "deepseek-chat",
+  model: "deepseek-flash",
   choices: [{ message: { role: "assistant", content: '{"ok": true}' }, finish_reason: "stop" }],
   usage: { prompt_tokens: 12, completion_tokens: 5 },
 };
@@ -51,8 +51,8 @@ describe("construireCorps", () => {
   it("envoie system + user, le modèle, le plafond et le mode JSON", () => {
     const corps = construireCorps(configDeepSeek(), { system: "S", prompt: "P" }, { avecJson: true });
     expect(corps).toEqual({
-      model: "deepseek-chat",
-      max_tokens: 8192,
+      model: "deepseek-flash",
+      max_tokens: 32768,
       messages: [
         { role: "system", content: "S" },
         { role: "user", content: "P" },
@@ -77,7 +77,7 @@ describe("appelerChatCompletions", () => {
     expect(appels[0].url).toBe("https://api.deepseek.com/v1/chat/completions");
     expect(appels[0].headers.authorization).toBe("Bearer sk-test");
     expect(appels[0].corps.response_format).toEqual({ type: "json_object" });
-    expect(r).toEqual({ texte: '{"ok": true}', modele: "deepseek-chat", inputTokens: 12, outputTokens: 5 });
+    expect(r).toEqual({ texte: '{"ok": true}', modele: "deepseek-flash", fournisseur: "deepseek", inputTokens: 12, outputTokens: 5 });
   });
 
   it("rejoue sans response_format quand le serveur refuse le mode JSON", async () => {
@@ -109,7 +109,7 @@ describe("appelerChatCompletions", () => {
     const cas: Array<[number, unknown, string]> = [
       [401, { error: { message: "Authentication Fails" } }, "clé API DeepSeek est invalide"],
       [402, { error: { message: "Insufficient Balance" } }, "Solde insuffisant"],
-      [404, { error: { message: "Model Not Exist" } }, "deepseek-chat » introuvable"],
+      [404, { error: { message: "Model Not Exist" } }, "deepseek-flash » introuvable"],
       [429, "", "Limite d'utilisation de DeepSeek"],
       [400, { error: { message: "invalid max_tokens" } }, "invalid max_tokens"],
       [503, "", "indisponible"],

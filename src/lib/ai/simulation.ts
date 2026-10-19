@@ -20,10 +20,38 @@ export function genererSimulation(brief: BriefGeneration): string {
   const marque =
     "[DÉMONSTRATION — contenu généré en mode simulation, sans IA. À remplacer par une vraie génération avant toute utilisation pédagogique.]";
 
-  const lecon = (titre: string, minutes: number) => ({
+  const competence1 = `[DÉMO] Appliquer les fondamentaux — ${titreCourt.slice(0, 40)}`;
+  const competence2 = `[DÉMO] Traiter une situation courante — ${titreCourt.slice(0, 40)}`;
+
+  /* Format du prompt v2 (lot 25) : compétences référencées, type de
+     situation et une activité d'exercice par leçon, pour que le
+     contrôle pédagogique s'exerce aussi en simulation. */
+  const lecon = (titre: string, minutes: number, competence: string, situation: string) => ({
     title: titre,
     text: `${marque}\n\nCette leçon traiterait de : ${titre.toLowerCase()}, en lien avec le besoin « ${titreCourt} ».\n\nStructure prévue : explication de la notion, exemple de la vie professionnelle adapté au public (${publicCible}), points à retenir, et courte activité d'application.`,
     estimated_minutes: minutes,
+    competency_refs: [competence],
+    situation_type: situation,
+    activities: [
+      {
+        type: "quiz",
+        title: `[DÉMO] Quiz — ${titre}`,
+        instructions: "Répondez à la question de démonstration.",
+        expected_outcome: "Une bonne réponse sur une.",
+        evaluation: "Correction automatique du QCM.",
+        difficulty: 1,
+        competency_refs: [competence],
+        situation_type: "evaluation",
+        questions: [
+          {
+            prompt: `[DÉMO] Quelle est la notion traitée dans « ${titre} » ?`,
+            options: [titre, "Une autre notion", "Aucune des deux"],
+            correct_index: 0,
+            explanation: "Contenu de démonstration : la bonne réponse est le titre de la leçon.",
+          },
+        ],
+      },
+    ],
   });
 
   const resultat = {
@@ -41,14 +69,14 @@ export function genererSimulation(brief: BriefGeneration): string {
     },
     competencies: [
       {
-        name: `[DÉMO] Appliquer les fondamentaux — ${titreCourt.slice(0, 40)}`,
+        name: competence1,
         domain: brief.secteur?.trim() || "général",
         description:
           "Compétence de démonstration : comportements observables à définir lors d'une vraie génération.",
         target_level: "fundamentals",
       },
       {
-        name: `[DÉMO] Traiter une situation courante — ${titreCourt.slice(0, 40)}`,
+        name: competence2,
         domain: brief.secteur?.trim() || "général",
         description:
           "Compétence de démonstration : application autonome dans une situation professionnelle courante.",
@@ -59,14 +87,19 @@ export function genererSimulation(brief: BriefGeneration): string {
       {
         title: "[DÉMO] Module 1 — Comprendre les notions essentielles",
         description: "Module de démonstration : apports et exemples.",
-        lessons: [lecon("Les notions clés du sujet", 30), lecon("Exemples professionnels", 30)],
+        level: "fundamentals",
+        lessons: [
+          lecon("Les notions clés du sujet", 30, competence1, "apport"),
+          lecon("Exemples professionnels", 30, competence1, "exemple"),
+        ],
       },
       {
         title: "[DÉMO] Module 2 — Mettre en pratique",
         description: "Module de démonstration : exercices guidés puis autonomes.",
+        level: "operational",
         lessons: [
-          lecon("Exercice guidé pas à pas", 45),
-          lecon("Mise en situation autonome", 45),
+          lecon("Exercice guidé pas à pas", 45, competence2, "exercice_guide"),
+          lecon("Mise en situation autonome", 45, competence2, "mise_en_situation"),
         ],
       },
     ],

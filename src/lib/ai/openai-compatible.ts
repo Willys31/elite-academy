@@ -6,11 +6,13 @@
  * sert avec la configuration résolue par `fournisseurs.ts`.
  */
 
-import type { ConfigurationIa } from "@/lib/ai/fournisseurs";
+import { messageModeleRetire, type ConfigurationIa, type Fournisseur } from "@/lib/ai/fournisseurs";
 
 export interface ReponseLlm {
   texte: string;
   modele: string;
+  /** Fournisseur réellement appelé (traçabilité par tâche, lot 25). */
+  fournisseur: Fournisseur;
   inputTokens: number | null;
   outputTokens: number | null;
 }
@@ -60,6 +62,12 @@ export function erreurHttp(status: number, config: ConfigurationIa, corps: strin
     return new Error(
       `Solde insuffisant sur le compte ${nom} : rechargez le crédit du compte API avant de relancer.`
     );
+  }
+  // Ancien nom DeepSeek (deepseek-chat, deepseek-reasoner) : le service
+  // répond 400 « Model Not Exist » ou 404 ; on explique le retrait.
+  if (status === 400 || status === 404 || status === 422) {
+    const retire = messageModeleRetire(config.fournisseur, config.modele);
+    if (retire) return new Error(retire);
   }
   if (status === 404) {
     const conseil =
@@ -132,6 +140,13 @@ export function construireCorps(
   };
   if (config.temperature !== null) corps.temperature = config.temperature;
   if (options.avecJson) corps.response_format = { type: "json_object" };
+  // Mode réflexion (DeepSeek V4) : transmis seulement aux fournisseurs
+  // qui le comprennent, et seulement quand un choix est fait (LLM_THINKING
+  // ou classe « interaction » en auto). Le raisonnement renvoyé dans
+  // `reasoning_content` n'est jamais lu ni stocké.
+  if (config.reflexionPriseEnCharge && config.reflexion !== null) {
+    corps.thinking = { type: config.reflexion === "on" ? "enabled" : "disabled" };
+  }
   return corps;
 }
 
@@ -141,7 +156,11 @@ interface CorpsReponse {
     finish_reason?: string;
   }>;
   model?: string;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    completion_tokens_details?: { reasoning_tokens?: number };
+  };
 }
 
 /** Contenu textuel d'un choix, quel que soit le format (chaîne ou blocs). */
@@ -214,11 +233,17 @@ export async function appelerChatCompletions(
     const texte = texteDuChoix(donnees);
     const fin = donnees.choices?.[0]?.finish_reason;
     if (fin === "length") {
-      journal(`[ia] ${config.fournisseur} : réponse tronquée (max_tokens=${config.maxTokens})`);
+      const raisonnement = donnees.usage?.completion_tokens_details?.reasoning_tokens;
+      journal(
+        `[ia] ${config.fournisseur} : réponse tronquée (max_tokens=${config.maxTokens}` +
+          (raisonnement ? `, dont ${raisonnement} jetons de réflexion` : "") +
+          ")"
+      );
     }
     return {
       texte,
       modele: donnees.model ?? config.modele,
+      fournisseur: config.fournisseur,
       inputTokens: donnees.usage?.prompt_tokens ?? null,
       outputTokens: donnees.usage?.completion_tokens ?? null,
     };

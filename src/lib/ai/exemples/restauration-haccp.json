@@ -1,0 +1,74 @@
+{
+  "id": "restauration-haccp",
+  "domaine": "restauration",
+  "titre": "Hygiène et sécurité en cuisine (HACCP)",
+  "source": "Rédigé le 16 octobre 2026 pour le lot 25 à partir de la méthode de structuration Elite Experience ; aucun module validé n'était disponible dans la base à cette date. Les seuils de température cités sont des ordres de grandeur à faire valider par un référent hygiène.",
+  "statut": "a_valider_par_yakin",
+  "confidentialite": "publiable",
+  "commercial": false,
+  "extrait": {
+    "competencies": [
+      {
+        "name": "Appliquer la marche en avant dans l'organisation du poste de travail",
+        "domain": "restauration",
+        "description": "Organise les flux (produits sales vers propres, cru vers cuit) sans croisement, identifie un croisement sur un plan de cuisine et propose la correction. Preuve : analyse correcte d'un plan et d'une situation filmée.",
+        "target_level": "operational"
+      },
+      {
+        "name": "Contrôler et enregistrer les températures aux points critiques",
+        "domain": "restauration",
+        "description": "Relève les températures à la réception, au stockage et au service, compare aux seuils en vigueur, enregistre et déclenche l'action corrective prévue. Preuve : fiche de relevé complète et décision correcte sur un cas de non-conformité.",
+        "target_level": "fundamentals"
+      }
+    ],
+    "modules": [
+      {
+        "title": "Les points critiques au quotidien",
+        "description": "Repérer les étapes où un écart met le convive en danger, et savoir quoi faire.",
+        "level": "fundamentals",
+        "lessons": [
+          {
+            "title": "Réceptionner une livraison",
+            "text": "La réception est le premier point de contrôle : un produit accepté hors température contamine toute la chaîne. Le contrôle porte sur trois éléments : l'état du véhicule et des emballages, la température à cœur des produits sensibles, et la date limite.\n\nExemple professionnel : au restaurant d'un hôtel d'Abidjan, Mariam réceptionne une livraison de poulet frais à 11 h. Le thermomètre à sonde indique une température supérieure au seuil prévu par le plan de maîtrise sanitaire de l'établissement. Elle refuse le lot, note le motif sur le bon de livraison, prévient le chef et consigne le refus dans le registre. Le fournisseur renvoie une livraison conforme dans l'après-midi.\n\nPoints à retenir : contrôler avant de ranger ; mesurer à cœur, pas en surface ; un refus se justifie par écrit ; un doute se traite comme une non-conformité.",
+            "estimated_minutes": 25,
+            "competency_refs": [
+              "Contrôler et enregistrer les températures aux points critiques"
+            ],
+            "situation_type": "demonstration",
+            "media_brief": {
+              "kind": "video",
+              "purpose": "Montrer le geste de mesure à cœur et la lecture du bon de livraison",
+              "description": "Séquence de deux minutes, plan rapproché sur la sonde insérée au centre d'une pièce de volaille, puis sur la main qui annote le bon de livraison ; voix off neutre, sous-titres en français."
+            },
+            "activities": [
+              {
+                "type": "case_study",
+                "title": "Livraison douteuse un vendredi soir",
+                "instructions": "Contexte : service dans deux heures, le livreur est pressé, le lot de poisson affiche une température légèrement au-dessus du seuil et le chef est absent. Acteurs : vous (commis), le livreur, le second de cuisine. Questions : quelle décision prenez-vous, qui prévenez-vous, qu'écrivez-vous et où ? Livrable : décision écrite en cinq lignes.",
+                "expected_outcome": "Refus ou mise en attente du lot, information du second, enregistrement écrit du motif ; aucune mise en production du produit douteux.",
+                "evaluation": "Grille : décision conforme (2 pts), personnes prévenues (1 pt), traçabilité écrite (1 pt), justification claire (1 pt). Erreur fréquente : accepter « parce que le service approche ».",
+                "difficulty": 3,
+                "competency_refs": [
+                  "Contrôler et enregistrer les températures aux points critiques"
+                ],
+                "situation_type": "etude_de_cas"
+              },
+              {
+                "type": "exercise",
+                "title": "Repérer le croisement sur le plan de cuisine",
+                "instructions": "Sur le plan de cuisine fourni (zone de réception, légumerie, zone de cuisson, plonge, passe), tracez le trajet d'une caisse de légumes terreux depuis la réception jusqu'à l'assiette, puis celui des assiettes sales depuis la salle. Entourez chaque endroit où les deux flux se croisent et proposez une correction (horaire, cheminement ou matériel).",
+                "expected_outcome": "Les deux trajets tracés, au moins un croisement identifié et une correction réaliste proposée.",
+                "evaluation": "Critères : trajets complets (1), croisements identifiés (2), correction applicable sans travaux (2). Réussite à partir de 4 sur 5.",
+                "difficulty": 2,
+                "competency_refs": [
+                  "Appliquer la marche en avant dans l'organisation du poste de travail"
+                ],
+                "situation_type": "exercice_guide"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

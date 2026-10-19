@@ -20,6 +20,9 @@ docs/
 # Fichiers de configuration
 .claude
 .mcp.json
+# Résultats du banc d'essai IA (sorties générées, parfois volumineuses)
+tools/banc-essai-ia/resultats/
+
 # Captures Playwright (aperçus locaux)
 .playwright-mcp/
 comptes_playwright.local.json

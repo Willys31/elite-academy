@@ -18,7 +18,7 @@ import {
 } from "@/lib/import/decoupage";
 import { ouvrirDecoupeurPdf, ouvrirDecoupeurPptx } from "@/lib/import/extraits";
 import { rattacherExtrait } from "@/lib/import/rattachement";
-import { appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlmJson, erreurConfigurationIa, iaConfiguree, modeleConfigure, modeSimulation, traceIa } from "@/lib/ai/client";
 import {
   construirePromptStructuration,
   PROMPT_VERSION_IMPORT,
@@ -263,10 +263,10 @@ export async function importerDocument(
       "Mode simulation actif : découpage par titres utilisé à la place de l'IA. Configurez un fournisseur IA (gratuit possible : LLM_PROVIDER=gemini) pour la structuration intelligente."
     );
   } else if (mode === "ia") {
-    if (!iaConfiguree()) {
+    if (!iaConfiguree("import")) {
       return {
         error:
-          `${erreurConfigurationIa() ?? "Aucune IA configurée."} ` +
+          `${erreurConfigurationIa("import") ?? "Aucune IA configurée."} ` +
           "Dans .env.local : LLM_PROVIDER=deepseek (ou gemini, ollama…) + LLM_API_KEY, ou ANTHROPIC_API_KEY, ou ELITE_IA_MODE=simulation — ou choisissez le découpage par titres ci-dessous.",
       };
     }
@@ -285,10 +285,10 @@ export async function importerDocument(
         requested_by: user.id,
         generation_type: "document_structuring",
         brief: { fichier: fichier.name, mode: "import_ia", unite: kind, total },
-        context: { source: "import_document" },
+        context: { source: "import_document", ia: traceIa("import") },
         source_ids: [stocke.sourceId],
         prompt_version: PROMPT_VERSION_IMPORT,
-        model_name: modeleConfigure(),
+        model_name: modeleConfigure("import"),
         status: "running",
       })
       .select("id")
@@ -315,7 +315,8 @@ export async function importerDocument(
           fichier.name,
           texte,
           kind ? { type: kind === "pages" ? "page" : "diapositive", total } : undefined
-        )
+        ),
+        { tache: "import" }
       );
       const analyse = validerResultat(reponse.json, {
         totalUnites: kind ? total : undefined,

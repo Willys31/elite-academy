@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { appelerLlmJson, iaConfiguree, modeleConfigure, modeSimulation } from "@/lib/ai/client";
+import { appelerLlmJson, iaConfiguree, modeleConfigure, modeSimulation, traceIa } from "@/lib/ai/client";
 import { extraireJson } from "@/lib/ai/schema";
 import {
   construirePromptAnalyseSession,
@@ -258,7 +258,7 @@ export async function analyserTranscription(
   const session = Array.isArray(transcript.session) ? transcript.session[0] : transcript.session;
   if (!session) return "Session introuvable.";
 
-  if (!iaConfiguree() && !modeSimulation()) {
+  if (!iaConfiguree("analyse_session") && !modeSimulation()) {
     await client.from("live_sessions").update({ analysis_status: "pending" }).eq("id", session.id);
     return "Aucune configuration IA : l'analyse est mise en attente (voir .env.example).";
   }
@@ -298,9 +298,9 @@ export async function analyserTranscription(
       requested_by: demandeurId ?? session.trainer_id,
       generation_type: "session_analysis",
       brief: { titre: session.title, anonymiser: Boolean(options.anonymiser) },
-      context: { session_id: session.id, transcript_id: transcriptId, source: demandeurId ? "formateur" : "webhook" },
+      context: { session_id: session.id, transcript_id: transcriptId, source: demandeurId ? "formateur" : "webhook", ia: traceIa("analyse_session") },
       prompt_version: PROMPT_VERSION_SESSION,
-      model_name: modeleConfigure(),
+      model_name: modeleConfigure("analyse_session"),
       status: "running",
     })
     .select("id")
@@ -318,7 +318,7 @@ export async function analyserTranscription(
   };
 
   let jsonReponse: unknown | null;
-  let modele = modeleConfigure();
+  let modele = modeleConfigure("analyse_session");
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
   try {
@@ -341,7 +341,8 @@ export async function analyserTranscription(
           participants: personnes.map((p) => p.fullName),
           transcript: texte,
           anonymiser: Boolean(options.anonymiser),
-        })
+        }),
+        { tache: "analyse_session" }
       );
       jsonReponse = reponse.json;
       modele = reponse.modele;

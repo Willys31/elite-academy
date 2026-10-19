@@ -40,10 +40,10 @@ describe("resoudreConfiguration – DeepSeek", () => {
     const c = config({ LLM_PROVIDER: "deepseek", LLM_API_KEY: "sk-test" });
     expect(c.fournisseur).toBe("deepseek");
     expect(c.baseUrl).toBe("https://api.deepseek.com/v1");
-    expect(c.modele).toBe("deepseek-chat");
+    expect(c.modele).toBe("deepseek-flash");
     expect(c.apiKey).toBe("sk-test");
     expect(c.modeJson).toBe("on");
-    expect(c.maxTokens).toBe(8192);
+    expect(c.maxTokens).toBe(32768);
   });
 
   it("refuse DeepSeek sans clé, avec un message qui dit où l'obtenir", () => {
@@ -57,13 +57,13 @@ describe("resoudreConfiguration – DeepSeek", () => {
     const c = config({
       LLM_PROVIDER: "deepseek",
       LLM_API_KEY: "sk",
-      LLM_MODEL: "deepseek-reasoner",
+      LLM_MODEL: "deepseek-v4-pro",
       LLM_BASE_URL: "https://proxy.interne/v1/",
       LLM_MAX_TOKENS: "4096",
       LLM_TIMEOUT_MS: "30000",
       LLM_TEMPERATURE: "0.3",
     });
-    expect(c.modele).toBe("deepseek-reasoner");
+    expect(c.modele).toBe("deepseek-v4-pro");
     expect(c.baseUrl).toBe("https://proxy.interne/v1");
     expect(c.maxTokens).toBe(4096);
     expect(c.timeoutMs).toBe(30000);
@@ -160,7 +160,7 @@ describe("decrireConfiguration", () => {
     const c = config({ LLM_PROVIDER: "deepseek", LLM_API_KEY: "sk-secret" });
     const d = decrireConfiguration(c);
     expect(d).toContain("DeepSeek");
-    expect(d).toContain("deepseek-chat");
+    expect(d).toContain("deepseek-flash");
     expect(d).not.toContain("sk-secret");
   });
 });

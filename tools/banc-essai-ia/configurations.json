@@ -1,0 +1,76 @@
+{
+  "_commentaire": "Configurations comparées par le banc d'essai. Les exemples de référence livrés sont encore au statut « a_valider_par_yakin » : la valeur « brouillons » les injecte explicitement pour la mesure ; « on » n'injecterait que des exemples validés (aucun pour l'instant). Les clés sont lues dans .env.local ou l'environnement sous le nom indiqué par cle_env.",
+  "configurations": [
+    {
+      "id": "deepseek-flash-sans-exemples",
+      "libelle": "DeepSeek Flash, sans exemples",
+      "fournisseur": "deepseek",
+      "modele": "deepseek-flash",
+      "cle_env": "DEEPSEEK_API_KEY",
+      "exemples": "off",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "deepseek-flash-avec-exemples",
+      "libelle": "DeepSeek Flash, avec exemples (brouillons)",
+      "fournisseur": "deepseek",
+      "modele": "deepseek-flash",
+      "cle_env": "DEEPSEEK_API_KEY",
+      "exemples": "brouillons",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "deepseek-pro-sans-exemples",
+      "libelle": "DeepSeek V4 Pro, sans exemples",
+      "fournisseur": "deepseek",
+      "modele": "deepseek-v4-pro",
+      "cle_env": "DEEPSEEK_API_KEY",
+      "exemples": "off",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "deepseek-pro-avec-exemples",
+      "libelle": "DeepSeek V4 Pro, avec exemples (brouillons)",
+      "fournisseur": "deepseek",
+      "modele": "deepseek-v4-pro",
+      "cle_env": "DEEPSEEK_API_KEY",
+      "exemples": "brouillons",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "gemini-flash-sans-exemples",
+      "libelle": "Gemini 2.5 Flash (fournisseur actuel), sans exemples",
+      "fournisseur": "gemini",
+      "modele": "gemini-2.5-flash",
+      "cle_env": "GEMINI_API_KEY",
+      "exemples": "off",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "gemini-flash-avec-exemples",
+      "libelle": "Gemini 2.5 Flash (fournisseur actuel), avec exemples (brouillons)",
+      "fournisseur": "gemini",
+      "modele": "gemini-2.5-flash",
+      "cle_env": "GEMINI_API_KEY",
+      "exemples": "brouillons",
+      "thinking": "auto",
+      "actif": true
+    },
+    {
+      "id": "deepseek-flash-reflexion",
+      "libelle": "DeepSeek Flash, réflexion forcée, avec exemples (brouillons)",
+      "fournisseur": "deepseek",
+      "modele": "deepseek-flash",
+      "cle_env": "DEEPSEEK_API_KEY",
+      "exemples": "brouillons",
+      "thinking": "on",
+      "actif": false,
+      "commentaire": "À activer pour mesurer l'apport du mode réflexion sur la conception (plus lent, plus de jetons)."
+    }
+  ]
+}

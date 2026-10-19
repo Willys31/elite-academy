@@ -5,6 +5,7 @@ import {
   resoudreConfiguration,
   type ConfigurationIa,
   type Fournisseur,
+  type TacheIa,
 } from "@/lib/ai/fournisseurs";
 import { extraireJson } from "@/lib/ai/json";
 import {
@@ -32,9 +33,12 @@ import {
  * - ollama, vllm, compatible — serveur local ou auto-hébergé, sans clé
  *   obligatoire, URL via LLM_BASE_URL.
  * Appel direct de l'API HTTP : aucune dépendance supplémentaire.
+ *
+ * Lot 25 : chaque fonction reçoit la tâche (`TacheIa`) ; le modèle et
+ * le fournisseur peuvent en dépendre (voir `fournisseurs.ts`).
  */
 
-export type { ReponseLlm };
+export type { ReponseLlm, TacheIa };
 
 /**
  * Mode simulation : ELITE_IA_MODE=simulation dans .env.local.
@@ -46,49 +50,67 @@ export function modeSimulation(): boolean {
 }
 
 /** Configuration résolue depuis l'environnement (ou l'erreur à afficher). */
-export function configurationIa() {
-  return resoudreConfiguration(lireEnv);
+export function configurationIa(tache: TacheIa = "conception") {
+  return resoudreConfiguration(lireEnv, tache);
 }
 
 /** Fournisseur déclaré (anthropic par défaut, même si mal configuré). */
-export function fournisseurConfigure(): Fournisseur {
-  const r = configurationIa();
+export function fournisseurConfigure(tache: TacheIa = "conception"): Fournisseur {
+  const r = configurationIa(tache);
   return r.ok ? r.config.fournisseur : "anthropic";
 }
 
 /** Une configuration IA utilisable existe-t-elle (hors simulation) ? */
-export function iaConfiguree(): boolean {
-  return configurationIa().ok;
+export function iaConfiguree(tache: TacheIa = "conception"): boolean {
+  return configurationIa(tache).ok;
 }
 
 /**
  * Pourquoi l'IA n'est pas utilisable, en français, sans secret ;
  * null si tout va bien ou en simulation.
  */
-export function erreurConfigurationIa(): string | null {
+export function erreurConfigurationIa(tache: TacheIa = "conception"): string | null {
   if (modeSimulation()) return null;
-  const r = configurationIa();
+  const r = configurationIa(tache);
   return r.ok ? null : r.erreur;
 }
 
-export function modeleConfigure(): string {
+export function modeleConfigure(tache: TacheIa = "conception"): string {
   if (modeSimulation()) return "simulation-locale";
-  const r = configurationIa();
+  const r = configurationIa(tache);
   if (r.ok) return r.config.modele;
   // Mal configuré : on renvoie quand même le modèle demandé, pour la
   // traçabilité (`ai_generations.model_name`).
   return lireEnv("LLM_MODEL") || lireEnv("ANTHROPIC_MODEL") || "non-configure";
 }
 
-/** Libellé lisible (« DeepSeek — modèle deepseek-chat ») pour les écrans. */
-export function descriptionIa(): string {
+/** Libellé lisible (« DeepSeek — modèle deepseek-flash ») pour les écrans. */
+export function descriptionIa(tache: TacheIa = "conception"): string {
   if (modeSimulation()) return "Simulation locale (sans IA)";
-  const r = configurationIa();
+  const r = configurationIa(tache);
   return r.ok ? decrireConfiguration(r.config) : "IA non configurée";
 }
 
-function exigerConfiguration(): ConfigurationIa {
-  const r = configurationIa();
+/**
+ * Trace de la configuration IA pour `ai_generations.context` (aucune
+ * migration : la colonne est un jsonb). Sans secret.
+ */
+export function traceIa(tache: TacheIa): Record<string, unknown> {
+  if (modeSimulation()) return { tache, simulation: true };
+  const r = configurationIa(tache);
+  if (!r.ok) return { tache, erreur_configuration: r.erreur };
+  return {
+    tache,
+    classe: r.config.classe,
+    fournisseur: r.config.fournisseur,
+    modele_demande: r.config.modele,
+    reflexion: r.config.reflexion,
+    fournisseur_dedie: r.config.fournisseurDedie,
+  };
+}
+
+function exigerConfiguration(tache: TacheIa): ConfigurationIa {
+  const r = configurationIa(tache);
   if (!r.ok) throw new Error(r.erreur);
   return r.config;
 }
@@ -134,9 +156,17 @@ async function appelerAnthropic(config: ConfigurationIa, system: string, prompt:
       .map((b) => b.text)
       .join("\n"),
     modele: donnees.model ?? config.modele,
+    fournisseur: "anthropic",
     inputTokens: donnees.usage?.input_tokens ?? null,
     outputTokens: donnees.usage?.output_tokens ?? null,
   };
+}
+
+export interface OptionsAppel {
+  /** Tâche : décide du modèle et du fournisseur (défaut : conception). */
+  tache?: TacheIa;
+  /** Demander une sortie JSON au serveur quand il le permet. */
+  json?: boolean;
 }
 
 /**
@@ -147,9 +177,9 @@ async function appelerAnthropic(config: ConfigurationIa, system: string, prompt:
 export async function appelerLlm(
   system: string,
   prompt: string,
-  options: { json?: boolean } = {}
+  options: OptionsAppel = {}
 ): Promise<ReponseLlm> {
-  const config = exigerConfiguration();
+  const config = exigerConfiguration(options.tache ?? "conception");
   if (config.fournisseur === "anthropic") return appelerAnthropic(config, system, prompt);
   return appelerChatCompletions(
     config,
@@ -170,6 +200,11 @@ const RAPPEL_JSON =
   "\n\nRAPPEL IMPORTANT : ta réponse précédente n'était pas un JSON valide. Réponds UNIQUEMENT avec l'objet JSON demandé, " +
   "sans aucun texte avant ni après, sans balise de code, sans commentaire.";
 
+/** Somme de jetons tolérante aux valeurs absentes. */
+export function additionnerJetons(a: number | null, b: number | null): number | null {
+  return a === null && b === null ? null : (a ?? 0) + (b ?? 0);
+}
+
 /**
  * Appel attendant un objet JSON : mode JSON du serveur quand il existe,
  * extraction tolérante, et UNE relance avec consigne renforcée si la
@@ -177,22 +212,25 @@ const RAPPEL_JSON =
  * n'honorent pas toujours le format). Les jetons des deux appels sont
  * additionnés pour la traçabilité.
  */
-export async function appelerLlmJson(system: string, prompt: string): Promise<ReponseLlmJson> {
-  const premiere = await appelerLlm(system, prompt, { json: true });
+export async function appelerLlmJson(
+  system: string,
+  prompt: string,
+  options: Omit<OptionsAppel, "json"> = {}
+): Promise<ReponseLlmJson> {
+  const premiere = await appelerLlm(system, prompt, { ...options, json: true });
   const json = extraireJson(premiere.texte);
   if (json !== null) return { ...premiere, json, tentatives: 1 };
 
   console.error(
     `[ia] réponse sans JSON exploitable (${premiere.texte.length} caractères) : relance avec consigne renforcée.`
   );
-  const seconde = await appelerLlm(system, prompt + RAPPEL_JSON, { json: true });
-  const additionner = (a: number | null, b: number | null) =>
-    a === null && b === null ? null : (a ?? 0) + (b ?? 0);
+  const seconde = await appelerLlm(system, prompt + RAPPEL_JSON, { ...options, json: true });
   return {
     texte: seconde.texte,
     modele: seconde.modele,
-    inputTokens: additionner(premiere.inputTokens, seconde.inputTokens),
-    outputTokens: additionner(premiere.outputTokens, seconde.outputTokens),
+    fournisseur: seconde.fournisseur,
+    inputTokens: additionnerJetons(premiere.inputTokens, seconde.inputTokens),
+    outputTokens: additionnerJetons(premiere.outputTokens, seconde.outputTokens),
     json: extraireJson(seconde.texte),
     tentatives: 2,
   };
