@@ -12,6 +12,13 @@ import { Alert, Card, Input, Label, PageTitle, Retour, Select, Textarea } from "
 export const metadata: Metadata = { title: "Assistant de création IA" };
 
 /**
+ * Durée maximale de l'action serveur `genererFormation` (Vercel) : une
+ * génération réelle DeepSeek Flash prend 1 à 3 min, Pro jusqu'à 7 min.
+ * Le plan Vercel plafonne la valeur réellement accordée (Hobby : 60 s).
+ */
+export const maxDuration = 300;
+
+/**
  * Assistant de création (UX/UI §5.2) : le concepteur décrit son
  * besoin en langage naturel ; l'IA propose une formation complète
  * enregistrée en brouillon, à relire puis soumettre à validation.
