@@ -7,7 +7,11 @@ import {
   type Fournisseur,
   type TacheIa,
 } from "@/lib/ai/fournisseurs";
-import { extraireJson } from "@/lib/ai/json";
+import {
+  appelerJsonAvecRelances,
+  type OptionsRelance,
+  type ReponseLlmJson,
+} from "@/lib/ai/appel-json";
 import {
   appelerChatCompletions,
   erreurHttp,
@@ -23,8 +27,8 @@ import {
  *
  * Ce fichier ne contient que le « câblage » : la résolution de la
  * configuration (`fournisseurs.ts`), l'appel compatible OpenAI
- * (`openai-compatible.ts`) et l'extraction JSON (`json.ts`) sont des
- * modules purs, testés sans réseau.
+ * (`openai-compatible.ts`), l'extraction JSON (`json.ts`) et les
+ * relances (`appel-json.ts`) sont des modules purs, testés sans réseau.
  *
  * Fournisseurs (LLM_PROVIDER) :
  * - anthropic (ANTHROPIC_API_KEY) — API Anthropic ;
@@ -38,7 +42,8 @@ import {
  * le fournisseur peuvent en dépendre (voir `fournisseurs.ts`).
  */
 
-export type { ReponseLlm, TacheIa };
+export type { ReponseLlm, ReponseLlmJson, TacheIa };
+export { additionnerJetons } from "@/lib/ai/appel-json";
 
 /**
  * Mode simulation : ELITE_IA_MODE=simulation dans .env.local.
@@ -148,6 +153,7 @@ async function appelerAnthropic(config: ConfigurationIa, system: string, prompt:
   const donnees = (await reponse.json()) as {
     content?: Array<{ type: string; text?: string }>;
     model?: string;
+    stop_reason?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
   return {
@@ -159,10 +165,11 @@ async function appelerAnthropic(config: ConfigurationIa, system: string, prompt:
     fournisseur: "anthropic",
     inputTokens: donnees.usage?.input_tokens ?? null,
     outputTokens: donnees.usage?.output_tokens ?? null,
+    tronquee: donnees.stop_reason === "max_tokens",
   };
 }
 
-export interface OptionsAppel {
+export interface OptionsAppel extends OptionsRelance {
   /** Tâche : décide du modèle et du fournisseur (défaut : conception). */
   tache?: TacheIa;
   /** Demander une sortie JSON au serveur quand il le permet. */
@@ -172,14 +179,16 @@ export interface OptionsAppel {
 /**
  * Appel texte libre (tuteur). `json: true` demande au serveur une
  * sortie JSON quand il le permet ; préférer `appelerLlmJson` pour
- * obtenir l'objet déjà extrait, avec relance.
+ * obtenir l'objet déjà extrait, avec relances.
  */
 export async function appelerLlm(
   system: string,
   prompt: string,
   options: OptionsAppel = {}
 ): Promise<ReponseLlm> {
-  const config = exigerConfiguration(options.tache ?? "conception");
+  const base = exigerConfiguration(options.tache ?? "conception");
+  const config: ConfigurationIa =
+    options.reflexion && base.reflexionPriseEnCharge ? { ...base, reflexion: options.reflexion } : base;
   if (config.fournisseur === "anthropic") return appelerAnthropic(config, system, prompt);
   return appelerChatCompletions(
     config,
@@ -189,49 +198,22 @@ export async function appelerLlm(
   );
 }
 
-export interface ReponseLlmJson extends ReponseLlm {
-  /** Objet extrait de la réponse, ou null si aucun JSON exploitable. */
-  json: unknown | null;
-  /** Nombre d'appels effectués (2 si une relance a été nécessaire). */
-  tentatives: number;
-}
-
-const RAPPEL_JSON =
-  "\n\nRAPPEL IMPORTANT : ta réponse précédente n'était pas un JSON valide. Réponds UNIQUEMENT avec l'objet JSON demandé, " +
-  "sans aucun texte avant ni après, sans balise de code, sans commentaire.";
-
-/** Somme de jetons tolérante aux valeurs absentes. */
-export function additionnerJetons(a: number | null, b: number | null): number | null {
-  return a === null && b === null ? null : (a ?? 0) + (b ?? 0);
-}
-
 /**
  * Appel attendant un objet JSON : mode JSON du serveur quand il existe,
- * extraction tolérante, et UNE relance avec consigne renforcée si la
- * réponse n'est pas exploitable (modèles locaux ou raisonneurs qui
- * n'honorent pas toujours le format). Les jetons des deux appels sont
- * additionnés pour la traçabilité.
+ * extraction tolérante, et relances (`appel-json.ts`) : sans réflexion
+ * si la réponse est tronquée, avec consigne renforcée si elle n'est pas
+ * du JSON. Les jetons des appels sont additionnés pour la traçabilité.
  */
 export async function appelerLlmJson(
   system: string,
   prompt: string,
-  options: Omit<OptionsAppel, "json"> = {}
+  options: Omit<OptionsAppel, "json" | "reflexion"> = {}
 ): Promise<ReponseLlmJson> {
-  const premiere = await appelerLlm(system, prompt, { ...options, json: true });
-  const json = extraireJson(premiere.texte);
-  if (json !== null) return { ...premiere, json, tentatives: 1 };
-
-  console.error(
-    `[ia] réponse sans JSON exploitable (${premiere.texte.length} caractères) : relance avec consigne renforcée.`
+  const config = exigerConfiguration(options.tache ?? "conception");
+  return appelerJsonAvecRelances(
+    (p, relance) => appelerLlm(system, p, { ...options, json: true, reflexion: relance.reflexion }),
+    prompt,
+    config,
+    (m) => console.error(m)
   );
-  const seconde = await appelerLlm(system, prompt + RAPPEL_JSON, { ...options, json: true });
-  return {
-    texte: seconde.texte,
-    modele: seconde.modele,
-    fournisseur: seconde.fournisseur,
-    inputTokens: additionnerJetons(premiere.inputTokens, seconde.inputTokens),
-    outputTokens: additionnerJetons(premiere.outputTokens, seconde.outputTokens),
-    json: extraireJson(seconde.texte),
-    tentatives: 2,
-  };
 }

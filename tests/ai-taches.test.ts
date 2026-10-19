@@ -43,7 +43,7 @@ describe("lot 25 – préréglage DeepSeek V4 (doc officielle du 16/10/2026)", (
   it("utilise deepseek-flash par défaut, avec un plafond cohérent avec la doc", () => {
     const c = config({ LLM_PROVIDER: "deepseek", LLM_API_KEY: "sk" });
     expect(c.modele).toBe("deepseek-flash");
-    expect(c.maxTokens).toBe(32768);
+    expect(c.maxTokens).toBe(65536);
     expect(c.maxTokens).toBeLessThanOrEqual(393216);
     expect(c.reflexionPriseEnCharge).toBe(true);
   });

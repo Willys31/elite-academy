@@ -43,7 +43,7 @@ describe("resoudreConfiguration – DeepSeek", () => {
     expect(c.modele).toBe("deepseek-flash");
     expect(c.apiKey).toBe("sk-test");
     expect(c.modeJson).toBe("on");
-    expect(c.maxTokens).toBe(32768);
+    expect(c.maxTokens).toBe(65536);
   });
 
   it("refuse DeepSeek sans clé, avec un message qui dit où l'obtenir", () => {

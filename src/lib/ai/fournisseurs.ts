@@ -184,9 +184,12 @@ export const PRESETS: Record<Exclude<Fournisseur, "anthropic">, PresetFournisseu
     modeleDefaut: MODELES_DEEPSEEK.flash,
     cleRequise: true,
     jsonMode: true,
-    // V4 accepte jusqu'à 393 216 jetons en sortie ; 32 768 suffit à un
-    // plan de formation complet et borne le coût. LLM_MAX_TOKENS remplace.
-    maxTokens: 32768,
+    // V4 accepte jusqu'à 393 216 jetons en sortie. 65 536 : un plan de
+    // formation complet fait 20 000 à 30 000 jetons, et la réflexion
+    // (activée par défaut) consomme le même budget — à 32 768, un plan
+    // HACCP a été coupé le 19/10/2026. Un plafond n'est pas une dépense :
+    // on ne paie que les jetons produits. LLM_MAX_TOKENS remplace.
+    maxTokens: 65536,
     reflexion: true,
     aide: "https://platform.deepseek.com/api_keys",
   },
@@ -346,7 +349,8 @@ export function resoudreConfiguration(env: LecteurEnv, tache: TacheIa = "concept
       : modeJsonBrut === "off" || modeJsonBrut === "false" || modeJsonBrut === "0"
         ? "off"
         : "auto";
-  const timeoutMs = entierPositif(env("LLM_TIMEOUT_MS"), 180_000);
+  // 300 s : DeepSeek V4 Pro met 3 à 5 min pour un plan complet (banc du 19/10/2026).
+  const timeoutMs = entierPositif(env("LLM_TIMEOUT_MS"), 300_000);
   const temperatureBrut = env("LLM_TEMPERATURE");
   const temperature =
     temperatureBrut !== "" && Number.isFinite(Number(temperatureBrut))

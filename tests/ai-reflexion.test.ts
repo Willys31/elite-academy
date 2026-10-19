@@ -80,6 +80,7 @@ describe("lot 25 – paramètre thinking", () => {
     expect(r.texte).not.toContain("raisonnement");
     expect(r.fournisseur).toBe("deepseek");
     expect(r.outputTokens).toBe(9);
+    expect(r.tronquee).toBe(false);
   });
 
   it("journalise une troncature en mentionnant les jetons de réflexion", async () => {
@@ -94,7 +95,8 @@ describe("lot 25 – paramètre thinking", () => {
       },
     ]);
     const journal: string[] = [];
-    await appelerChatCompletions(config(DS, "conception"), { system: "S", prompt: "P" }, fetchImpl, (m) => journal.push(m));
+    const r = await appelerChatCompletions(config(DS, "conception"), { system: "S", prompt: "P" }, fetchImpl, (m) => journal.push(m));
+    expect(r.tronquee).toBe(true);
     expect(journal.join("\n")).toContain("tronquée");
     expect(journal.join("\n")).toContain("réflexion");
   });

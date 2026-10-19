@@ -52,7 +52,7 @@ describe("construireCorps", () => {
     const corps = construireCorps(configDeepSeek(), { system: "S", prompt: "P" }, { avecJson: true });
     expect(corps).toEqual({
       model: "deepseek-flash",
-      max_tokens: 32768,
+      max_tokens: 65536,
       messages: [
         { role: "system", content: "S" },
         { role: "user", content: "P" },
@@ -77,7 +77,7 @@ describe("appelerChatCompletions", () => {
     expect(appels[0].url).toBe("https://api.deepseek.com/v1/chat/completions");
     expect(appels[0].headers.authorization).toBe("Bearer sk-test");
     expect(appels[0].corps.response_format).toEqual({ type: "json_object" });
-    expect(r).toEqual({ texte: '{"ok": true}', modele: "deepseek-flash", fournisseur: "deepseek", inputTokens: 12, outputTokens: 5 });
+    expect(r).toEqual({ texte: '{"ok": true}', modele: "deepseek-flash", fournisseur: "deepseek", inputTokens: 12, outputTokens: 5, tronquee: false });
   });
 
   it("rejoue sans response_format quand le serveur refuse le mode JSON", async () => {

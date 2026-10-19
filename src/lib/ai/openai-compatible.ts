@@ -15,6 +15,8 @@ export interface ReponseLlm {
   fournisseur: Fournisseur;
   inputTokens: number | null;
   outputTokens: number | null;
+  /** Réponse coupée au plafond `max_tokens` (`finish_reason: length`). */
+  tronquee: boolean;
 }
 
 export interface RequeteLlm {
@@ -246,6 +248,7 @@ export async function appelerChatCompletions(
       fournisseur: config.fournisseur,
       inputTokens: donnees.usage?.prompt_tokens ?? null,
       outputTokens: donnees.usage?.completion_tokens ?? null,
+      tronquee: fin === "length",
     };
   }
   throw new Error(`Le service ${config.libelle} n'a pas pu être appelé.`);

@@ -6,13 +6,30 @@
     "Gemini : grille publique Google AI pour gemini-2.5-flash telle que connue au 16/10/2026 ; à revérifier sur https://ai.google.dev/pricing avant toute décision budgétaire"
   ],
   "modeles": {
-    "deepseek-flash": { "entree_par_million": 0.3, "sortie_par_million": 1.2, "note": "DeepSeek-V4.1-Flash, heure pleine" },
-    "deepseek-v4-flash": { "entree_par_million": 0.3, "sortie_par_million": 1.2, "note": "ancien nom, redirigé vers V4.1-Flash et facturé au tarif Flash" },
-    "deepseek-v4-pro": { "entree_par_million": 1.32, "sortie_par_million": 3.96, "note": "DeepSeek-V4-Pro, heure pleine" },
-    "gemini-2.5-flash": { "entree_par_million": 0.3, "sortie_par_million": 2.5, "note": "à revérifier ; l'offre gratuite d'AI Studio facture 0 mais autorise l'usage des données" }
+    "deepseek-flash": {
+      "entree_par_million": 0.3,
+      "sortie_par_million": 1.2,
+      "note": "DeepSeek-V4.1-Flash, heure pleine"
+    },
+    "deepseek-v4-flash": {
+      "entree_par_million": 0.3,
+      "sortie_par_million": 1.2,
+      "note": "ancien nom, redirigé vers V4.1-Flash et facturé au tarif Flash"
+    },
+    "deepseek-v4-pro": {
+      "entree_par_million": 1.32,
+      "sortie_par_million": 3.96,
+      "note": "DeepSeek-V4-Pro, heure pleine"
+    },
+    "gemini-2.5-flash": {
+      "entree_par_million": 0.3,
+      "sortie_par_million": 2.5,
+      "note": "à revérifier ; l'offre gratuite d'AI Studio facture 0 mais autorise l'usage des données"
+    }
   },
   "hypotheses": {
-    "sortie_jetons": 12000,
-    "probabilite_reparation": 0.3
+    "sortie_jetons": 25000,
+    "probabilite_reparation": 0.3,
+    "note": "25 000 jetons : sortie médiane constatée le 19/10/2026 (19 000 à 28 500 par plan, deux fois plus avec une relance)"
   }
 }
