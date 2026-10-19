@@ -235,6 +235,6 @@ describe("controlerPlan – version v1 et formatage", () => {
   it("formate les avertissements pour warnings avec le code", () => {
     const c = controlerPlan(plan((r) => (lecon(r).competency_refs = [])), OPTIONS);
     const t = avertissementsEnTexte(c.avertissements);
-    expect(t[0]).toMatch(/^\[contrôle LECON_SANS_COMPETENCE\] /);
+    expect(t[0]).toMatch(/^Contrôle pédagogique : Module 1, leçon 1 /);
   });
 });

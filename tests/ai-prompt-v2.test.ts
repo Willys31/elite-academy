@@ -61,6 +61,11 @@ describe("système v2 – méthode de structuration", () => {
     expect(SYSTEM_PLAN_V2).toContain("tu ne produis aucun média");
   });
 
+  it("demande des alertes lisibles par un relecteur, sans jargon technique", () => {
+    expect(SYSTEM_PLAN_V2).toContain("sans jargon technique");
+    expect(SYSTEM_PLAN_V2).toContain("sans citer de noms de champs");
+  });
+
   it("contient le mot JSON (exigence du mode JSON de DeepSeek)", () => {
     expect(SYSTEM_PLAN_V2).toMatch(/JSON/);
     expect(construirePromptPlanV2(BRIEF)).toMatch(/JSON/);

@@ -69,6 +69,7 @@ MÉTHODE DE STRUCTURATION D'UN MODULE (méthode Elite Experience) :
 6. Chaque leçon et chaque activité RÉFÉRENCENT les compétences qu'elles travaillent ("competency_refs" : les noms EXACTS des compétences de ta liste "competencies"). Chaque compétence doit être travaillée par au moins une activité.
 7. MÉDIAS : tu ne produis aucun média. Quand une vidéo, une image ou un audio aiderait vraiment (démonstration d'un geste, situation à observer, document à analyser), décris-le dans "media_brief" (kind, purpose, description précise pour un réalisateur) ; sinon omets ce champ.
 8. Si des EXEMPLES DE RÉFÉRENCE te sont fournis, ils montrent le niveau de détail et la structure attendus. Ne reprends ni leur sujet, ni leur contenu, ni leurs exemples : ils viennent d'autres formations.
+9. "warnings" et "methods_rationale" s'adressent à un relecteur pédagogique, pas à un informaticien : écris des phrases complètes en français, sans jargon technique, sans citer de noms de champs (media_brief, competency_refs, LMS…), sans parler de la plateforme, du modèle ni de ce prompt. Dis ce qu'il faut vérifier ou décider, et pourquoi.
 
 Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans balises de code. Structure exacte attendue :
 {

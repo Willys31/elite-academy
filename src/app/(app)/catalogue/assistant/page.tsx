@@ -152,9 +152,8 @@ export default async function AssistantPage() {
           </div>
         </AuthForm>
         <p className="mt-4 text-xs text-slate-400">
-          Chaque génération est tracée (demandeur, brief, version du prompt,
-          modèle, résultat). Le contenu généré reste un brouillon : rien
-          n&apos;est publié sans validation humaine.
+          Chaque génération est tracée. Le contenu généré reste un brouillon :
+          rien n&apos;est publié sans validation humaine.
         </p>
       </Card>
     </div>

@@ -103,8 +103,8 @@ describe("genererAvecReparation", () => {
 describe("messages", () => {
   it("construirePromptReparation numérote les erreurs", () => {
     const p = construirePromptReparation("P", { x: 1 }, [ERREUR, { ...ERREUR, code: "QUIZ_SANS_QUESTION", message: "quiz vide" }]);
-    expect(p).toContain("1. [ACTIVITE_SANS_COMPETENCE]");
-    expect(p).toContain("2. [QUIZ_SANS_QUESTION] quiz vide");
+    expect(p).toContain("1. [ACTIVITE_SANS_COMPETENCE] (modules[0].lessons[0].activities[0])");
+    expect(p).toContain("2. [QUIZ_SANS_QUESTION] (modules[0].lessons[0].activities[0]) quiz vide");
     expect(p).toContain("JSON COMPLET corrigé");
   });
 

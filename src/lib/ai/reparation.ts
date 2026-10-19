@@ -49,7 +49,7 @@ function additionner(a: number | null, b: number | null): number | null {
 
 /** Message utilisateur de réparation : erreurs exactes + réponse précédente. */
 export function construirePromptReparation(promptInitial: string, jsonPrecedent: unknown, erreurs: Probleme[]): string {
-  const liste = erreurs.map((e, i) => `${i + 1}. [${e.code}] ${e.message}`).join("\n");
+  const liste = erreurs.map((e, i) => `${i + 1}. [${e.code}] (${e.chemin}) ${e.message}`).join("\n");
   return `${promptInitial}
 
 ===== RÉPARATION DEMANDÉE =====

@@ -94,7 +94,7 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
   const competences = new Map(r.competencies.map((c) => [normaliser(c.name), c]));
   const travaillees = new Set<string>();
 
-  const verifierRefs = (refs: string[], chemin: string, bloquant: boolean) => {
+  const verifierRefs = (refs: string[], chemin: string, lieu: string) => {
     const connues = refs.filter((n) => competences.has(normaliser(n)));
     const inconnues = refs.filter((n) => !competences.has(normaliser(n)));
     for (const n of connues) travaillees.add(normaliser(n));
@@ -102,13 +102,13 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
       avertissements.push({
         code: "COMPETENCE_INCONNUE",
         chemin,
-        message: `${chemin} référence une compétence absente de la liste "competencies" : ${inconnues.map((n) => `« ${n} »`).join(", ")}. Utiliser les noms exacts.`,
+        message: `${lieu} référence une compétence absente de la liste "competencies" : ${inconnues.map((n) => `« ${n} »`).join(", ")}. Utiliser les noms exacts.`,
       });
     }
     return connues.length;
   };
 
-  const verifierMedia = (media: { kind: string; purpose: string; description: string } | null, chemin: string) => {
+  const verifierMedia = (media: { kind: string; purpose: string; description: string } | null, chemin: string, lieu: string) => {
     if (!media) return;
     const problemes: string[] = [];
     if (!(TYPES_MEDIA as readonly string[]).includes(media.kind)) {
@@ -120,32 +120,32 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
       avertissements.push({
         code: "MEDIA_BRIEF_INVALIDE",
         chemin: `${chemin}.media_brief`,
-        message: `${chemin}.media_brief est mal formé : ${problemes.join(" ; ")}.`,
+        message: `${lieu}.media_brief est mal formé : ${problemes.join(" ; ")}.`,
       });
     }
   };
 
-  const verifierSituation = (situation: string | null, chemin: string) => {
+  const verifierSituation = (situation: string | null, chemin: string, lieu: string) => {
     if (!v2) return;
     if (situation === null) {
-      avertissements.push({ code: "SITUATION_INCONNUE", chemin, message: `${chemin} n'indique pas de "situation_type".` });
+      avertissements.push({ code: "SITUATION_INCONNUE", chemin, message: `${lieu} n'indique pas de "situation_type".` });
     } else if (!(TYPES_SITUATION as readonly string[]).includes(situation)) {
       avertissements.push({
         code: "SITUATION_INCONNUE",
         chemin,
-        message: `${chemin} a un "situation_type" inconnu (« ${situation} »). Valeurs : ${TYPES_SITUATION.join(", ")}.`,
+        message: `${lieu} a un "situation_type" inconnu (« ${situation} »). Valeurs : ${TYPES_SITUATION.join(", ")}.`,
       });
     }
   };
 
-  const verifierMethodesCommerciales = (texte: string, chemin: string) => {
+  const verifierMethodesCommerciales = (texte: string, chemin: string, lieu: string) => {
     if (options.sujetCommercial) return;
     const m = texte.match(METHODES_COMMERCIALES);
     if (m) {
       avertissements.push({
         code: "METHODE_COMMERCIALE_INJUSTIFIEE",
         chemin,
-        message: `${chemin} mobilise une méthode commerciale (« ${m[0]} ») alors que le sujet n'est pas commercial : à justifier ou à retirer.`,
+        message: `${lieu} mobilise une méthode commerciale (« ${m[0]} ») alors que le sujet n'est pas commercial : à justifier ou à retirer.`,
       });
     }
   };
@@ -153,11 +153,12 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
   let niveauPrecedent = -1;
   r.modules.forEach((module, im) => {
     const cheminModule = `modules[${im}]`;
-    verifierMethodesCommerciales(`${module.title}\n${module.description}`, cheminModule);
+    const lieuModule = `Module ${im + 1}`;
+    verifierMethodesCommerciales(`${module.title}\n${module.description}`, cheminModule, lieuModule);
 
     if (module.level === null) {
       if (v2) {
-        avertissements.push({ code: "NIVEAU_MODULE_ABSENT", chemin: cheminModule, message: `${cheminModule} n'indique pas de "level" valide (fundamentals, operational, advanced, elite).` });
+        avertissements.push({ code: "NIVEAU_MODULE_ABSENT", chemin: cheminModule, message: `${lieuModule} (« ${module.title} ») n'indique pas de niveau valide (fundamentals, operational, advanced, elite).` });
       }
     } else {
       const rang = NIVEAUX_CIBLES.indexOf(module.level);
@@ -165,7 +166,7 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
         avertissements.push({
           code: "PROGRESSION_INCOHERENTE",
           chemin: cheminModule,
-          message: `${cheminModule} (« ${module.title} », niveau ${module.level}) suit un module de niveau supérieur : la progression doit être croissante.`,
+          message: `${lieuModule} (« ${module.title} », niveau ${module.level}) suit un module de niveau supérieur : la progression doit être croissante.`,
         });
       }
       niveauPrecedent = Math.max(niveauPrecedent, rang);
@@ -173,17 +174,18 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
 
     module.lessons.forEach((lecon, il) => {
       const cheminLecon = `${cheminModule}.lessons[${il}]`;
-      verifierMethodesCommerciales(`${lecon.title}\n${lecon.text}`, cheminLecon);
-      verifierSituation(lecon.situation_type, cheminLecon);
-      verifierMedia(lecon.media_brief, cheminLecon);
+      const lieuLecon = `${lieuModule}, leçon ${il + 1}`;
+      verifierMethodesCommerciales(`${lecon.title}\n${lecon.text}`, cheminLecon, lieuLecon);
+      verifierSituation(lecon.situation_type, cheminLecon, lieuLecon);
+      verifierMedia(lecon.media_brief, cheminLecon, lieuLecon);
 
       if (v2) {
-        const connues = verifierRefs(lecon.competency_refs, cheminLecon, false);
+        const connues = verifierRefs(lecon.competency_refs, cheminLecon, lieuLecon);
         if (connues === 0) {
           avertissements.push({
             code: "LECON_SANS_COMPETENCE",
             chemin: cheminLecon,
-            message: `${cheminLecon} (« ${lecon.title} ») ne référence aucune compétence existante dans "competency_refs".`,
+            message: `${lieuLecon} (« ${lecon.title} ») ne référence aucune compétence existante dans "competency_refs".`,
           });
         }
       }
@@ -191,46 +193,47 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
       let exercices = 0;
       lecon.activities.forEach((act, ia) => {
         const cheminAct = `${cheminLecon}.activities[${ia}]`;
+        const lieuAct = `${lieuLecon}, activité ${ia + 1}`;
         if (TYPES_EXERCICE.has(act.type)) exercices += 1;
-        verifierMethodesCommerciales(`${act.title}\n${act.instructions}\n${act.evaluation}`, cheminAct);
-        verifierSituation(act.situation_type, cheminAct);
-        verifierMedia(act.media_brief, cheminAct);
+        verifierMethodesCommerciales(`${act.title}\n${act.instructions}\n${act.evaluation}`, cheminAct, lieuAct);
+        verifierSituation(act.situation_type, cheminAct, lieuAct);
+        verifierMedia(act.media_brief, cheminAct, lieuAct);
 
         if (!(TYPES_ACTIVITE_GENEREE as readonly string[]).includes(act.type)) {
           avertissements.push({
             code: "TYPE_ACTIVITE_INCONNU",
             chemin: cheminAct,
-            message: `${cheminAct} a un "type" inconnu (« ${act.type} »). Valeurs : ${TYPES_ACTIVITE_GENEREE.join(", ")}.`,
+            message: `${lieuAct} a un "type" inconnu (« ${act.type} »). Valeurs : ${TYPES_ACTIVITE_GENEREE.join(", ")}.`,
           });
         }
         if (act.type === "quiz" && act.questions.length === 0) {
           erreurs.push({
             code: "QUIZ_SANS_QUESTION",
             chemin: cheminAct,
-            message: `${cheminAct} (« ${act.title} ») est un quiz sans aucune question valide (énoncé, 2 à 6 options, "correct_index" dans les bornes).`,
+            message: `${lieuAct} (« ${act.title} ») est un quiz sans aucune question valide (énoncé, 2 à 6 options, "correct_index" dans les bornes).`,
           });
         }
         if (act.type !== "quiz" && !act.instructions) {
           erreurs.push({
             code: "ACTIVITE_INCOMPLETE",
             chemin: cheminAct,
-            message: `${cheminAct} (« ${act.title} ») n'a pas de consigne ("instructions").`,
+            message: `${lieuAct} (« ${act.title} ») n'a pas de consigne ("instructions").`,
           });
         }
         if (v2 && !act.evaluation) {
           avertissements.push({
             code: "ACTIVITE_INCOMPLETE",
             chemin: cheminAct,
-            message: `${cheminAct} (« ${act.title} ») n'indique pas de mode d'évaluation ("evaluation").`,
+            message: `${lieuAct} (« ${act.title} ») n'indique pas de mode d'évaluation ("evaluation").`,
           });
         }
         if (v2) {
-          const connues = verifierRefs(act.competency_refs, cheminAct, true);
+          const connues = verifierRefs(act.competency_refs, cheminAct, lieuAct);
           if (connues === 0) {
             erreurs.push({
               code: "ACTIVITE_SANS_COMPETENCE",
               chemin: cheminAct,
-              message: `${cheminAct} (« ${act.title} ») ne référence aucune compétence existante : "competency_refs" doit contenir au moins un nom exact de "competencies".`,
+              message: `${lieuAct} (« ${act.title} ») ne référence aucune compétence existante : "competency_refs" doit contenir au moins un nom exact de "competencies".`,
             });
           }
         }
@@ -243,13 +246,13 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
           erreurs.push({
             code: "EXERCICES_TROP_NOMBREUX",
             chemin: cheminLecon,
-            message: `${cheminLecon} (« ${lecon.title} ») compte ${exercices} activités d'exercice ; le maximum est ${bornes.max}. Garder les plus pertinentes.`,
+            message: `${lieuLecon} (« ${lecon.title} ») compte ${exercices} activités d'exercice ; le maximum est ${bornes.max}. Garder les plus pertinentes.`,
           });
         } else if (exercices < bornes.min) {
           avertissements.push({
             code: "EXERCICES_TROP_PEU",
             chemin: cheminLecon,
-            message: `${cheminLecon} (« ${lecon.title} ») compte ${exercices} activité(s) d'exercice ; le minimum attendu est ${bornes.min}.`,
+            message: `${lieuLecon} (« ${lecon.title} ») compte ${exercices} activité(s) d'exercice ; le minimum attendu est ${bornes.min}.`,
           });
         }
       }
@@ -273,5 +276,5 @@ export function controlerPlan(r: ResultatGeneration, options: OptionsControle): 
 
 /** Avertissements formatés pour `warnings` (visibles du validateur). */
 export function avertissementsEnTexte(avertissements: Probleme[], maximum = 20): string[] {
-  return avertissements.slice(0, maximum).map((a) => `[contrôle ${a.code}] ${a.message}`);
+  return avertissements.slice(0, maximum).map((a) => `Contrôle pédagogique : ${a.message}`);
 }

@@ -228,8 +228,7 @@ export default async function EditeurFormationPage({
         <Card className="mb-6 border-gold-400/40 bg-gold-300/10">
           <h2 className="mb-2 font-semibold">Contenu généré par IA — à relire</h2>
           <p className="text-xs text-slate-500">
-            Générée le {new Date(generation.created_at).toLocaleString("fr-FR")} ·
-            modèle {generation.model_name} · prompt {generation.prompt_version}.
+            Générée le {new Date(generation.created_at).toLocaleString("fr-FR")}.
             Ce contenu est un brouillon : vérifiez l&apos;exactitude, les exemples
             et la cohérence pédagogique avant de le soumettre à validation.
           </p>
