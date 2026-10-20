@@ -10,7 +10,8 @@ import {
   STATUT_TENTATIVE_LABELS,
   TYPE_QUESTION_LABELS,
 } from "@/lib/courses/questions";
-import { noterTentative } from "@/app/(app)/resultats/actions";
+import { noterTentative, reviserTentative } from "@/app/(app)/resultats/actions";
+import { estRevisable, libelleDecision, lireDecision, relectureDemandee } from "@/lib/courses/correction-auto";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert } from "@/components/ui";
 import { EcranTitre, Etiquette, Panneau, Retour } from "@/components/app";
@@ -64,6 +65,11 @@ export default async function CorrigerCopiePage({
 
   const activite = Array.isArray(tentative.activity) ? tentative.activity[0] : tentative.activity;
   const enAttente = tentative.status === "pending_review";
+  // Lot 27 : une copie notée (automatiquement ou non) reste révisable
+  // par l'encadrement tant qu'elle contient une réponse rédigée.
+  const decision = lireDecision(tentative.feedback);
+  const revisable = !enAttente && tentative.status === "graded" && estRevisable(feedback);
+  const relecture = relectureDemandee(tentative.feedback);
 
   const [{ data: profil }, { data: questionsBrutes }, { data: revue }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", tentative.user_id).maybeSingle(),
@@ -93,7 +99,14 @@ export default async function CorrigerCopiePage({
   const aNoter = feedback.details.filter((d) => d.type === "open" && d.correcte === null);
   const proposees = aNoter.filter((d) => propositions[d.questionId]).length;
   const liste = (
-    <ListeQuestions feedback={feedback} questions={questions} enAttente={enAttente} propositions={propositions} redigee={Boolean(redigee)} />
+    <ListeQuestions
+      feedback={feedback}
+      questions={questions}
+      enAttente={enAttente}
+      revision={revisable}
+      propositions={propositions}
+      redigee={Boolean(redigee)}
+    />
   );
 
   return (
@@ -150,15 +163,27 @@ export default async function CorrigerCopiePage({
       {enAttente && proposees > 0 ? (
         <div className="mb-6">
           <Alert kind="info">
-            L&apos;IA a pré-corrigé {proposees > 1 ? `${proposees} réponses` : "la réponse"} : son verdict et son feedback sont pré-remplis ci-dessous.
-            Vous décidez : validez tel quel, ou modifiez le verdict et le commentaire avant d&apos;enregistrer. L&apos;apprenant ne voit que ce que vous enregistrez.
+            La correction automatique a préparé {proposees > 1 ? `${proposees} réponses` : "cette réponse"} sans pouvoir conclure seule : verdict et commentaire sont pré-remplis ci-dessous.
+            Vous décidez : validez tel quel, ou modifiez-les avant d&apos;enregistrer. L&apos;apprenant ne voit que ce que vous enregistrez.
           </Alert>
         </div>
       ) : null}
 
       {!enAttente ? (
         <div className="mb-6">
-          <Alert kind="info">Cette copie a déjà été notée : elle est affichée en lecture seule.</Alert>
+          <Alert kind={relecture ? "error" : "info"}>
+            {libelleDecision(decision)}
+            {tentative.graded_at
+              ? ` le ${new Date(tentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
+              : ""}
+            .{" "}
+            {relecture && decision?.relecture?.demandee_le
+              ? `L'apprenant a demandé une relecture le ${new Date(decision.relecture.demandee_le).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`
+              : ""}
+            {revisable
+              ? " Vous pouvez réviser le verdict et le commentaire ci-dessous : l'apprenant sera prévenu."
+              : " Cette copie est affichée en lecture seule."}
+          </Alert>
         </div>
       ) : null}
 
@@ -182,6 +207,11 @@ export default async function CorrigerCopiePage({
           {proposees > 0 ? <input type="hidden" name="source" value="ia" /> : null}
           {liste}
         </AuthForm>
+      ) : revisable ? (
+        <AuthForm action={reviserTentative} submitLabel="Enregistrer la révision" pendingLabel="Enregistrement…">
+          <input type="hidden" name="attempt_id" value={tentative.id as string} />
+          {liste}
+        </AuthForm>
       ) : (
         liste
       )}
@@ -195,12 +225,15 @@ function ListeQuestions({
   feedback,
   questions,
   enAttente,
+  revision,
   propositions,
   redigee,
 }: {
   feedback: ResultatCorrection;
   questions: Map<string, QuestionCorrecteur>;
   enAttente: boolean;
+  /** Copie déjà notée, révisable : les verdicts actuels sont pré-cochés. */
+  revision: boolean;
   propositions: PropositionsCopie;
   /** Activité rédigée : la consigne est déjà affichée en tête, pas de numérotation. */
   redigee: boolean;
@@ -210,8 +243,14 @@ function ListeQuestions({
       {feedback.details.map((d, i) => {
         const q = questions.get(d.questionId);
         const ouverte = d.type === "open";
-        const proposition = ouverte && d.correcte === null ? propositions[d.questionId] : undefined;
-        const preRempli = proposition ? propositionVersNote(proposition) : null;
+        const proposition = ouverte && (d.correcte === null || revision) ? propositions[d.questionId] : undefined;
+        const preRempli = revision
+          ? { acquise: d.correcte === true, commentaire: d.commentaire }
+          : proposition
+            ? propositionVersNote(proposition)
+            : null;
+        const cocheAcquise = revision ? d.correcte === true : preRempli !== null && proposition?.verdict === "acquise";
+        const cocheNonAcquise = revision ? d.correcte === false : preRempli !== null && proposition?.verdict === "non_acquise";
         return (
           <li key={d.questionId}>
             <Panneau className={ouverte && d.correcte === null ? "border-gold-400/60" : ""}>
@@ -267,10 +306,10 @@ function ListeQuestions({
               {proposition ? <PropositionIa proposition={proposition} /> : null}
 
               {/* Verdict et commentaire */}
-              {ouverte && enAttente && d.correcte === null ? (
+              {ouverte && ((enAttente && d.correcte === null) || revision) ? (
                 <fieldset className="mt-4">
                   <legend className="mb-1.5 text-sm font-medium text-ink-900">
-                    {preRempli ? "Votre décision (pré-remplie par la proposition)" : "Votre note"}
+                    {revision ? "Votre révision (verdict et commentaire actuels pré-remplis)" : preRempli ? "Votre décision (pré-remplie par la proposition)" : "Votre note"}
                   </legend>
                   <div className="flex flex-wrap gap-2">
                     <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm hover:bg-slate-50 has-checked:border-brand-400 has-checked:bg-brand-50">
@@ -279,7 +318,7 @@ function ListeQuestions({
                         name={`note_${d.questionId}`}
                         value="1"
                         required
-                        defaultChecked={preRempli !== null && proposition?.verdict === "acquise"}
+                        defaultChecked={cocheAcquise}
                         className="h-5 w-5 accent-brand-600"
                       />
                       Acquise
@@ -290,7 +329,7 @@ function ListeQuestions({
                         name={`note_${d.questionId}`}
                         value="0"
                         required
-                        defaultChecked={preRempli !== null && proposition?.verdict === "non_acquise"}
+                        defaultChecked={cocheNonAcquise}
                         className="h-5 w-5 accent-red-600"
                       />
                       Non acquise

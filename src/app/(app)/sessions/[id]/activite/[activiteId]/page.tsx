@@ -109,7 +109,7 @@ export default async function ActiviteSessionPage({
         <Card className="mb-6 border-brand-200">
           <h2 className="font-semibold">
             {derniereTentative.score === null
-              ? "Votre réponse : en attente de la note du formateur"
+              ? "Votre réponse : en attente de correction"
               : `Votre réponse : ${Number(derniereTentative.score)} % (${feedback.nbCorrectes}/${feedback.nbQuestions})`}
           </h2>
           <ul className="mt-3 space-y-2 text-sm">
@@ -150,7 +150,7 @@ export default async function ActiviteSessionPage({
                   </legend>
                   <ChampReponse
                     question={q}
-                    placeholder={redigee ? "Rédigez votre réponse ici. Elle est pré-corrigée par l'IA puis validée par le formateur." : undefined}
+                    placeholder={redigee ? "Rédigez votre réponse ici." : undefined}
                   />
                 </fieldset>
               ))}

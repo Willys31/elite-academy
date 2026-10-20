@@ -118,6 +118,7 @@ export default async function ActiviteRedigeePage({
             </p>
           ) : null}
           <p className="text-xs text-slate-500">
+            {contenu.correction_humaine ? "Correction humaine obligatoire · " : "Correction automatique · "}
             Difficulté {activite.difficulty}/5
             {nomsCompetences.length > 0 ? ` · Compétence : ${nomsCompetences.join(", ")}` : " · Aucune compétence liée"}
           </p>
@@ -177,6 +178,14 @@ export default async function ActiviteRedigeePage({
                 Visibles de l&apos;apprenant avant sa réponse. L&apos;IA pré-corrige et le formateur valide sur cette base.
               </p>
             </div>
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input type="checkbox" name="correction_humaine" defaultChecked={contenu.correction_humaine} className="mt-0.5 size-4 accent-brand-700" />
+              <span>
+                <span className="font-medium text-ink-900">Correction humaine obligatoire</span>
+                {" "}— un formateur notera chaque réponse (contenu certifiant, réglementaire ou sensible). Sinon, la
+                correction est automatique et un formateur peut relire sur demande.
+              </span>
+            </label>
             <div>
               <Label htmlFor="competency_id">Compétence évaluée</Label>
               <Select id="competency_id" name="competency_id" defaultValue={competenceActuelle}>

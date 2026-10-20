@@ -46,7 +46,18 @@ export default async function CorrectionsPage() {
     .order("submitted_at", { ascending: true })
     .limit(200);
 
-  const idsApprenants = [...new Set((copies ?? []).map((c) => c.user_id as string))];
+  // Lot 27 : copies corrigées automatiquement dont l'apprenant demande une relecture.
+  const { data: relectures } = await supabase
+    .from("attempts")
+    .select("id, user_id, activity_id, submitted_at, feedback, activity:activities(title, type), review:attempt_ai_reviews(proposal)")
+    .eq("status", "graded")
+    .neq("user_id", user.id)
+    .not("feedback->decision->relecture->>demandee_le", "is", null)
+    .is("feedback->decision->relecture->>traitee_le", null)
+    .order("submitted_at", { ascending: true })
+    .limit(200);
+
+  const idsApprenants = [...new Set([...(copies ?? []), ...(relectures ?? [])].map((c) => c.user_id as string))];
   const noms = new Map<string, string>();
   if (idsApprenants.length > 0) {
     const { data: profils } = await supabase
@@ -56,7 +67,7 @@ export default async function CorrectionsPage() {
     for (const p of profils ?? []) noms.set(p.id as string, (p.full_name as string) || "Apprenant");
   }
 
-  const liste = (copies ?? []).map((c) => {
+  const formater = (c: NonNullable<typeof copies>[number]) => {
     const activite = Array.isArray(c.activity) ? c.activity[0] : c.activity;
     const feedback = c.feedback as ResultatCorrection | null;
     const revue = Array.isArray(c.review) ? c.review[0] : c.review;
@@ -69,20 +80,46 @@ export default async function CorrectionsPage() {
       date: c.submitted_at as string | null,
       ia: resumerPropositions((revue?.proposal ?? null) as PropositionsCopie | null),
     };
-  });
+  };
+  const liste = (copies ?? []).map(formater);
+  const listeRelectures = (relectures ?? []).map(formater);
 
   return (
     <div>
       <Retour href="/resultats" />
       <EnTete />
 
-      {liste.length === 0 ? (
+      {listeRelectures.length > 0 ? (
+        <section className="mb-8">
+          <SectionTitre compte={listeRelectures.length}>Relectures demandées</SectionTitre>
+          <ul className="space-y-3">
+            {listeRelectures.map((c) => (
+              <li key={c.id}>
+                <PanneauLien href={`/resultats/corrections/${c.id}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink-900">{c.nom}</p>
+                      <p className="text-xs text-slate-500">
+                        {c.typeActivite ? `${c.typeActivite} · ` : ""}
+                        {c.titreActivite} · corrigée automatiquement, relecture demandée
+                      </p>
+                    </div>
+                    <Etiquette ton="or">À relire</Etiquette>
+                  </div>
+                </PanneauLien>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {liste.length === 0 && listeRelectures.length === 0 ? (
         <Vide
           titre="Aucune copie en attente"
-          texte="Dès qu'un apprenant répond à une question ouverte d'une formation que vous encadrez, sa copie apparaît ici et vous êtes notifié."
+          texte="Les réponses rédigées sont corrigées automatiquement. Une copie n'apparaît ici que si la correction n'a pas pu conclure seule, ou si un apprenant demande une relecture."
           action={<LienSobre href="/resultats">Voir les résultats</LienSobre>}
         />
-      ) : (
+      ) : liste.length > 0 ? (
         <section>
           <SectionTitre compte={liste.length}>À noter</SectionTitre>
           <ul className="space-y-3">
@@ -112,7 +149,7 @@ export default async function CorrectionsPage() {
               ))}
           </ul>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -121,7 +158,7 @@ function EnTete() {
   return (
     <EcranTitre
       eyebrow="Vue formateur"
-      intro="Les questions ouvertes ne se corrigent pas toutes seules. Pour chacune, dites si la réponse est acquise et laissez un commentaire : l'apprenant le lit sur l'activité et dans sa révision, et sa maîtrise se met à jour."
+      intro="Les réponses rédigées sont corrigées automatiquement dès l'envoi. Vous intervenez quand la correction n'a pas pu conclure seule, quand un apprenant demande une relecture, ou pour réviser une copie : l'apprenant lit votre décision sur l'activité et dans sa révision, et sa maîtrise se met à jour."
     >
       Copies à corriger
     </EcranTitre>

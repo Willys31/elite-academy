@@ -295,7 +295,7 @@ export default async function RevisionPage({
                           {q.commentaire ? (
                             <p className="mt-4 rounded-lg bg-brand-50 px-3.5 py-2.5 text-sm leading-relaxed text-brand-900">
                               <span className="text-xs font-medium text-brand-700/80">
-                                Commentaire du formateur
+                                Commentaire de correction
                               </span>
                               <br />
                               {q.commentaire}

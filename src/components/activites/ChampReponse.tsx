@@ -38,7 +38,7 @@ export function ChampReponse({
         name={nom}
         rows={5}
         maxLength={4000}
-        placeholder={placeholder ?? "Rédigez votre réponse. Un formateur la lira et la notera."}
+        placeholder={placeholder ?? "Rédigez votre réponse."}
         className="block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none transition duration-200 focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15"
       />
     );
@@ -74,11 +74,14 @@ export function LigneFeedback({
   detail,
   numero,
   libelle,
+  libelleCommentaire,
 }: {
   detail: CorrectionQuestion;
   numero: number;
   /** Remplace « Question N » (activité rédigée : « Votre réponse »). */
   libelle?: string;
+  /** Intitulé du commentaire (défaut « Commentaire »). */
+  libelleCommentaire?: string;
 }) {
   const enAttente = detail.correcte === null;
   const ouverte = detail.type === "open";
@@ -91,7 +94,7 @@ export function LigneFeedback({
     <li className={`rounded-lg px-3 py-2 ${ton}`}>
       {libelle ?? `Question ${numero}`} :{" "}
       {enAttente
-        ? "en attente de la note du formateur ⏳"
+        ? "en attente de correction ⏳"
         : detail.correcte
           ? ouverte
             ? "acquise ✓"
@@ -112,7 +115,7 @@ export function LigneFeedback({
       ) : null}
       {detail.commentaire ? (
         <span className="mt-1 block border-l-2 border-brand-300 pl-3 text-slate-700">
-          Commentaire du formateur : {detail.commentaire}
+          {libelleCommentaire ?? "Commentaire"} : {detail.commentaire}
         </span>
       ) : null}
       {detail.explication && !enAttente ? (

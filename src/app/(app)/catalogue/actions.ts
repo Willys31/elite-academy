@@ -872,6 +872,7 @@ export async function mettreAJourActiviteRedigee(
     expected_outcome: a.activite.content.expected_outcome,
     evaluation: a.activite.content.evaluation,
     situation_type: a.activite.content.situation_type ?? ancien.situation_type,
+    correction_humaine: a.activite.content.correction_humaine,
   };
 
   const { error } = await supabase

@@ -11,6 +11,8 @@ import {
   VERDICT_LABELS,
 } from "@/lib/courses/positionnement";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
+import { demanderRelecture } from "@/app/(app)/resultats/actions";
+import { estCorrigeeAutomatiquement, libelleDecision, lireDecision, relectureDemandee } from "@/lib/courses/correction-auto";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { estEnAttenteDeCorrection, lireTypeQuestion } from "@/lib/courses/questions";
 import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
@@ -110,6 +112,10 @@ export default async function ActivitePage({
     .maybeSingle();
   const feedback = (derniereTentative?.feedback ?? null) as ResultatCorrection | null;
   const enAttente = estEnAttenteDeCorrection(derniereTentative?.status);
+  // Lot 27 : qui a décidé (correction automatique ou formateur), relecture.
+  const decision = lireDecision(derniereTentative?.feedback);
+  const automatique = estCorrigeeAutomatiquement(derniereTentative?.feedback);
+  const relectureEnCours = relectureDemandee(derniereTentative?.feedback);
 
   const competences = (activite.activity_competencies ?? [])
     .map((ac) => {
@@ -184,18 +190,36 @@ export default async function ActivitePage({
               {feedback.nbQuestions - feedback.nbEnAttente > 0
                 ? `Réponses enregistrées : ${feedback.nbCorrectes}/${feedback.nbQuestions - feedback.nbEnAttente} sur les questions corrigées automatiquement. `
                 : "Réponses enregistrées. "}
-              Un formateur doit encore noter {feedback.nbEnAttente > 1 ? `${feedback.nbEnAttente} questions ouvertes` : "votre question ouverte"}.
-              Vous recevrez une notification dès que la note sera posée.
+              {feedback.nbEnAttente > 1 ? `${feedback.nbEnAttente} réponses rédigées sont` : "Votre réponse rédigée est"} en cours de correction.
+              Vous recevrez une notification dès que le résultat sera disponible.
             </p>
           ) : derniereTentative.graded_at ? (
-            <p className="mt-1 text-sm text-slate-600">
-              Notée par un formateur le{" "}
-              {new Date(derniereTentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
-            </p>
+            <div className="mt-1 text-sm text-slate-600">
+              <p>
+                {libelleDecision(decision)} le{" "}
+                {new Date(derniereTentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
+                {relectureEnCours && decision?.relecture?.demandee_le
+                  ? ` Relecture demandée le ${new Date(decision.relecture.demandee_le).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} : un formateur va relire votre réponse.`
+                  : ""}
+              </p>
+              {automatique && !relectureEnCours && !decision?.revisee_le ? (
+                <div className="mt-2">
+                  <AuthForm action={demanderRelecture} submitLabel="Demander une relecture par un formateur" pendingLabel="Envoi…">
+                    <input type="hidden" name="attempt_id" value={derniereTentative.id as string} />
+                  </AuthForm>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
-              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} libelle={redigee ? "Votre réponse" : undefined} />
+              <LigneFeedback
+                key={d.questionId}
+                detail={d}
+                numero={i + 1}
+                libelle={redigee ? "Votre réponse" : undefined}
+                libelleCommentaire={automatique && !decision?.revisee_le ? "Commentaire" : "Commentaire du formateur"}
+              />
             ))}
           </ul>
           {placement ? (
@@ -245,8 +269,8 @@ export default async function ActivitePage({
         <Alert kind="info">{redigee ? "Cette activité n'a pas encore de consigne." : "Ce QCM ne contient pas encore de question."}</Alert>
       ) : enAttente ? (
         <Alert kind="info">
-          Votre copie est entre les mains d&apos;un formateur. Vous pourrez
-          retenter cette activité une fois la note reçue.
+          Votre réponse est en cours de correction. Vous pourrez retenter
+          cette activité une fois le résultat reçu.
         </Alert>
       ) : (
         <Card>
@@ -275,14 +299,14 @@ export default async function ActivitePage({
                       <>
                         {i + 1}. {q.prompt}
                         {lireTypeQuestion(q.type) === "open" ? (
-                          <span className="ml-2 text-xs font-normal text-slate-500">(réponse rédigée, notée par un formateur)</span>
+                          <span className="ml-2 text-xs font-normal text-slate-500">(réponse rédigée)</span>
                         ) : null}
                       </>
                     )}
                   </legend>
                   <ChampReponse
                     question={q}
-                    placeholder={redigee ? "Rédigez votre réponse ici. Elle est pré-corrigée par l'IA puis validée par un formateur." : undefined}
+                    placeholder={redigee ? "Rédigez votre réponse ici." : undefined}
                   />
                 </fieldset>
               ))}

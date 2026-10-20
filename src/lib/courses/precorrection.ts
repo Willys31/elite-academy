@@ -15,6 +15,8 @@ import {
 } from "@/lib/ai/precorrection";
 import { simulerPrecorrection } from "@/lib/ai/simulation";
 import { lireContenuActiviteRedigee } from "@/lib/courses/activites-redigees";
+import { correctionHumaineForcee, decisionAutomatique, lireReglagesCorrectionAuto } from "@/lib/courses/correction-auto";
+import { enregistrerNotes } from "@/lib/courses/correction";
 import { formationDeLActivite } from "@/lib/courses/maitrise";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 
@@ -41,7 +43,7 @@ export async function precorrigerTentative(params: {
   attemptId: string;
   userId: string;
   activityId: string;
-}): Promise<{ ok: boolean; motif: string }> {
+}): Promise<{ ok: boolean; motif: string; corrigee?: { score: number; nbCorrectes: number; nbQuestions: number } }> {
   const { attemptId, userId, activityId } = params;
   const simulation = modeSimulation();
   if (!simulation && !iaConfiguree("correction")) return { ok: false, motif: "IA non configurée" };
@@ -64,7 +66,7 @@ export async function precorrigerTentative(params: {
 
   // Copie et questions ouvertes encore sans note.
   const [{ data: tentative }, { data: activite }, { data: profil }] = await Promise.all([
-    admin.from("attempts").select("id, answers, feedback, status").eq("id", attemptId).maybeSingle(),
+    admin.from("attempts").select("id, user_id, activity_id, session_id, answers, feedback, status").eq("id", attemptId).maybeSingle(),
     admin.from("activities").select("id, type, title, instructions, content").eq("id", activityId).maybeSingle(),
     admin.from("profiles").select("full_name, email").eq("id", userId).maybeSingle(),
   ]);
@@ -177,6 +179,34 @@ export async function precorrigerTentative(params: {
           completed_at: new Date().toISOString(),
         })
         .eq("id", generation.id);
+    }
+
+    // Correction automatique (lot 27) : si le mode est actif, que
+    // l'activité ne force pas la correction humaine, et que chaque
+    // proposition est nette et assez sûre, la note est posée tout de
+    // suite ; sinon la copie reste « à corriger » pour un formateur.
+    const reglages = lireReglagesCorrectionAuto(lireEnv);
+    if (reglages.actif && !correctionHumaineForcee(activite.content)) {
+      const notes = decisionAutomatique(propositions, enAttente.map((d) => d.questionId), reglages.seuil);
+      if (notes) {
+        const r = await enregistrerNotes({
+          admin,
+          tentative: {
+            id: attemptId,
+            user_id: tentative.user_id as string,
+            activity_id: activityId,
+            session_id: (tentative.session_id as string | null) ?? null,
+            status: "pending_review",
+            feedback: correction as ResultatCorrection,
+          },
+          notes,
+          decidePar: null,
+        });
+        return r.ok
+          ? { ok: true, motif: `corrigée automatiquement (${r.score} %)`, corrigee: { score: r.score, nbCorrectes: r.nbCorrectes, nbQuestions: r.nbQuestions } }
+          : { ok: true, motif: `proposition enregistrée ; note automatique refusée : ${r.erreur}` };
+      }
+      return { ok: true, motif: "proposition enregistrée ; décision laissée au formateur (confiance ou verdict insuffisants)" };
     }
     return { ok: true, motif: "proposition enregistrée" };
   } catch (e) {

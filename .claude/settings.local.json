@@ -4,7 +4,8 @@
       "PowerShell(npm run test 2>&1)",
       "PowerShell(npm run build 2>&1)",
       "Bash(npx vitest *)",
-      "Bash(python -)"
+      "Bash(python -)",
+      "Bash(grep -v \"^\\\\s*//\")"
     ]
   }
 }

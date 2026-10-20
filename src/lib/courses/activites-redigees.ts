@@ -53,6 +53,8 @@ export interface ContenuActiviteRedigee {
   media_brief: MediaBriefGenere | null;
   generated_by_ai: boolean;
   prompt_version: string | null;
+  /** Lot 27 : exiger une correction humaine (contenu certifiant, sensible). */
+  correction_humaine: boolean;
 }
 
 const texte = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
@@ -72,6 +74,7 @@ export function lireContenuActiviteRedigee(brut: unknown): ContenuActiviteRedige
         : null,
     generated_by_ai: c.generated_by_ai === true,
     prompt_version: texte(c.prompt_version) || null,
+    correction_humaine: c.correction_humaine === true,
   };
 }
 
@@ -132,6 +135,7 @@ export function activiteDepuisPlan(
     media_brief: a.media_brief,
     generated_by_ai: true,
     prompt_version: options.prompt_version,
+    correction_humaine: false,
   };
   const difficulty = borner(a.difficulty, 2);
   return {
@@ -179,6 +183,7 @@ export function lireFormulaireActiviteRedigee(lire: (nom: string) => string): Le
     media_brief: null,
     generated_by_ai: false,
     prompt_version: null,
+    correction_humaine: lire("correction_humaine") === "on" || lire("correction_humaine") === "true",
   };
   const difficulty = borner(lire("difficulty"), 2);
   return {

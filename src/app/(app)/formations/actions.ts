@@ -457,11 +457,21 @@ export async function soumettreQcm(
   if (attenteCorrecteur) {
     // Pré-correction IA (lot 26) : une proposition pour le formateur,
     // rangée hors de portée de l'apprenant ; jamais bloquante.
+    let corrigee: { score: number; nbCorrectes: number; nbQuestions: number } | undefined;
     try {
       const pre = await precorrigerTentative({ attemptId: tentative.id as string, userId: user.id, activityId });
       if (!pre.ok) console.error("[ia] pré-correction non effectuée :", pre.motif);
+      corrigee = pre.corrigee;
     } catch (e) {
       console.error("[ia] pré-correction :", e instanceof Error ? e.message : e);
+    }
+    // Corrigée automatiquement (lot 27) : résultat immédiat, pas de copie à corriger.
+    if (corrigee) {
+      revalidatePath(`/formations/${courseId}/activite/${activityId}`);
+      revalidatePath("/progression");
+      return {
+        success: `Réponse corrigée : ${corrigee.score} % (${corrigee.nbCorrectes}/${corrigee.nbQuestions}). Le résultat et le commentaire s'affichent ci-dessus ; vous pouvez demander une relecture par un formateur.`,
+      };
     }
     if (courseId) {
       const pluriel = correction.nbEnAttente > 1 ? "s" : "";
@@ -481,7 +491,7 @@ export async function soumettreQcm(
     return {
       success: `Réponses enregistrées${
         notees > 0 ? ` : ${correction.nbCorrectes}/${notees} sur les questions corrigées automatiquement` : ""
-      }. ${correction.nbEnAttente > 1 ? `${correction.nbEnAttente} questions ouvertes attendent` : "Votre question ouverte attend"} la note d'un formateur : vous serez prévenu.`,
+      }. ${correction.nbEnAttente > 1 ? `${correction.nbEnAttente} réponses rédigées sont` : "Votre réponse rédigée est"} en cours de correction : vous serez prévenu.`,
     };
   }
 

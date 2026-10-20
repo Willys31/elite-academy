@@ -196,10 +196,10 @@ describe("resumerPropositions", () => {
   it("résume une ou plusieurs propositions pour la file des copies", () => {
     expect(resumerPropositions(null)).toBeNull();
     expect(resumerPropositions({})).toBeNull();
-    expect(resumerPropositions({ q1: acquise })).toBe("IA : acquise (82 %)");
-    expect(resumerPropositions({ q1: { ...acquise, verdict: "incertain" } })).toBe("IA : incertain");
+    expect(resumerPropositions({ q1: acquise })).toBe("Correction proposée : acquise (82 %)");
+    expect(resumerPropositions({ q1: { ...acquise, verdict: "incertain" } })).toBe("Correction proposée : incertain");
     expect(resumerPropositions({ q1: acquise, q2: { ...acquise, verdict: "non_acquise" }, q3: { ...acquise, verdict: "incertain" } })).toBe(
-      "IA : 1 acquise · 1 non acquise · 1 incertain"
+      "Correction proposée : 1 acquise · 1 non acquise · 1 incertain"
     );
   });
 });

@@ -174,14 +174,14 @@ export function resumerPropositions(proposal: PropositionsCopie | null | undefin
   if (liste.length === 1) {
     const p = liste[0];
     return p.verdict === "incertain"
-      ? "IA : incertain"
-      : `IA : ${VERDICT_LABELS[p.verdict].toLowerCase()} (${Math.round(p.confiance * 100)} %)`;
+      ? "Correction proposée : incertain"
+      : `Correction proposée : ${VERDICT_LABELS[p.verdict].toLowerCase()} (${Math.round(p.confiance * 100)} %)`;
   }
   const parts: string[] = [];
   if (compte.acquise) parts.push(`${compte.acquise} acquise${compte.acquise > 1 ? "s" : ""}`);
   if (compte.non_acquise) parts.push(`${compte.non_acquise} non acquise${compte.non_acquise > 1 ? "s" : ""}`);
   if (compte.incertain) parts.push(`${compte.incertain} incertain${compte.incertain > 1 ? "s" : ""}`);
-  return `IA : ${parts.join(" · ")}`;
+  return `Correction proposée : ${parts.join(" · ")}`;
 }
 
 /** LLM_PRECORRECTIONS_PAR_JOUR : défaut 200 ; 0 désactive la pré-correction. */
