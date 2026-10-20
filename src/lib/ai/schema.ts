@@ -208,6 +208,9 @@ function validerActivite(brut: unknown): ActiviteGeneree | null {
   };
 }
 
+/** Validation d'une activité isolée (reprise des leçons générées avant le lot 26). */
+export const validerActiviteGeneree = validerActivite;
+
 /** Lignes-repères [[PAGE n]] / [[DIAPOSITIVE n]] qu'un modèle aurait recopiées. */
 const MARQUEUR_RECOPIE = /^\s*\[\[(?:PAGE|DIAPOSITIVE) \d+[^\]]*\]\]\s*$/gm;
 

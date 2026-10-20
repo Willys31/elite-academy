@@ -17,6 +17,15 @@ import {
   OPTIONS_VRAI_FAUX,
   TYPE_QUESTION_LABELS,
 } from "@/lib/courses/questions";
+import {
+  activiteDepuisPlan,
+  grilleDepuisActivite,
+  lireContenuActiviteRedigee,
+  lireFormulaireActiviteRedigee,
+  retirerBlocActivites,
+  type ActiviteRedigeeACreer,
+} from "@/lib/courses/activites-redigees";
+import { validerActiviteGeneree } from "@/lib/ai/schema";
 
 export interface ActionState {
   error?: string;
@@ -747,4 +756,231 @@ export async function supprimerFormation(
   revalidatePath("/catalogue");
   revalidatePath("/validation");
   redirect("/catalogue?supprimee=1");
+}
+
+// ------------------------------------------------------------
+// Activités rédigées (lot 26) : exercice, étude de cas, simulation.
+// Une activité = une ligne `activities` + UNE question `open` dont la
+// grille (`expected_answer.rubric`, illisible de l'apprenant) reprend le
+// résultat attendu et les critères. Modifiable en brouillon seulement.
+// ------------------------------------------------------------
+
+async function positionSuivante(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lessonId: string
+): Promise<number> {
+  const { count } = await supabase
+    .from("activities")
+    .select("id", { count: "exact", head: true })
+    .eq("lesson_id", lessonId);
+  return (count ?? 0) + 1;
+}
+
+/** Insère activité + question ouverte + lien compétence. Renvoie l'identifiant de l'activité. */
+async function insererActiviteRedigee(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lessonId: string,
+  a: ActiviteRedigeeACreer,
+  competencyIds: Array<{ id: string; level?: string }>,
+  genereeParIa: boolean
+): Promise<string | null> {
+  const { data: activite, error } = await supabase
+    .from("activities")
+    .insert({
+      lesson_id: lessonId,
+      type: a.activite.type,
+      title: a.activite.title,
+      instructions: a.activite.instructions,
+      content: a.activite.content,
+      difficulty: a.activite.difficulty,
+      position: await positionSuivante(supabase, lessonId),
+      generated_by_ai: genereeParIa,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error || !activite) {
+    loguerErreur("création d'une activité rédigée", error);
+    return null;
+  }
+  const { error: erreurQuestion } = await supabase.from("questions").insert({
+    activity_id: activite.id,
+    type: "open",
+    prompt: a.question.prompt,
+    options: [],
+    expected_answer: a.question.expected_answer,
+    explanation: null,
+    difficulty: a.question.difficulty,
+    competency_id: competencyIds[0]?.id ?? null,
+    position: 1,
+  });
+  if (erreurQuestion) loguerErreur("question de l'activité rédigée", erreurQuestion);
+  if (competencyIds.length > 0) {
+    await supabase.from("activity_competencies").upsert(
+      competencyIds.map((c) => ({ activity_id: activite.id, competency_id: c.id, level: c.level ?? "fundamentals", weight: 1 })),
+      { onConflict: "activity_id,competency_id" }
+    );
+  }
+  return activite.id;
+}
+
+export async function creerActiviteRedigee(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const courseId = String(formData.get("course_id") ?? "");
+  const lessonId = String(formData.get("lesson_id") ?? "");
+  const competencyId = String(formData.get("competency_id") ?? "");
+  const lecture = lireFormulaireActiviteRedigee((nom) => String(formData.get(nom) ?? ""));
+  if (!lecture.ok) return { error: lecture.erreur };
+
+  const ctx = await verifierEditionContenu(courseId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase } = ctx;
+
+  const id = await insererActiviteRedigee(supabase, lessonId, lecture.valeur, competencyId ? [{ id: competencyId }] : [], false);
+  if (!id) return { error: ERREUR_GENERIQUE };
+  redirect(`/catalogue/${courseId}/activite-redigee/${id}`);
+}
+
+export async function mettreAJourActiviteRedigee(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const courseId = String(formData.get("course_id") ?? "");
+  const activityId = String(formData.get("activity_id") ?? "");
+  const competencyId = String(formData.get("competency_id") ?? "");
+  const lecture = lireFormulaireActiviteRedigee((nom) => String(formData.get(nom) ?? ""));
+  if (!lecture.ok) return { error: lecture.erreur };
+
+  const ctx = await verifierEditionContenu(courseId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase } = ctx;
+
+  // Le contenu existant garde ce que le formulaire ne porte pas
+  // (compétences nommées, média décrit, provenance IA).
+  const { data: existante } = await supabase
+    .from("activities")
+    .select("id, content")
+    .eq("id", activityId)
+    .maybeSingle();
+  if (!existante) return { error: "Activité introuvable." };
+  const ancien = lireContenuActiviteRedigee(existante.content);
+  const a = lecture.valeur;
+  const content = {
+    ...ancien,
+    expected_outcome: a.activite.content.expected_outcome,
+    evaluation: a.activite.content.evaluation,
+    situation_type: a.activite.content.situation_type ?? ancien.situation_type,
+  };
+
+  const { error } = await supabase
+    .from("activities")
+    .update({
+      type: a.activite.type,
+      title: a.activite.title,
+      instructions: a.activite.instructions,
+      content,
+      difficulty: a.activite.difficulty,
+    })
+    .eq("id", activityId);
+  if (error) {
+    loguerErreur("mise à jour d'une activité rédigée", error);
+    return { error: ERREUR_GENERIQUE };
+  }
+
+  // La question ouverte suit : consigne, grille, difficulté, compétence.
+  const { data: question } = await supabase
+    .from("questions")
+    .select("id")
+    .eq("activity_id", activityId)
+    .order("position")
+    .limit(1)
+    .maybeSingle();
+  const champsQuestion = {
+    prompt: a.question.prompt,
+    expected_answer: { rubric: grilleDepuisActivite(content) },
+    difficulty: a.question.difficulty,
+    competency_id: competencyId || null,
+  };
+  if (question) {
+    await supabase.from("questions").update(champsQuestion).eq("id", question.id);
+  } else {
+    await supabase.from("questions").insert({ activity_id: activityId, type: "open", options: [], explanation: null, position: 1, ...champsQuestion });
+  }
+  if (competencyId) {
+    await supabase.from("activity_competencies").upsert(
+      { activity_id: activityId, competency_id: competencyId, weight: 1 },
+      { onConflict: "activity_id,competency_id" }
+    );
+  }
+
+  revalidatePath(`/catalogue/${courseId}/activite-redigee/${activityId}`);
+  revalidatePath(`/catalogue/${courseId}/modifier`);
+  return { success: "Activité enregistrée." };
+}
+
+/**
+ * Reprise d'une leçon générée avant le lot 26 : ses activités décrites
+ * dans `lessons.content.activities` deviennent de vraies activités, et
+ * le bloc « — Activités — » ajouté à son texte est retiré. Une seule fois.
+ */
+export async function creerActivitesDepuisLecon(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const courseId = String(formData.get("course_id") ?? "");
+  const lessonId = String(formData.get("lesson_id") ?? "");
+
+  const ctx = await verifierEditionContenu(courseId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, course } = ctx;
+
+  const { data: lecon } = await supabase
+    .from("lessons")
+    .select("id, content")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!lecon) return { error: "Leçon introuvable." };
+  const contenu = (lecon.content ?? {}) as Record<string, unknown>;
+  const decrites = Array.isArray(contenu.activities) ? (contenu.activities as unknown[]) : [];
+  if (decrites.length === 0) return { error: "Cette leçon ne décrit aucune activité à créer." };
+
+  // Compétences de l'organisation, par nom (celles que le plan a nommées).
+  const { data: competences } = await supabase
+    .from("competencies")
+    .select("id, name")
+    .eq("organization_id", course.organization_id);
+  const parNom = new Map((competences ?? []).map((c) => [String(c.name).trim().toLowerCase(), c.id as string]));
+  const { data: niveaux } = await supabase
+    .from("course_competencies")
+    .select("competency_id, target_level")
+    .eq("course_id", courseId);
+  const niveauDe = new Map((niveaux ?? []).map((n) => [n.competency_id as string, n.target_level as string]));
+
+  const version = typeof contenu.prompt_version === "string" ? contenu.prompt_version : "plan-formation/v2";
+  let creees = 0;
+  for (const brut of decrites) {
+    const a = validerActiviteGeneree(brut);
+    if (!a) continue;
+    const redigee = activiteDepuisPlan(a, { prompt_version: version });
+    if (!redigee) continue;
+    const ids = redigee.competences
+      .map((n) => parNom.get(n.trim().toLowerCase()))
+      .filter((x): x is string => Boolean(x))
+      .map((id) => ({ id, level: niveauDe.get(id) }));
+    const id = await insererActiviteRedigee(supabase, lessonId, redigee, ids, true);
+    if (id) creees += 1;
+  }
+
+  const { activities: _retirees, ...reste } = contenu;
+  void _retirees;
+  const texte = typeof contenu.text === "string" ? retirerBlocActivites(contenu.text) : contenu.text;
+  await supabase
+    .from("lessons")
+    .update({ content: { ...reste, text: texte } })
+    .eq("id", lessonId);
+
+  revalidatePath(`/catalogue/${courseId}/modifier`);
+  return { success: `${creees} activité${creees > 1 ? "s" : ""} créée${creees > 1 ? "s" : ""} à partir de la leçon.` };
 }

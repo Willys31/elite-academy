@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/lib/auth/profile";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
+import { ActiviteRedigee } from "@/components/activites/ActiviteRedigee";
+import { estActiviteRedigee } from "@/lib/courses/activites-redigees";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, Card, PageTitle } from "@/components/ui";
 
@@ -44,10 +46,17 @@ export default async function ActiviteSessionPage({
 
   const { data: activite } = await supabase
     .from("activities")
-    .select("id, title, instructions")
+    .select("id, title, instructions, type, content, difficulty, activity_competencies(competency:competencies(name))")
     .eq("id", activiteId)
     .maybeSingle();
   if (!activite) notFound();
+  const redigee = estActiviteRedigee(activite.type) ? activite.type : null;
+  const competences = (activite.activity_competencies ?? [])
+    .map((ac) => {
+      const c = Array.isArray(ac.competency) ? ac.competency[0] : ac.competency;
+      return c?.name;
+    })
+    .filter(Boolean) as string[];
 
   // IMPORTANT : pas de expected_answer ni explanation côté navigateur.
   const { data: questions } = await supabase
@@ -82,7 +91,15 @@ export default async function ActiviteSessionPage({
       </p>
       <PageTitle>{activite.title}</PageTitle>
 
-      {activite.instructions ? (
+      {redigee ? (
+        <ActiviteRedigee
+          type={redigee}
+          instructions={activite.instructions}
+          content={activite.content}
+          difficulty={activite.difficulty}
+          competences={competences}
+        />
+      ) : activite.instructions ? (
         <Card className="mb-6">
           <p className="text-sm text-slate-700">{activite.instructions}</p>
         </Card>
@@ -97,7 +114,7 @@ export default async function ActiviteSessionPage({
           </h2>
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
-              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} />
+              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} libelle={redigee ? "Votre réponse" : undefined} />
             ))}
           </ul>
           <p className="mt-3 text-sm text-slate-500">
@@ -113,7 +130,7 @@ export default async function ActiviteSessionPage({
             : "Cette activité n'est pas (ou plus) en cours. Revenez à l'écran de session."}
         </Alert>
       ) : !questions || questions.length === 0 ? (
-        <Alert kind="info">Ce QCM ne contient pas encore de question.</Alert>
+        <Alert kind="info">{redigee ? "Cette activité n'a pas encore de consigne." : "Ce QCM ne contient pas encore de question."}</Alert>
       ) : !derniereTentative ? (
         <Card>
           <AuthForm
@@ -129,9 +146,12 @@ export default async function ActiviteSessionPage({
               {questions.map((q, i) => (
                 <fieldset key={q.id}>
                   <legend className="mb-2 text-sm font-medium text-slate-900">
-                    {i + 1}. {q.prompt}
+                    {redigee ? "Votre réponse" : `${i + 1}. ${q.prompt}`}
                   </legend>
-                  <ChampReponse question={q} />
+                  <ChampReponse
+                    question={q}
+                    placeholder={redigee ? "Rédigez votre réponse ici. Elle est pré-corrigée par l'IA puis validée par le formateur." : undefined}
+                  />
                 </fieldset>
               ))}
             </div>

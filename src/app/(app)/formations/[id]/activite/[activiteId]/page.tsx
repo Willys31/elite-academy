@@ -14,6 +14,8 @@ import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { estEnAttenteDeCorrection, lireTypeQuestion } from "@/lib/courses/questions";
 import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
+import { ActiviteRedigee } from "@/components/activites/ActiviteRedigee";
+import { estActiviteRedigee } from "@/lib/courses/activites-redigees";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { MAX_AIDES_PAR_JOUR, TYPE_AIDE_LABELS, type TypeAide } from "@/lib/tutorat/blocage";
 import { generationsDuJour } from "@/lib/tutorat/moteur";
@@ -72,6 +74,10 @@ export default async function ActivitePage({
     .maybeSingle();
   if (!activite) notFound();
   const placement = estTestDePositionnement(activite.content);
+  // Activité rédigée (lot 26) : une question ouverte, consigne et
+  // critères affichés en tête, réponse pré-corrigée par l'IA puis
+  // validée par un formateur.
+  const redigee = estActiviteRedigee(activite.type) ? activite.type : null;
 
   // IMPORTANT : expected_answer et explanation ne sont PAS sélectionnés ici
   // (et, depuis la migration 0019, ne sont plus lisibles par l'apprenant).
@@ -137,18 +143,30 @@ export default async function ActivitePage({
       </p>
       <PageTitle>{activite.title}</PageTitle>
 
-      <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        {placement ? <Badge>🧭 Test de positionnement · sans XP</Badge> : <Badge>Difficulté {activite.difficulty}/5</Badge>}
-        {competences.map((c) => (
-          <Badge key={c}>{c}</Badge>
-        ))}
-      </div>
+      {redigee ? (
+        <ActiviteRedigee
+          type={redigee}
+          instructions={activite.instructions}
+          content={activite.content}
+          difficulty={activite.difficulty}
+          competences={competences}
+        />
+      ) : (
+        <>
+          <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            {placement ? <Badge>🧭 Test de positionnement · sans XP</Badge> : <Badge>Difficulté {activite.difficulty}/5</Badge>}
+            {competences.map((c) => (
+              <Badge key={c}>{c}</Badge>
+            ))}
+          </div>
 
-      {activite.instructions ? (
-        <Card className="mb-6">
-          <p className="text-sm text-slate-700">{activite.instructions}</p>
-        </Card>
-      ) : null}
+          {activite.instructions ? (
+            <Card className="mb-6">
+              <p className="text-sm text-slate-700">{activite.instructions}</p>
+            </Card>
+          ) : null}
+        </>
+      )}
 
       {derniereTentative && feedback ? (
         <Card className="mb-6 border-brand-200">
@@ -177,7 +195,7 @@ export default async function ActivitePage({
           ) : null}
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
-              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} />
+              <LigneFeedback key={d.questionId} detail={d} numero={i + 1} libelle={redigee ? "Votre réponse" : undefined} />
             ))}
           </ul>
           {placement ? (
@@ -203,8 +221,9 @@ export default async function ActivitePage({
             </div>
           ) : enAttente ? null : (
             <p className="mt-3 text-xs text-slate-500">
-              Vous pouvez refaire le QCM : seul votre meilleur score compte pour
-              la maîtrise de la compétence.
+              {redigee
+                ? "Vous pouvez répondre à nouveau : seul votre meilleur résultat compte pour la maîtrise de la compétence."
+                : "Vous pouvez refaire le QCM : seul votre meilleur score compte pour la maîtrise de la compétence."}
             </p>
           )}
           {/* Entraide (lot 15) : après une tentative, l'apprenant peut
@@ -223,7 +242,7 @@ export default async function ActivitePage({
       ) : null}
 
       {!questions || questions.length === 0 ? (
-        <Alert kind="info">Ce QCM ne contient pas encore de question.</Alert>
+        <Alert kind="info">{redigee ? "Cette activité n'a pas encore de consigne." : "Ce QCM ne contient pas encore de question."}</Alert>
       ) : enAttente ? (
         <Alert kind="info">
           Votre copie est entre les mains d&apos;un formateur. Vous pourrez
@@ -233,14 +252,14 @@ export default async function ActivitePage({
         <Card>
           <AuthForm
             action={soumettreQcm}
-            submitLabel={nbOuvertes > 0 ? "Envoyer mes réponses" : "Soumettre mes réponses"}
+            submitLabel={redigee ? "Envoyer ma réponse" : nbOuvertes > 0 ? "Envoyer mes réponses" : "Soumettre mes réponses"}
             pendingLabel={nbOuvertes > 0 ? "Envoi en cours…" : "Correction en cours…"}
           >
             <input type="hidden" name="course_id" value={formation.id} />
             <input type="hidden" name="activity_id" value={activite.id} />
             {/* Horodatage de l'affichage, pour le bonus de rapidité (lot 14). */}
             <input type="hidden" name="started_at" value={Date.now()} />
-            {nbOuvertes > 0 ? (
+            {nbOuvertes > 0 && !redigee ? (
               <p className="text-xs leading-relaxed text-slate-500">
                 {nbOuvertes > 1 ? `${nbOuvertes} questions ouvertes seront notées` : "Une question ouverte sera notée"} par un formateur ;
                 les autres sont corrigées immédiatement.
@@ -250,12 +269,21 @@ export default async function ActivitePage({
               {questions.map((q, i) => (
                 <fieldset key={q.id}>
                   <legend className="mb-2 text-sm font-medium text-slate-900">
-                    {i + 1}. {q.prompt}
-                    {lireTypeQuestion(q.type) === "open" ? (
-                      <span className="ml-2 text-xs font-normal text-slate-500">(réponse rédigée, notée par un formateur)</span>
-                    ) : null}
+                    {redigee ? (
+                      "Votre réponse"
+                    ) : (
+                      <>
+                        {i + 1}. {q.prompt}
+                        {lireTypeQuestion(q.type) === "open" ? (
+                          <span className="ml-2 text-xs font-normal text-slate-500">(réponse rédigée, notée par un formateur)</span>
+                        ) : null}
+                      </>
+                    )}
                   </legend>
-                  <ChampReponse question={q} />
+                  <ChampReponse
+                    question={q}
+                    placeholder={redigee ? "Rédigez votre réponse ici. Elle est pré-corrigée par l'IA puis validée par un formateur." : undefined}
+                  />
                 </fieldset>
               ))}
             </div>

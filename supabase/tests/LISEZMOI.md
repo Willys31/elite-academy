@@ -37,6 +37,8 @@ psql -h /tmp -p 5433 -U postgres -d ea -f fonctions_essai.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f fonctions_essai_generique.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f test_creation.sql
 psql -h /tmp -p 5433 -U postgres -d ea -f test_stockage.sql   # lot 20 : quota, politique UPDATE Storage
+psql -h /tmp -p 5433 -U postgres -d ea -f test_preuves.sql    # lot 22 : corrigés et preuves hors de portée de l'apprenant
+psql -h /tmp -p 5433 -U postgres -d ea -f test_attempt_ai_reviews.sql   # lot 26 : proposition IA réservée à l'encadrement
 ```
 
 ## Les deux pièces qui font que le test prouve quelque chose

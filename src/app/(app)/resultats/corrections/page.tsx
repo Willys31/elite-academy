@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { encadreUneOrganisation } from "@/lib/auth/roles";
 import type { ResultatCorrection } from "@/lib/courses/progression";
+import { resumerPropositions, type PropositionsCopie } from "@/lib/ai/precorrection";
+import { estActiviteRedigee, TYPE_ACTIVITE_REDIGEE_LABELS } from "@/lib/courses/activites-redigees";
 import { EcranTitre, Etiquette, LienSobre, PanneauLien, Retour, SectionTitre, Vide } from "@/components/app";
 
 export const metadata: Metadata = { title: "Copies à corriger" };
@@ -38,7 +40,7 @@ export default async function CorrectionsPage() {
   const supabase = await createClient();
   const { data: copies } = await supabase
     .from("attempts")
-    .select("id, user_id, activity_id, submitted_at, feedback, activity:activities(title)")
+    .select("id, user_id, activity_id, submitted_at, feedback, activity:activities(title, type), review:attempt_ai_reviews(proposal)")
     .eq("status", "pending_review")
     .neq("user_id", user.id)
     .order("submitted_at", { ascending: true })
@@ -57,12 +59,15 @@ export default async function CorrectionsPage() {
   const liste = (copies ?? []).map((c) => {
     const activite = Array.isArray(c.activity) ? c.activity[0] : c.activity;
     const feedback = c.feedback as ResultatCorrection | null;
+    const revue = Array.isArray(c.review) ? c.review[0] : c.review;
     return {
       id: c.id as string,
       nom: noms.get(c.user_id as string) ?? "Apprenant",
       titreActivite: activite?.title ?? "Activité",
+      typeActivite: estActiviteRedigee(activite?.type) ? TYPE_ACTIVITE_REDIGEE_LABELS[activite.type] : null,
       nbEnAttente: feedback?.nbEnAttente ?? 0,
       date: c.submitted_at as string | null,
+      ia: resumerPropositions((revue?.proposal ?? null) as PropositionsCopie | null),
     };
   });
 
@@ -88,15 +93,19 @@ export default async function CorrectionsPage() {
                       <div className="min-w-0">
                         <p className="font-medium text-ink-900">{c.nom}</p>
                         <p className="text-xs text-slate-500">
+                          {c.typeActivite ? `${c.typeActivite} · ` : ""}
                           {c.titreActivite}
                           {c.date
                             ? ` · remise le ${new Date(c.date).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
                             : ""}
                         </p>
                       </div>
-                      <Etiquette ton="or">
-                        {c.nbEnAttente} question{c.nbEnAttente > 1 ? "s" : ""} à noter
-                      </Etiquette>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {c.ia ? <Etiquette>{c.ia}</Etiquette> : null}
+                        <Etiquette ton="or">
+                          {c.nbEnAttente} {c.typeActivite ? "réponse" : "question"}{c.nbEnAttente > 1 ? "s" : ""} à noter
+                        </Etiquette>
+                      </div>
                     </div>
                   </PanneauLien>
                 </li>

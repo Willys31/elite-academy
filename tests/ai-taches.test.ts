@@ -35,7 +35,8 @@ describe("lot 25 – classes de tâches", () => {
     expect(classeDeTache("tuteur")).toBe("interaction");
     expect(classeDeTache("exercices")).toBe("interaction");
     expect(classeDeTache("analyse_session")).toBe("interaction");
-    expect(TACHES_IA).toHaveLength(5);
+    expect(classeDeTache("correction")).toBe("interaction");
+    expect(TACHES_IA).toHaveLength(6);
   });
 });
 

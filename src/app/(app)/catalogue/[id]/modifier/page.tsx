@@ -19,6 +19,8 @@ import {
   ajouterLecon,
   ajouterModule,
   changerStatut,
+  creerActiviteRedigee,
+  creerActivitesDepuisLecon,
   creerQcm,
   lierCompetence,
   mettreAJourFiche,
@@ -38,6 +40,12 @@ import {
 import { libelleCourt } from "@/lib/import/decoupage";
 import { sourceDeLecon } from "@/lib/import/rattachement";
 import { estTestDePositionnement } from "@/lib/courses/positionnement";
+import {
+  estActiviteRedigee,
+  TYPE_ACTIVITE_REDIGEE_AIDES,
+  TYPE_ACTIVITE_REDIGEE_LABELS,
+  TYPES_ACTIVITE_REDIGEE,
+} from "@/lib/courses/activites-redigees";
 import { TeleverseurFichier } from "@/components/stockage/TeleverseurFichier";
 import { lireUsageStockage } from "@/lib/stockage/usage";
 import { ACCEPT_SUPPORTS, formaterTaille, TAILLE_MAX_FICHIER } from "@/lib/stockage/limites";
@@ -497,6 +505,38 @@ export default async function EditeurFormationPage({
                               </div>
                             ) : null}
 
+                            {/* Activités rédigées (lot 26) */}
+                            {(l.activities ?? []).filter((a) => estActiviteRedigee(a.type)).length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {(l.activities ?? [])
+                                  .filter((a) => estActiviteRedigee(a.type))
+                                  .map((a) => (
+                                    <Link
+                                      key={a.id}
+                                      href={`/catalogue/${formation.id}/activite-redigee/${a.id}`}
+                                      className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-ink-900 transition duration-200 hover:bg-brand-100"
+                                    >
+                                      ✍️ {estActiviteRedigee(a.type) ? TYPE_ACTIVITE_REDIGEE_LABELS[a.type] : "Activité"} — {a.title}
+                                    </Link>
+                                  ))}
+                              </div>
+                            ) : null}
+
+                            {/* Leçon générée avant le lot 26 : activités encore décrites dans le texte */}
+                            {editable && Array.isArray((l.content as { activities?: unknown[] } | null)?.activities) &&
+                            ((l.content as { activities?: unknown[] }).activities ?? []).length > 0 ? (
+                              <div className="mt-2">
+                                <AuthForm
+                                  action={creerActivitesDepuisLecon}
+                                  submitLabel={`Créer les ${((l.content as { activities?: unknown[] }).activities ?? []).length} activités décrites dans la leçon`}
+                                  pendingLabel="Création…"
+                                >
+                                  <input type="hidden" name="course_id" value={formation.id} />
+                                  <input type="hidden" name="lesson_id" value={l.id} />
+                                </AuthForm>
+                              </div>
+                            ) : null}
+
                             {/* Supports de la leçon */}
                             {(l.activities ?? []).filter((a) => a.type === "file").length > 0 ? (
                               <ul className="mt-2 space-y-1">
@@ -558,6 +598,73 @@ export default async function EditeurFormationPage({
                                           compétence par compétence (reliez chaque question à sa compétence).
                                         </span>
                                       </label>
+                                    </AuthForm>
+                                  </div>
+                                </details>
+                                <details>
+                                  <summary className="cursor-pointer text-xs font-medium text-slate-600 transition duration-200 hover:text-ink-900">
+                                    Ajouter une activité rédigée
+                                  </summary>
+                                  <div className="mt-2 max-w-xl">
+                                    <AuthForm
+                                      action={creerActiviteRedigee}
+                                      submitLabel="Créer l'activité"
+                                      pendingLabel="Création…"
+                                    >
+                                      <input type="hidden" name="course_id" value={formation.id} />
+                                      <input type="hidden" name="lesson_id" value={l.id} />
+                                      <div className="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                          <Label htmlFor={`type-ar-${l.id}`}>Type</Label>
+                                          <Select id={`type-ar-${l.id}`} name="type" defaultValue="exercise">
+                                            {TYPES_ACTIVITE_REDIGEE.map((t) => (
+                                              <option key={t} value={t}>
+                                                {TYPE_ACTIVITE_REDIGEE_LABELS[t]}
+                                              </option>
+                                            ))}
+                                          </Select>
+                                        </div>
+                                        <div>
+                                          <Label htmlFor={`diff-ar-${l.id}`}>Difficulté</Label>
+                                          <Select id={`diff-ar-${l.id}`} name="difficulty" defaultValue="2">
+                                            {[1, 2, 3, 4, 5].map((d) => (
+                                              <option key={d} value={d}>
+                                                {d}/5
+                                              </option>
+                                            ))}
+                                          </Select>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <Label htmlFor={`titre-ar-${l.id}`}>Titre</Label>
+                                        <Input id={`titre-ar-${l.id}`} name="title" required />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor={`consigne-ar-${l.id}`}>Consigne</Label>
+                                        <Textarea id={`consigne-ar-${l.id}`} name="instructions" rows={5} required placeholder={TYPE_ACTIVITE_REDIGEE_AIDES.exercise} />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor={`attendu-ar-${l.id}`}>Résultat attendu</Label>
+                                        <Textarea id={`attendu-ar-${l.id}`} name="expected_outcome" rows={2} placeholder="Ce que l'apprenant doit produire, en une ou deux phrases." />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor={`criteres-ar-${l.id}`}>Critères d'évaluation (obligatoire)</Label>
+                                        <Textarea id={`criteres-ar-${l.id}`} name="evaluation" rows={3} required placeholder="Critères observables ; l'IA pré-corrige et le formateur valide sur cette base." />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor={`comp-ar-${l.id}`}>Compétence évaluée</Label>
+                                        <Select id={`comp-ar-${l.id}`} name="competency_id" defaultValue="">
+                                          <option value="">— Aucune —</option>
+                                          {(liees ?? []).map((c) => {
+                                            const comp = Array.isArray(c.competency) ? c.competency[0] : c.competency;
+                                            return (
+                                              <option key={c.competency_id} value={c.competency_id}>
+                                                {comp?.name ?? c.competency_id}
+                                              </option>
+                                            );
+                                          })}
+                                        </Select>
+                                      </div>
                                     </AuthForm>
                                   </div>
                                 </details>

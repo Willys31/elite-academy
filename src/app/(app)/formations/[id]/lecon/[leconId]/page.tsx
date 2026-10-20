@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { donneAcces } from "@/lib/courses/inscriptions";
 import { estTestDePositionnement } from "@/lib/courses/positionnement";
+import { estActiviteRedigee, TYPE_ACTIVITE_REDIGEE_LABELS } from "@/lib/courses/activites-redigees";
 import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
 import { obtenirUrlLecture, type UrlLecture } from "@/lib/stockage/fournisseur";
 import { formaterTaille, nomSur } from "@/lib/stockage/limites";
@@ -90,7 +91,9 @@ export default async function LeconPage({
   // les politiques Storage de l'organisation. `obtenirUrlLecture`
   // isole le fournisseur (Supabase aujourd'hui, Cloudflare Stream
   // plus tard) : la page ne connaît qu'un type d'URL.
-  const quizzes = (activites ?? []).filter((a) => a.type === "quiz");
+  // Activités praticables : QCM et, depuis le lot 26, activités rédigées
+  // (exercice, étude de cas, simulation), dans l'ordre de la leçon.
+  const quizzes = (activites ?? []).filter((a) => a.type === "quiz" || estActiviteRedigee(a.type));
   const fichiers = (activites ?? []).filter((a) => a.type === "file");
   const idsSources = fichiers
     .map((a) => (a.content as { source_id?: string } | null)?.source_id)
@@ -251,7 +254,11 @@ export default async function LeconPage({
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm transition hover:border-brand-300"
               >
                 <span>
-                  {estTestDePositionnement(a.content) ? "🧭 Test de positionnement — " : "📝 QCM — "}
+                  {estActiviteRedigee(a.type)
+                    ? `✍️ ${TYPE_ACTIVITE_REDIGEE_LABELS[a.type]} — `
+                    : estTestDePositionnement(a.content)
+                      ? "🧭 Test de positionnement — "
+                      : "📝 QCM — "}
                   {a.title}
                 </span>
                 <span className="text-xs text-slate-400">

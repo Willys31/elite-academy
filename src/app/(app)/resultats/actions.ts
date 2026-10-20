@@ -9,6 +9,7 @@ import { appliquerNotes, type ResultatCorrection } from "@/lib/courses/progressi
 import { estTestDePositionnement } from "@/lib/courses/positionnement";
 import { formationDeLActivite, mettreAJourMaitrise } from "@/lib/courses/maitrise";
 import type { NoteCorrecteur } from "@/lib/courses/questions";
+import { ecartProposition, type PropositionsCopie } from "@/lib/ai/precorrection";
 import { gamifierTentative, tentativesPrecedentes } from "@/lib/gamification/tentative";
 import { emettreNotification } from "@/lib/notifications/emettre";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
@@ -99,6 +100,26 @@ export async function noterTentative(
   if (erreurMaj || count === 0) {
     loguer("enregistrement de la note", erreurMaj);
     return { error: "La note n'a pas pu être enregistrée. Rechargez la page et réessayez." };
+  }
+
+  // Proposition de l'IA (lot 26) : conserver l'écart avec la décision
+  // humaine pour mesurer, plus tard, la fiabilité de la pré-correction.
+  const { data: revue } = await admin
+    .from("attempt_ai_reviews")
+    .select("id, proposal")
+    .eq("attempt_id", tentative.id)
+    .maybeSingle();
+  if (revue) {
+    const ecart = ecartProposition((revue.proposal ?? {}) as PropositionsCopie, notes);
+    await admin
+      .from("attempt_ai_reviews")
+      .update({
+        validated_as_is: ecart.validatedAsIs,
+        final_verdicts: ecart.finalVerdicts,
+        decided_by: user.id,
+        decided_at: new Date().toISOString(),
+      })
+      .eq("id", revue.id);
   }
 
   // Formation de l'activité : c'est elle qui reçoit la maîtrise.

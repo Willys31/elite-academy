@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { precorrigerTentative } from "@/lib/courses/precorrection";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { calculerCompletion, corrigerQcm, tentativeEnAttente } from "@/lib/courses/progression";
 import {
@@ -454,6 +455,14 @@ export async function soumettreQcm(
   // Pas de score, donc ni XP ni badge pour l'instant : tout cela vient
   // avec la note du correcteur (`noterTentative`).
   if (attenteCorrecteur) {
+    // Pré-correction IA (lot 26) : une proposition pour le formateur,
+    // rangée hors de portée de l'apprenant ; jamais bloquante.
+    try {
+      const pre = await precorrigerTentative({ attemptId: tentative.id as string, userId: user.id, activityId });
+      if (!pre.ok) console.error("[ia] pré-correction non effectuée :", pre.motif);
+    } catch (e) {
+      console.error("[ia] pré-correction :", e instanceof Error ? e.message : e);
+    }
     if (courseId) {
       const pluriel = correction.nbEnAttente > 1 ? "s" : "";
       await notifierEncadrementFormation(

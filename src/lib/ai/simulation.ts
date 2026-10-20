@@ -206,3 +206,37 @@ export function simulerExercices(competence: string, typeExercice: string, nb: n
   }));
   return JSON.stringify({ exercises });
 }
+
+/* ------------------------------------------------------------------
+   Lot 26 – Pré-correction d'une réponse rédigée (mode simulation)
+   ------------------------------------------------------------------ */
+
+/**
+ * Proposition de démonstration : verdict selon la longueur de la réponse,
+ * un critère par ligne de la grille, feedback clairement étiqueté.
+ */
+export function simulerPrecorrection(reponse: string, criteres: string): string {
+  const longue = reponse.trim().length >= 200;
+  const lignes = criteres
+    .split(/[;\n]/)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  return JSON.stringify({
+    verdict: longue ? "acquise" : "non_acquise",
+    confiance: 0.5,
+    criteres: lignes.map((c, i) => ({
+      critere: c,
+      atteint: longue || i === 0,
+      observation: "[DÉMO] observation de démonstration, sans lecture réelle de la réponse.",
+    })),
+    type_difficulte: longue ? null : "raisonnement_incomplet",
+    points_forts: ["[DÉMO] La réponse est rédigée et structurée."],
+    a_travailler: longue ? [] : ["[DÉMO] Développer davantage chaque critère de la consigne."],
+    feedback_apprenant:
+      "[DÉMO] Ceci est un feedback de démonstration produit sans IA. Votre réponse a été enregistrée. Un formateur la lira et décidera. En mode réel, vous recevriez ici des observations précises sur chaque critère, ce qui est réussi et une piste pour progresser.",
+    commentaire_formateur: "[DÉMO] Proposition générée en mode simulation : à vérifier entièrement.",
+    warnings: ["Mode simulation : aucune analyse réelle de la réponse."],
+  });
+}
+

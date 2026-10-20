@@ -59,7 +59,7 @@ const ALIAS: Record<string, Fournisseur> = {
    Tâches et classes de tâches (lot 25, étape B)
    ------------------------------------------------------------------ */
 
-export const TACHES_IA = ["conception", "import", "tuteur", "exercices", "analyse_session"] as const;
+export const TACHES_IA = ["conception", "import", "tuteur", "exercices", "analyse_session", "correction"] as const;
 export type TacheIa = (typeof TACHES_IA)[number];
 
 export type ClasseTache = "conception" | "interaction";

@@ -23,12 +23,8 @@ import {
   sujetEstCommercial,
 } from "@/lib/ai/controle-pedagogique";
 import { genererAvecReparation, type Verification } from "@/lib/ai/reparation";
-import {
-  extraireJson,
-  validerResultat,
-  type ActiviteGeneree,
-  type ResultatGeneration,
-} from "@/lib/ai/schema";
+import { extraireJson, validerResultat, type ResultatGeneration } from "@/lib/ai/schema";
+import { activiteDepuisPlan } from "@/lib/courses/activites-redigees";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 /**
@@ -41,7 +37,9 @@ import type { ActionState } from "@/app/(app)/catalogue/actions";
  * Lot 25 : prompt méthodologique v2 (LLM_PROMPT_PLAN), exemples de
  * référence (LLM_EXEMPLES), contrôle pédagogique après génération et UNE
  * relance de réparation si des erreurs bloquantes subsistent. Le modèle
- * et le fournisseur sont ceux de la tâche « conception ».
+ * et le fournisseur sont ceux de la tâche « conception ». Lot 26 : les
+ * exercices, études de cas et simulations du plan deviennent des
+ * activités rédigées (question ouverte + grille), praticables.
  */
 export async function genererFormation(
   _prev: ActionState,
@@ -306,12 +304,6 @@ export async function genererFormation(
       if (!moduleCree) continue;
 
       for (const [j, l] of mod.lessons.entries()) {
-        // Les activités sans quiz (exercice, étude de cas, simulation,
-        // question ouverte) n'ont pas encore d'écran dédié : elles sont
-        // conservées dans le contenu de la leçon ET rendues lisibles dans
-        // son texte. Les quiz deviennent de vraies activités corrigées.
-        const quiz = l.activities.filter((a) => a.type === "quiz" && a.questions.length > 0);
-        const autres = l.activities.filter((a) => !(a.type === "quiz" && a.questions.length > 0));
         const { data: leconCreee } = await supabase
           .from("lessons")
           .insert({
@@ -319,13 +311,12 @@ export async function genererFormation(
             title: l.title,
             content: {
               type: "text",
-              text: texteLeconAvecActivites(l.text, autres),
+              text: l.text,
               generated_by_ai: true,
               prompt_version: pp.version,
               competency_refs: l.competency_refs,
               situation_type: l.situation_type,
               media_brief: l.media_brief,
-              activities: autres,
             },
             position: j + 1,
             estimated_minutes: l.estimated_minutes,
@@ -335,57 +326,89 @@ export async function genererFormation(
           .single();
         if (!leconCreee) continue;
 
-        for (const [k, a] of quiz.entries()) {
-          const competences = idsDe(a.competency_refs.length > 0 ? a.competency_refs : l.competency_refs);
+        // Activités, dans l'ordre du plan : un quiz devient une activité
+        // corrigée automatiquement ; un exercice, une étude de cas ou une
+        // simulation devient une activité rédigée (lot 26) : une question
+        // ouverte dont la grille sert à la pré-correction et au formateur.
+        let position = 0;
+        for (const a of l.activities) {
+          const refs = a.competency_refs.length > 0 ? a.competency_refs : l.competency_refs;
+          const competences = idsDe(refs);
+          if (a.type === "quiz") {
+            if (a.questions.length === 0) continue;
+            position += 1;
+            const { data: activite } = await supabase
+              .from("activities")
+              .insert({
+                lesson_id: leconCreee.id,
+                type: "quiz",
+                title: a.title,
+                instructions: a.instructions || null,
+                content: {
+                  generated_by_ai: true,
+                  prompt_version: pp.version,
+                  situation_type: a.situation_type,
+                  expected_outcome: a.expected_outcome,
+                  evaluation: a.evaluation,
+                  competency_refs: a.competency_refs,
+                  media_brief: a.media_brief,
+                },
+                difficulty: a.difficulty,
+                position,
+                generated_by_ai: true,
+                status: "draft",
+              })
+              .select("id")
+              .single();
+            if (!activite) continue;
+            await supabase.from("questions").insert(
+              a.questions.map((q, n) => ({
+                activity_id: activite.id,
+                type: "qcm",
+                prompt: q.prompt,
+                options: q.options,
+                expected_answer: { index: q.correct_index },
+                explanation: q.explanation,
+                difficulty: a.difficulty,
+                competency_id: competences[0]?.id ?? null,
+                position: n + 1,
+              }))
+            );
+            await lierCompetences(activite.id, competences);
+            continue;
+          }
+
+          const redigee = activiteDepuisPlan(a, { prompt_version: pp.version });
+          if (!redigee) continue;
+          position += 1;
           const { data: activite } = await supabase
             .from("activities")
             .insert({
               lesson_id: leconCreee.id,
-              type: "quiz",
-              title: a.title,
-              instructions: a.instructions || null,
-              content: {
-                generated_by_ai: true,
-                prompt_version: pp.version,
-                situation_type: a.situation_type,
-                expected_outcome: a.expected_outcome,
-                evaluation: a.evaluation,
-                competency_refs: a.competency_refs,
-                media_brief: a.media_brief,
-              },
-              difficulty: a.difficulty,
-              position: k + 1,
+              type: redigee.activite.type,
+              title: redigee.activite.title,
+              instructions: redigee.activite.instructions,
+              content: redigee.activite.content,
+              difficulty: redigee.activite.difficulty,
+              position,
               generated_by_ai: true,
               status: "draft",
             })
             .select("id")
             .single();
           if (!activite) continue;
-
-          await supabase.from("questions").insert(
-            a.questions.map((q, n) => ({
-              activity_id: activite.id,
-              type: "qcm",
-              prompt: q.prompt,
-              options: q.options,
-              expected_answer: { index: q.correct_index },
-              explanation: q.explanation,
-              difficulty: a.difficulty,
-              competency_id: competences[0]?.id ?? null,
-              position: n + 1,
-            }))
-          );
-          if (competences.length > 0) {
-            await supabase.from("activity_competencies").upsert(
-              competences.map((c) => ({
-                activity_id: activite.id,
-                competency_id: c.id,
-                level: c.target_level,
-                weight: 1,
-              })),
-              { onConflict: "activity_id,competency_id" }
-            );
-          }
+          await supabase.from("questions").insert({
+            activity_id: activite.id,
+            type: "open",
+            prompt: redigee.question.prompt,
+            options: [],
+            expected_answer: redigee.question.expected_answer,
+            explanation: null,
+            difficulty: redigee.question.difficulty,
+            competency_id: competences[0]?.id ?? null,
+            position: 1,
+          });
+          await lierCompetences(activite.id, competences);
         }
       }
     }
@@ -425,24 +448,15 @@ export async function genererFormation(
   redirect(`/catalogue/${course.id}/modifier`);
 }
 
-const LIBELLES_ACTIVITE: Record<string, string> = {
-  exercise: "Exercice",
-  case_study: "Étude de cas",
-  simulation: "Simulation",
-  open_question: "Question ouverte",
-  quiz: "Quiz",
-};
-
-/** Texte de la leçon suivi des activités sans écran dédié, lisibles par tous. */
-function texteLeconAvecActivites(texte: string, activites: ActiviteGeneree[]): string {
-  if (activites.length === 0) return texte;
-  const blocs = activites.map((a) => {
-    const lignes = [`${LIBELLES_ACTIVITE[a.type] ?? "Activité"} — ${a.title}`];
-    if (a.instructions) lignes.push(`Consigne : ${a.instructions}`);
-    if (a.expected_outcome) lignes.push(`Résultat attendu : ${a.expected_outcome}`);
-    if (a.evaluation) lignes.push(`Évaluation : ${a.evaluation}`);
-    if (a.competency_refs.length > 0) lignes.push(`Compétence(s) : ${a.competency_refs.join(", ")}`);
-    return lignes.join("\n");
-  });
-  return `${texte}\n\n— Activités —\n\n${blocs.join("\n\n")}`;
+/** Lie une activité à ses compétences (niveau cible de la formation). */
+async function lierCompetences(
+  activityId: string,
+  competences: Array<{ id: string; target_level: string }>
+): Promise<void> {
+  if (competences.length === 0) return;
+  const supabase = await createClient();
+  await supabase.from("activity_competencies").upsert(
+    competences.map((c) => ({ activity_id: activityId, competency_id: c.id, level: c.target_level, weight: 1 })),
+    { onConflict: "activity_id,competency_id" }
+  );
 }

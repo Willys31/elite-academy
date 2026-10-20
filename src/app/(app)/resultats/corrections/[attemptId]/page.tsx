@@ -14,6 +14,13 @@ import { noterTentative } from "@/app/(app)/resultats/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert } from "@/components/ui";
 import { EcranTitre, Etiquette, Panneau, Retour } from "@/components/app";
+import { PropositionIa } from "@/components/activites/PropositionIa";
+import { propositionVersNote, type PropositionsCopie } from "@/lib/ai/precorrection";
+import {
+  estActiviteRedigee,
+  lireContenuActiviteRedigee,
+  TYPE_ACTIVITE_REDIGEE_LABELS,
+} from "@/lib/courses/activites-redigees";
 
 export const metadata: Metadata = { title: "Corriger une copie" };
 
@@ -46,7 +53,7 @@ export default async function CorrigerCopiePage({
   const { data: tentative } = await supabase
     .from("attempts")
     .select(
-      "id, user_id, activity_id, status, score, feedback, submitted_at, graded_at, activity:activities(title, instructions)"
+      "id, user_id, activity_id, status, score, feedback, submitted_at, graded_at, activity:activities(title, instructions, type, content)"
     )
     .eq("id", attemptId)
     .maybeSingle();
@@ -58,14 +65,20 @@ export default async function CorrigerCopiePage({
   const activite = Array.isArray(tentative.activity) ? tentative.activity[0] : tentative.activity;
   const enAttente = tentative.status === "pending_review";
 
-  const [{ data: profil }, { data: questionsBrutes }] = await Promise.all([
+  const [{ data: profil }, { data: questionsBrutes }, { data: revue }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", tentative.user_id).maybeSingle(),
     createAdminClient()
       .from("questions")
       .select("id, type, prompt, options, expected_answer, explanation, competency_id, position, competency:competencies(name)")
       .eq("activity_id", tentative.activity_id)
       .order("position"),
+    /* Proposition de l'IA (lot 26) : lue sous RLS (`oversees_attempt`),
+       donc jamais par l'auteur de la copie. */
+    supabase.from("attempt_ai_reviews").select("proposal, model_name, created_at").eq("attempt_id", attemptId).maybeSingle(),
   ]);
+  const propositions = ((revue?.proposal ?? null) as PropositionsCopie | null) ?? {};
+  const redigee = estActiviteRedigee(activite?.type) ? activite?.type : null;
+  const contenuRedige = redigee ? lireContenuActiviteRedigee(activite?.content) : null;
   const questions = new Map(
     (questionsBrutes ?? []).map((q) => [
       q.id as string,
@@ -78,7 +91,10 @@ export default async function CorrigerCopiePage({
 
   const nom = (profil?.full_name as string | null) || "Apprenant";
   const aNoter = feedback.details.filter((d) => d.type === "open" && d.correcte === null);
-  const liste = <ListeQuestions feedback={feedback} questions={questions} enAttente={enAttente} />;
+  const proposees = aNoter.filter((d) => propositions[d.questionId]).length;
+  const liste = (
+    <ListeQuestions feedback={feedback} questions={questions} enAttente={enAttente} propositions={propositions} redigee={Boolean(redigee)} />
+  );
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -106,10 +122,38 @@ export default async function CorrigerCopiePage({
         ) : null}
       </div>
 
-      {activite?.instructions ? (
+      {redigee && contenuRedige ? (
+        <Panneau className="mb-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            {TYPE_ACTIVITE_REDIGEE_LABELS[redigee]} — consigne donnée à l&apos;apprenant
+          </p>
+          <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{activite?.instructions}</p>
+          {contenuRedige.expected_outcome ? (
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-medium">Résultat attendu : </span>
+              {contenuRedige.expected_outcome}
+            </p>
+          ) : null}
+          {contenuRedige.evaluation ? (
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-medium">Critères d&apos;évaluation : </span>
+              {contenuRedige.evaluation}
+            </p>
+          ) : null}
+        </Panneau>
+      ) : activite?.instructions ? (
         <Panneau className="mb-6">
           <p className="text-sm text-slate-700">{activite.instructions}</p>
         </Panneau>
+      ) : null}
+
+      {enAttente && proposees > 0 ? (
+        <div className="mb-6">
+          <Alert kind="info">
+            L&apos;IA a pré-corrigé {proposees > 1 ? `${proposees} réponses` : "la réponse"} : son verdict et son feedback sont pré-remplis ci-dessous.
+            Vous décidez : validez tel quel, ou modifiez le verdict et le commentaire avant d&apos;enregistrer. L&apos;apprenant ne voit que ce que vous enregistrez.
+          </Alert>
+        </div>
       ) : null}
 
       {!enAttente ? (
@@ -123,10 +167,19 @@ export default async function CorrigerCopiePage({
       {enAttente ? (
         <AuthForm
           action={noterTentative}
-          submitLabel={aNoter.length > 1 ? `Enregistrer les ${aNoter.length} notes` : "Enregistrer la note"}
+          submitLabel={
+            proposees > 0 && proposees === aNoter.length
+              ? aNoter.length > 1
+                ? "Valider les propositions"
+                : "Valider la proposition"
+              : aNoter.length > 1
+                ? `Enregistrer les ${aNoter.length} notes`
+                : "Enregistrer la note"
+          }
           pendingLabel="Enregistrement…"
         >
           <input type="hidden" name="attempt_id" value={tentative.id as string} />
+          {proposees > 0 ? <input type="hidden" name="source" value="ia" /> : null}
           {liste}
         </AuthForm>
       ) : (
@@ -142,22 +195,29 @@ function ListeQuestions({
   feedback,
   questions,
   enAttente,
+  propositions,
+  redigee,
 }: {
   feedback: ResultatCorrection;
   questions: Map<string, QuestionCorrecteur>;
   enAttente: boolean;
+  propositions: PropositionsCopie;
+  /** Activité rédigée : la consigne est déjà affichée en tête, pas de numérotation. */
+  redigee: boolean;
 }) {
   return (
     <ol className="space-y-4">
       {feedback.details.map((d, i) => {
         const q = questions.get(d.questionId);
         const ouverte = d.type === "open";
+        const proposition = ouverte && d.correcte === null ? propositions[d.questionId] : undefined;
+        const preRempli = proposition ? propositionVersNote(proposition) : null;
         return (
           <li key={d.questionId}>
             <Panneau className={ouverte && d.correcte === null ? "border-gold-400/60" : ""}>
               <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                 <p className="min-w-0 font-medium text-ink-900">
-                  {i + 1}. {q?.prompt ?? "Question supprimée depuis la remise"}
+                  {redigee ? "Réponse rédigée" : `${i + 1}. ${q?.prompt ?? "Question supprimée depuis la remise"}`}
                 </p>
                 <div className="flex shrink-0 items-center gap-2">
                   <Etiquette>{TYPE_QUESTION_LABELS[d.type]}</Etiquette>
@@ -203,17 +263,36 @@ function ListeQuestions({
                 </p>
               ) : null}
 
+              {/* Proposition de l'IA (lot 26), pour le correcteur seulement */}
+              {proposition ? <PropositionIa proposition={proposition} /> : null}
+
               {/* Verdict et commentaire */}
               {ouverte && enAttente && d.correcte === null ? (
                 <fieldset className="mt-4">
-                  <legend className="mb-1.5 text-sm font-medium text-ink-900">Votre note</legend>
+                  <legend className="mb-1.5 text-sm font-medium text-ink-900">
+                    {preRempli ? "Votre décision (pré-remplie par la proposition)" : "Votre note"}
+                  </legend>
                   <div className="flex flex-wrap gap-2">
                     <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm hover:bg-slate-50 has-checked:border-brand-400 has-checked:bg-brand-50">
-                      <input type="radio" name={`note_${d.questionId}`} value="1" required className="h-5 w-5 accent-brand-600" />
+                      <input
+                        type="radio"
+                        name={`note_${d.questionId}`}
+                        value="1"
+                        required
+                        defaultChecked={preRempli !== null && proposition?.verdict === "acquise"}
+                        className="h-5 w-5 accent-brand-600"
+                      />
                       Acquise
                     </label>
                     <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm hover:bg-slate-50 has-checked:border-red-300 has-checked:bg-red-50">
-                      <input type="radio" name={`note_${d.questionId}`} value="0" required className="h-5 w-5 accent-red-600" />
+                      <input
+                        type="radio"
+                        name={`note_${d.questionId}`}
+                        value="0"
+                        required
+                        defaultChecked={preRempli !== null && proposition?.verdict === "non_acquise"}
+                        className="h-5 w-5 accent-red-600"
+                      />
                       Non acquise
                     </label>
                   </div>
@@ -223,8 +302,9 @@ function ListeQuestions({
                   <textarea
                     id={`commentaire_${d.questionId}`}
                     name={`commentaire_${d.questionId}`}
-                    rows={3}
+                    rows={preRempli?.commentaire ? 6 : 3}
                     maxLength={2000}
+                    defaultValue={preRempli?.commentaire ?? ""}
                     placeholder="Ce qui est juste, ce qui manque, par quoi continuer."
                     className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-900 outline-none transition duration-200 focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15"
                   />
