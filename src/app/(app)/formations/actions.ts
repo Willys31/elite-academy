@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { precorrigerTentative } from "@/lib/courses/precorrection";
+import { corrigerTentativeAutomatiquement } from "@/lib/courses/precorrection";
 import { getCurrentUser } from "@/lib/auth/profile";
 import { calculerCompletion, corrigerQcm, tentativeEnAttente } from "@/lib/courses/progression";
 import {
@@ -19,7 +19,6 @@ import { mettreAJourMaitrise } from "@/lib/courses/maitrise";
 import { XP_FIXES } from "@/lib/gamification/xp";
 import { attribuerXp, mettreAJourSerie, verifierBadges } from "@/lib/gamification/moteur";
 import { gamifierTentative, tentativesPrecedentes } from "@/lib/gamification/tentative";
-import { notifierEncadrementFormation } from "@/lib/notifications/emettre";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 function loguer(contexte: string, error: { message?: string } | null) {
@@ -357,9 +356,8 @@ export async function soumettreQcm(
   }
   const admin = createAdminClient();
 
-  /* Une copie déjà entre les mains d'un correcteur (lot 23) : on ne
-     relance pas tant qu'elle n'est pas notée, sinon le formateur
-     corrigerait des copies périmées. */
+  /* Une copie encore en cours de correction (lot 23, lot 27 bis) : on
+     n'en ouvre pas une seconde tant que la première n'est pas notée. */
   const { data: enAttente } = await supabase
     .from("attempts")
     .select("id")
@@ -371,7 +369,7 @@ export async function soumettreQcm(
   if (enAttente) {
     return {
       error:
-        "Votre précédente réponse attend encore la correction d'un formateur. Vous pourrez retenter une fois la note reçue.",
+        "Votre précédente réponse est encore en cours de correction. Patientez quelques instants, puis rechargez la page.",
     };
   }
 
@@ -451,47 +449,35 @@ export async function soumettreQcm(
   revalidatePath(`/formations/${courseId}/activite/${activityId}`);
   revalidatePath("/progression");
 
-  // ---------- Copie à corriger (lot 23) ----------
-  // Pas de score, donc ni XP ni badge pour l'instant : tout cela vient
-  // avec la note du correcteur (`noterTentative`).
+  // ---------- Réponses rédigées (lot 23, lot 26, lot 27 bis) ----------
+  // Pas de score tant que chaque réponse rédigée n'a pas sa correction :
+  // XP, badge et notification viennent avec la note (`enregistrerNotes`).
   if (attenteCorrecteur) {
-    // Pré-correction IA (lot 26) : une proposition pour le formateur,
-    // rangée hors de portée de l'apprenant ; jamais bloquante.
+    // Correction automatique : la note est posée tout de suite. Si le
+    // service ne répond pas, la copie reste « en cours » et la page de
+    // l'activité relance la correction d'elle-même.
     let corrigee: { score: number; nbCorrectes: number; nbQuestions: number } | undefined;
     try {
-      const pre = await precorrigerTentative({ attemptId: tentative.id as string, userId: user.id, activityId });
-      if (!pre.ok) console.error("[ia] pré-correction non effectuée :", pre.motif);
-      corrigee = pre.corrigee;
+      const r = await corrigerTentativeAutomatiquement({ attemptId: tentative.id as string, userId: user.id, activityId });
+      if (r.ok) corrigee = r.corrigee;
+      else console.error("[ia] correction automatique non aboutie :", r.motif);
     } catch (e) {
-      console.error("[ia] pré-correction :", e instanceof Error ? e.message : e);
+      console.error("[ia] correction automatique :", e instanceof Error ? e.message : e);
     }
-    // Corrigée automatiquement (lot 27) : résultat immédiat, pas de copie à corriger.
+    revalidatePath(`/formations/${courseId}/activite/${activityId}`);
+    revalidatePath("/progression");
     if (corrigee) {
-      revalidatePath(`/formations/${courseId}/activite/${activityId}`);
-      revalidatePath("/progression");
+      revalidatePath("/badges");
       return {
-        success: `Réponse corrigée : ${corrigee.score} % (${corrigee.nbCorrectes}/${corrigee.nbQuestions}). Le résultat et le commentaire s'affichent ci-dessus ; vous pouvez demander une relecture par un formateur.`,
+        success: `Réponse corrigée : ${corrigee.score} % (${corrigee.nbCorrectes}/${corrigee.nbQuestions}). Le résultat et le commentaire s'affichent ci-dessus.`,
       };
-    }
-    if (courseId) {
-      const pluriel = correction.nbEnAttente > 1 ? "s" : "";
-      await notifierEncadrementFormation(
-        courseId,
-        {
-          type: "copie_a_corriger",
-          title: `Copie à corriger : ${activiteVisible.title}`,
-          body: `${user.fullName || "Un apprenant"} a répondu à ${correction.nbEnAttente} question${pluriel} ouverte${pluriel}.`,
-          href: `/resultats/corrections/${tentative.id}`,
-        },
-        user.id
-      );
     }
     revalidatePath("/resultats/corrections");
     const notees = correction.nbQuestions - correction.nbEnAttente;
     return {
       success: `Réponses enregistrées${
-        notees > 0 ? ` : ${correction.nbCorrectes}/${notees} sur les questions corrigées automatiquement` : ""
-      }. ${correction.nbEnAttente > 1 ? `${correction.nbEnAttente} réponses rédigées sont` : "Votre réponse rédigée est"} en cours de correction : vous serez prévenu.`,
+        notees > 0 ? ` : ${correction.nbCorrectes}/${notees} sur les questions à choix` : ""
+      }. ${correction.nbEnAttente > 1 ? "Vos réponses rédigées sont" : "Votre réponse rédigée est"} en cours de correction : le résultat s'affichera ici dans quelques instants.`,
     };
   }
 
@@ -528,4 +514,55 @@ export async function soumettreQcm(
       xpGagne > 0 ? ` +${xpGagne} XP.` : ""
     } Le détail corrigé s'affiche ci-dessous.`,
   };
+}
+
+// ------------------------------------------------------------
+// Relance de la correction automatique d'une copie en cours (lot 27 bis)
+// ------------------------------------------------------------
+
+/**
+ * Appelée par la page de l'activité tant que la dernière copie de
+ * l'apprenant est « en cours de correction » : reprend la correction là
+ * où elle s'est arrêtée (service indisponible, page quittée avant la
+ * fin). L'apprenant ne relance que ses propres copies.
+ */
+export async function relancerCorrection(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+  const attemptId = String(formData.get("attempt_id") ?? "");
+
+  const supabase = await createClient();
+  const { data: tentative } = await supabase
+    .from("attempts")
+    .select("id, activity_id, session_id, status")
+    .eq("id", attemptId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!tentative) return { error: "Copie introuvable." };
+  if (tentative.status !== "pending_review") return { success: "Votre réponse est corrigée." };
+
+  let resultat: Awaited<ReturnType<typeof corrigerTentativeAutomatiquement>>;
+  try {
+    resultat = await corrigerTentativeAutomatiquement({ attemptId, userId: user.id, activityId: tentative.activity_id as string });
+  } catch (e) {
+    console.error("[ia] relance de la correction :", e instanceof Error ? e.message : e);
+    return { error: "La correction n'a pas pu aboutir pour le moment. Réessayez dans quelques instants." };
+  }
+  if (resultat.ok) {
+    revalidatePath("/formations/[id]/activite/[activiteId]", "page");
+    revalidatePath("/sessions/[id]/activite/[activiteId]", "page");
+    revalidatePath("/progression");
+    revalidatePath("/badges");
+    return {
+      success: `Réponse corrigée : ${resultat.corrigee.score} % (${resultat.corrigee.nbCorrectes}/${resultat.corrigee.nbQuestions}).`,
+    };
+  }
+  if (resultat.enCours) {
+    return { error: "La correction est en cours. Patientez quelques instants, puis rechargez la page." };
+  }
+  console.error("[ia] relance de la correction non aboutie :", resultat.motif);
+  return { error: "La correction n'a pas pu aboutir pour le moment. Réessayez dans quelques instants." };
 }

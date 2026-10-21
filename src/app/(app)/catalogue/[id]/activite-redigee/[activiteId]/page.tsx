@@ -26,7 +26,7 @@ export const metadata: Metadata = { title: "Activité rédigée" };
 /**
  * Éditeur d'une activité rédigée (lot 26) : exercice, étude de cas ou
  * simulation à laquelle l'apprenant répond par écrit. Les champs sont
- * ceux que l'IA et le formateur utilisent pour corriger : consigne,
+ * ceux sur lesquels la correction automatique s'appuie : consigne,
  * résultat attendu, critères d'évaluation, difficulté, compétence.
  * Modifiable uniquement quand la formation est en brouillon.
  */
@@ -118,7 +118,6 @@ export default async function ActiviteRedigeePage({
             </p>
           ) : null}
           <p className="text-xs text-slate-500">
-            {contenu.correction_humaine ? "Correction humaine obligatoire · " : "Correction automatique · "}
             Difficulté {activite.difficulty}/5
             {nomsCompetences.length > 0 ? ` · Compétence : ${nomsCompetences.join(", ")}` : " · Aucune compétence liée"}
           </p>
@@ -175,17 +174,10 @@ export default async function ActiviteRedigeePage({
               <Label htmlFor="evaluation">Critères d&apos;évaluation (obligatoire)</Label>
               <Textarea id="evaluation" name="evaluation" rows={4} defaultValue={contenu.evaluation} required />
               <p className="mt-1 text-xs text-slate-500">
-                Visibles de l&apos;apprenant avant sa réponse. L&apos;IA pré-corrige et le formateur valide sur cette base.
+                Visibles de l&apos;apprenant avant sa réponse. La correction automatique s&apos;appuie sur eux : plus
+                ils sont observables, plus elle est juste.
               </p>
             </div>
-            <label className="flex items-start gap-2 text-sm text-slate-700">
-              <input type="checkbox" name="correction_humaine" defaultChecked={contenu.correction_humaine} className="mt-0.5 size-4 accent-brand-700" />
-              <span>
-                <span className="font-medium text-ink-900">Correction humaine obligatoire</span>
-                {" "}— un formateur notera chaque réponse (contenu certifiant, réglementaire ou sensible). Sinon, la
-                correction est automatique et un formateur peut relire sur demande.
-              </span>
-            </label>
             <div>
               <Label htmlFor="competency_id">Compétence évaluée</Label>
               <Select id="competency_id" name="competency_id" defaultValue={competenceActuelle}>

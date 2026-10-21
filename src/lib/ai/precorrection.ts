@@ -84,6 +84,25 @@ export function propositionIncertaine(raison: string): PropositionCorrection {
   };
 }
 
+/** Commentaire transmis à l'apprenant quand sa réponse est vide ou trop courte (lot 27 bis). */
+export const FEEDBACK_REPONSE_INSUFFISANTE =
+  "Votre réponse est vide ou trop courte pour être évaluée. Reprenez la consigne et les critères d'évaluation annoncés, développez chaque point en quelques phrases, puis renvoyez votre réponse.";
+
+/** Réponse vide ou trop courte : notée non acquise sans appel au modèle (lot 27 bis). */
+export function propositionReponseInsuffisante(): PropositionCorrection {
+  return {
+    verdict: "non_acquise",
+    confiance: 1,
+    criteres: [],
+    type_difficulte: "raisonnement_incomplet",
+    points_forts: [],
+    a_travailler: ["Développer la réponse en suivant chaque critère d'évaluation."],
+    feedback_apprenant: FEEDBACK_REPONSE_INSUFFISANTE,
+    commentaire_formateur: "Réponse vide ou trop courte : notée non acquise sans analyse du contenu.",
+    warnings: ["Réponse trop courte pour être analysée."],
+  };
+}
+
 export type ValidationPrecorrection =
   | { ok: true; proposition: PropositionCorrection }
   | { ok: false; erreur: string };

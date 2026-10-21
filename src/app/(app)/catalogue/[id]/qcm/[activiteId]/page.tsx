@@ -394,7 +394,7 @@ function ChampsDuType({ type }: { type: TypeQuestion }) {
       />
       <p className="mt-1 text-xs text-slate-500">
         Visible du correcteur seulement, jamais de l&apos;apprenant. La
-        question attendra la note d&apos;un formateur ou d&apos;un concepteur.
+        réponse est corrigée automatiquement sur cette base.
       </p>
     </div>
   );

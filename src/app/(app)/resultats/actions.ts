@@ -8,9 +8,7 @@ import { encadreUneOrganisation } from "@/lib/auth/roles";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import type { NoteCorrecteur } from "@/lib/courses/questions";
 import { enregistrerNotes, type TentativeACorriger } from "@/lib/courses/correction";
-import { estCorrigeeAutomatiquement, estRevisable, lireDecision, relectureDemandee } from "@/lib/courses/correction-auto";
-import { formationDeLActivite } from "@/lib/courses/maitrise";
-import { notifierEncadrementFormation } from "@/lib/notifications/emettre";
+import { estRevisable } from "@/lib/courses/correction-auto";
 import type { ActionState } from "@/app/(app)/catalogue/actions";
 
 /** Notes saisies : une par question rédigée (`note_<id>` = 1 / 0, `commentaire_<id>`). */
@@ -63,7 +61,8 @@ async function copieEncadree(attemptId: string) {
 }
 
 // ------------------------------------------------------------
-// Correction humaine d'une copie en attente (lot 23, lot 26)
+// Repli : note humaine d'une copie dont la correction automatique n'a
+// pas abouti (lot 23, lot 26 ; lot 27 bis : cas exceptionnel)
 // ------------------------------------------------------------
 
 export async function noterTentative(
@@ -91,8 +90,8 @@ export async function noterTentative(
 }
 
 // ------------------------------------------------------------
-// Révision d'une copie déjà notée (lot 27) : correction automatique
-// contestée, ou simple second regard d'un formateur.
+// Révision d'une copie déjà notée (lot 27) : second regard d'un
+// formateur sur une correction automatique.
 // ------------------------------------------------------------
 
 export async function reviserTentative(
@@ -122,53 +121,4 @@ export async function reviserTentative(
   revalidatePath(`/resultats/corrections/${copie.id}`);
   revalidatePath(r.hrefApprenant);
   return { success: `Correction révisée : ${r.score} % (${r.nbCorrectes}/${r.nbQuestions}). L'apprenant a été prévenu.` };
-}
-
-// ------------------------------------------------------------
-// Demande de relecture par l'apprenant (lot 27, cadre légal §15)
-// ------------------------------------------------------------
-
-export async function demanderRelecture(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "Vous devez être connecté." };
-  const attemptId = String(formData.get("attempt_id") ?? "");
-
-  const supabase = await createClient();
-  const { data: tentative } = await supabase
-    .from("attempts")
-    .select("id, user_id, activity_id, status, feedback, activity:activities(title)")
-    .eq("id", attemptId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!tentative) return { error: "Copie introuvable." };
-  if (tentative.status !== "graded" || !estCorrigeeAutomatiquement(tentative.feedback)) {
-    return { error: "Seule une réponse corrigée automatiquement peut faire l'objet d'une relecture." };
-  }
-  if (relectureDemandee(tentative.feedback)) return { error: "Une relecture est déjà demandée pour cette réponse." };
-
-  const decision = lireDecision(tentative.feedback);
-  const admin = createAdminClient();
-  const feedback = tentative.feedback as Record<string, unknown>;
-  const { error } = await admin
-    .from("attempts")
-    .update({ feedback: { ...feedback, decision: { ...decision, relecture: { demandee_le: new Date().toISOString() } } } })
-    .eq("id", tentative.id);
-  if (error) return { error: "La demande n'a pas pu être enregistrée. Réessayez." };
-
-  const cours = await formationDeLActivite(admin, tentative.activity_id as string);
-  const activite = Array.isArray(tentative.activity) ? tentative.activity[0] : tentative.activity;
-  if (cours) {
-    await notifierEncadrementFormation(cours.id, {
-      type: "copie_a_corriger",
-      title: `Relecture demandée : ${activite?.title ?? "activité"}`,
-      body: `${user.fullName || "Un apprenant"} demande qu'un formateur relise sa réponse corrigée automatiquement.`,
-      href: `/resultats/corrections/${tentative.id}`,
-    });
-  }
-  revalidatePath("/resultats/corrections");
-  if (cours) revalidatePath(`/formations/${cours.id}/activite/${tentative.activity_id}`);
-  return { success: "Relecture demandée : un formateur va relire votre réponse et vous serez prévenu." };
 }

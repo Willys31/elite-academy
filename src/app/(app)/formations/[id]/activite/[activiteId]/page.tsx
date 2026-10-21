@@ -11,12 +11,12 @@ import {
   VERDICT_LABELS,
 } from "@/lib/courses/positionnement";
 import { soumettreQcm } from "@/app/(app)/formations/actions";
-import { demanderRelecture } from "@/app/(app)/resultats/actions";
-import { estCorrigeeAutomatiquement, libelleDecision, lireDecision, relectureDemandee } from "@/lib/courses/correction-auto";
+import { estCorrigeeAutomatiquement, libelleDecision, lireDecision } from "@/lib/courses/correction-auto";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { estEnAttenteDeCorrection, lireTypeQuestion } from "@/lib/courses/questions";
 import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
 import { ActiviteRedigee } from "@/components/activites/ActiviteRedigee";
+import { RelanceCorrection } from "@/components/activites/RelanceCorrection";
 import { estActiviteRedigee } from "@/lib/courses/activites-redigees";
 import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
 import { MAX_AIDES_PAR_JOUR, TYPE_AIDE_LABELS, type TypeAide } from "@/lib/tutorat/blocage";
@@ -35,8 +35,9 @@ export const metadata: Metadata = { title: "Activité" };
  *
  * Quatre types de questions (lot 23) : choix unique, vrai/faux et
  * réponse courte sont corrigés à la soumission ; une question ouverte
- * attend la note d'un formateur, et la tentative reste « en attente »
- * jusque-là — pas de nouvel essai entre-temps.
+ * est corrigée automatiquement dans la foulée (lot 27 bis). Tant que
+ * cette correction n'a pas abouti, la tentative reste « en cours » et la
+ * page la relance d'elle-même — pas de nouvel essai entre-temps.
  */
 export default async function ActivitePage({
   params,
@@ -77,8 +78,7 @@ export default async function ActivitePage({
   if (!activite) notFound();
   const placement = estTestDePositionnement(activite.content);
   // Activité rédigée (lot 26) : une question ouverte, consigne et
-  // critères affichés en tête, réponse pré-corrigée par l'IA puis
-  // validée par un formateur.
+  // critères affichés en tête, réponse corrigée automatiquement.
   const redigee = estActiviteRedigee(activite.type) ? activite.type : null;
 
   // IMPORTANT : expected_answer et explanation ne sont PAS sélectionnés ici
@@ -112,10 +112,9 @@ export default async function ActivitePage({
     .maybeSingle();
   const feedback = (derniereTentative?.feedback ?? null) as ResultatCorrection | null;
   const enAttente = estEnAttenteDeCorrection(derniereTentative?.status);
-  // Lot 27 : qui a décidé (correction automatique ou formateur), relecture.
+  // Lot 27 : qui a décidé (correction automatique, ou formateur en révision).
   const decision = lireDecision(derniereTentative?.feedback);
   const automatique = estCorrigeeAutomatiquement(derniereTentative?.feedback);
-  const relectureEnCours = relectureDemandee(derniereTentative?.feedback);
 
   const competences = (activite.activity_competencies ?? [])
     .map((ac) => {
@@ -178,38 +177,28 @@ export default async function ActivitePage({
         <Card className="mb-6 border-brand-200">
           <h2 className="font-semibold">
             {enAttente || derniereTentative.score === null
-              ? "Dernière tentative : en attente de correction"
+              ? "Dernière tentative : correction en cours"
               : `Dernière tentative : ${Number(derniereTentative.score)} % (${feedback.nbCorrectes}/${feedback.nbQuestions})`}
           </h2>
           {enAttente ? (
-            <p className="mt-1 text-sm text-slate-600">
+            <div className="mt-2 space-y-2 text-sm text-slate-600">
               {/* Le message de l'action est perdu au rechargement (le
                   formulaire qui le porte est masqué tant que la copie
-                  attend) : le bilan des questions corrigées
-                  automatiquement est donc redit ici. */}
-              {feedback.nbQuestions - feedback.nbEnAttente > 0
-                ? `Réponses enregistrées : ${feedback.nbCorrectes}/${feedback.nbQuestions - feedback.nbEnAttente} sur les questions corrigées automatiquement. `
-                : "Réponses enregistrées. "}
-              {feedback.nbEnAttente > 1 ? `${feedback.nbEnAttente} réponses rédigées sont` : "Votre réponse rédigée est"} en cours de correction.
-              Vous recevrez une notification dès que le résultat sera disponible.
-            </p>
-          ) : derniereTentative.graded_at ? (
-            <div className="mt-1 text-sm text-slate-600">
-              <p>
-                {libelleDecision(decision)} le{" "}
-                {new Date(derniereTentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
-                {relectureEnCours && decision?.relecture?.demandee_le
-                  ? ` Relecture demandée le ${new Date(decision.relecture.demandee_le).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} : un formateur va relire votre réponse.`
-                  : ""}
-              </p>
-              {automatique && !relectureEnCours && !decision?.revisee_le ? (
-                <div className="mt-2">
-                  <AuthForm action={demanderRelecture} submitLabel="Demander une relecture par un formateur" pendingLabel="Envoi…">
-                    <input type="hidden" name="attempt_id" value={derniereTentative.id as string} />
-                  </AuthForm>
-                </div>
+                  attend) : le bilan des questions à choix est redit
+                  ici, et la correction des réponses rédigées est
+                  relancée d'elle-même. */}
+              {feedback.nbQuestions - feedback.nbEnAttente > 0 ? (
+                <p>
+                  Réponses enregistrées : {feedback.nbCorrectes}/{feedback.nbQuestions - feedback.nbEnAttente} sur les questions à choix.
+                </p>
               ) : null}
+              <RelanceCorrection attemptId={derniereTentative.id as string} />
             </div>
+          ) : derniereTentative.graded_at ? (
+            <p className="mt-1 text-sm text-slate-600">
+              {libelleDecision(decision)} le{" "}
+              {new Date(derniereTentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
+            </p>
           ) : null}
           <ul className="mt-3 space-y-2 text-sm">
             {feedback.details.map((d, i) => (
@@ -268,10 +257,7 @@ export default async function ActivitePage({
       {!questions || questions.length === 0 ? (
         <Alert kind="info">{redigee ? "Cette activité n'a pas encore de consigne." : "Ce QCM ne contient pas encore de question."}</Alert>
       ) : enAttente ? (
-        <Alert kind="info">
-          Votre réponse est en cours de correction. Vous pourrez retenter
-          cette activité une fois le résultat reçu.
-        </Alert>
+        <Alert kind="info">Vous pourrez répondre à nouveau une fois cette correction terminée.</Alert>
       ) : (
         <Card>
           <AuthForm
@@ -285,8 +271,8 @@ export default async function ActivitePage({
             <input type="hidden" name="started_at" value={Date.now()} />
             {nbOuvertes > 0 && !redigee ? (
               <p className="text-xs leading-relaxed text-slate-500">
-                {nbOuvertes > 1 ? `${nbOuvertes} questions ouvertes seront notées` : "Une question ouverte sera notée"} par un formateur ;
-                les autres sont corrigées immédiatement.
+                Toutes les réponses, y compris {nbOuvertes > 1 ? "les réponses rédigées" : "la réponse rédigée"}, sont corrigées
+                automatiquement dès l&apos;envoi.
               </p>
             ) : null}
             <div className="space-y-6">

@@ -57,8 +57,8 @@ export function ActiviteRedigee({
             </p>
           ) : null}
           <p className="text-xs text-slate-500">
-            Votre réponse est corrigée automatiquement dès l&apos;envoi : vous recevez un résultat et un commentaire.
-            Un formateur peut la relire à votre demande.
+            Votre réponse est corrigée automatiquement dès l&apos;envoi : vous recevez un résultat et un commentaire
+            détaillé, critère par critère.
           </p>
         </div>
       </Card>

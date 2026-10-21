@@ -11,7 +11,7 @@ import {
   TYPE_QUESTION_LABELS,
 } from "@/lib/courses/questions";
 import { noterTentative, reviserTentative } from "@/app/(app)/resultats/actions";
-import { estRevisable, libelleDecision, lireDecision, relectureDemandee } from "@/lib/courses/correction-auto";
+import { estRevisable, libelleDecision, lireDecision } from "@/lib/courses/correction-auto";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert } from "@/components/ui";
 import { EcranTitre, Etiquette, Panneau, Retour } from "@/components/app";
@@ -29,11 +29,12 @@ export const metadata: Metadata = { title: "Corriger une copie" };
 type QuestionCorrecteur = ReturnType<typeof lireQuestion> & { competence: string | null };
 
 /**
- * Correction d'une copie (lot 23). Le correcteur voit toute la copie :
- * les questions corrigées automatiquement (pour le contexte) et, pour
- * chaque question ouverte, la réponse de l'apprenant, la grille du
- * concepteur, puis un verdict « acquise / non acquise » et un
- * commentaire.
+ * Copie vue par l'encadrement (lot 23 ; lot 27 bis). Deux usages : noter
+ * en repli une copie dont la correction automatique n'a pas abouti, ou
+ * réviser une copie déjà notée automatiquement. Le correcteur voit toute
+ * la copie : les questions à choix (pour le contexte) et, pour chaque
+ * question ouverte, la réponse de l'apprenant, la grille du concepteur,
+ * puis un verdict « acquise / non acquise » et un commentaire.
  *
  * Droits : la tentative est lue sous RLS (la sienne ou `oversees_activity`)
  * ; une copie à soi n'est pas corrigeable. Les corrigés (grille,
@@ -69,7 +70,6 @@ export default async function CorrigerCopiePage({
   // par l'encadrement tant qu'elle contient une réponse rédigée.
   const decision = lireDecision(tentative.feedback);
   const revisable = !enAttente && tentative.status === "graded" && estRevisable(feedback);
-  const relecture = relectureDemandee(tentative.feedback);
 
   const [{ data: profil }, { data: questionsBrutes }, { data: revue }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", tentative.user_id).maybeSingle(),
@@ -160,32 +160,31 @@ export default async function CorrigerCopiePage({
         </Panneau>
       ) : null}
 
-      {enAttente && proposees > 0 ? (
+      {enAttente ? (
         <div className="mb-6">
           <Alert kind="info">
-            La correction automatique a préparé {proposees > 1 ? `${proposees} réponses` : "cette réponse"} sans pouvoir conclure seule : verdict et commentaire sont pré-remplis ci-dessous.
-            Vous décidez : validez tel quel, ou modifiez-les avant d&apos;enregistrer. L&apos;apprenant ne voit que ce que vous enregistrez.
+            La correction automatique de cette copie n&apos;a pas abouti ; elle sera relancée d&apos;elle-même quand l&apos;apprenant
+            reviendra sur l&apos;activité.
+            {proposees > 0
+              ? ` Une correction a déjà été préparée pour ${proposees > 1 ? `${proposees} réponses` : "cette réponse"} : verdict et commentaire sont pré-remplis ci-dessous.`
+              : ""}{" "}
+            Vous pouvez aussi la noter vous-même dès maintenant : l&apos;apprenant ne voit que ce que vous enregistrez.
           </Alert>
         </div>
-      ) : null}
-
-      {!enAttente ? (
+      ) : (
         <div className="mb-6">
-          <Alert kind={relecture ? "error" : "info"}>
+          <Alert kind="info">
             {libelleDecision(decision)}
             {tentative.graded_at
               ? ` le ${new Date(tentative.graded_at as string).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`
               : ""}
-            .{" "}
-            {relecture && decision?.relecture?.demandee_le
-              ? `L'apprenant a demandé une relecture le ${new Date(decision.relecture.demandee_le).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`
-              : ""}
+            .
             {revisable
               ? " Vous pouvez réviser le verdict et le commentaire ci-dessous : l'apprenant sera prévenu."
               : " Cette copie est affichée en lecture seule."}
           </Alert>
         </div>
-      ) : null}
+      )}
 
       {/* Une copie déjà notée se lit sans formulaire : ni bouton, ni
           enregistrement refusé. */}
@@ -302,7 +301,7 @@ function ListeQuestions({
                 </p>
               ) : null}
 
-              {/* Proposition de l'IA (lot 26), pour le correcteur seulement */}
+              {/* Correction automatique préparée (lot 26), pour le correcteur seulement */}
               {proposition ? <PropositionIa proposition={proposition} /> : null}
 
               {/* Verdict et commentaire */}

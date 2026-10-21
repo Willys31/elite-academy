@@ -18,7 +18,7 @@ export function PropositionIa({ proposition }: { proposition: PropositionCorrect
   return (
     <div className="mt-3 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 px-3.5 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-brand-800">Correction automatique proposée — à valider ou à modifier</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-brand-800">Correction automatique préparée — modifiable</p>
         <div className="flex items-center gap-2">
           <Etiquette ton={ton}>{VERDICT_LABELS[p.verdict]}</Etiquette>
           {p.verdict !== "incertain" ? <span className="text-xs text-slate-500">confiance {confiance} %</span> : null}

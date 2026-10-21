@@ -3,8 +3,8 @@
  *
  * Une activité rédigée est une ligne `activities` de type `exercise`,
  * `case_study` ou `simulation` qui porte UNE question `open` (lot 23) :
- * l'apprenant répond par écrit, l'IA pré-corrige (lot 26, étape D), un
- * membre de l'encadrement valide. Le circuit des tentatives et de la
+ * l'apprenant répond par écrit, la réponse est corrigée automatiquement
+ * (lot 26, étape D ; lot 27 bis). Le circuit des tentatives et de la
  * maîtrise par compétence est celui du lot 23.
  *
  * Ce module traduit :
@@ -53,8 +53,6 @@ export interface ContenuActiviteRedigee {
   media_brief: MediaBriefGenere | null;
   generated_by_ai: boolean;
   prompt_version: string | null;
-  /** Lot 27 : exiger une correction humaine (contenu certifiant, sensible). */
-  correction_humaine: boolean;
 }
 
 const texte = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
@@ -74,7 +72,6 @@ export function lireContenuActiviteRedigee(brut: unknown): ContenuActiviteRedige
         : null,
     generated_by_ai: c.generated_by_ai === true,
     prompt_version: texte(c.prompt_version) || null,
-    correction_humaine: c.correction_humaine === true,
   };
 }
 
@@ -135,7 +132,6 @@ export function activiteDepuisPlan(
     media_brief: a.media_brief,
     generated_by_ai: true,
     prompt_version: options.prompt_version,
-    correction_humaine: false,
   };
   const difficulty = borner(a.difficulty, 2);
   return {
@@ -171,7 +167,7 @@ export function lireFormulaireActiviteRedigee(lire: (nom: string) => string): Le
   if (instructions.length > LONGUEUR_MAX_CONSIGNE) {
     return { ok: false, erreur: `La consigne dépasse ${LONGUEUR_MAX_CONSIGNE} caractères.` };
   }
-  if (!evaluation) return { ok: false, erreur: "Indiquez les critères d'évaluation : c'est sur eux que l'IA et le formateur corrigeront." };
+  if (!evaluation) return { ok: false, erreur: "Indiquez les critères d'évaluation : c'est sur eux que la réponse est corrigée." };
   if (expected_outcome.length > LONGUEUR_MAX_CHAMP || evaluation.length > LONGUEUR_MAX_CHAMP) {
     return { ok: false, erreur: `Le résultat attendu et les critères font ${LONGUEUR_MAX_CHAMP} caractères au maximum chacun.` };
   }
@@ -183,7 +179,6 @@ export function lireFormulaireActiviteRedigee(lire: (nom: string) => string): Le
     media_brief: null,
     generated_by_ai: false,
     prompt_version: null,
-    correction_humaine: lire("correction_humaine") === "on" || lire("correction_humaine") === "true",
   };
   const difficulty = borner(lire("difficulty"), 2);
   return {

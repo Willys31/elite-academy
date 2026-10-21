@@ -7,6 +7,7 @@ import { soumettreQcm } from "@/app/(app)/formations/actions";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import { ChampReponse, LigneFeedback } from "@/components/activites/ChampReponse";
 import { ActiviteRedigee } from "@/components/activites/ActiviteRedigee";
+import { RelanceCorrection } from "@/components/activites/RelanceCorrection";
 import { estActiviteRedigee } from "@/lib/courses/activites-redigees";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Alert, Card, PageTitle } from "@/components/ui";
@@ -117,8 +118,13 @@ export default async function ActiviteSessionPage({
               <LigneFeedback key={d.questionId} detail={d} numero={i + 1} libelle={redigee ? "Votre réponse" : undefined} />
             ))}
           </ul>
+          {derniereTentative.score === null ? (
+            <div className="mt-3">
+              <RelanceCorrection attemptId={derniereTentative.id as string} />
+            </div>
+          ) : null}
           <p className="mt-3 text-sm text-slate-500">
-            Réponse transmise au formateur — attendez le débriefing en salle.
+            Réponse transmise au formateur pour le débriefing en salle.
           </p>
         </Card>
       ) : null}

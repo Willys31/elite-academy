@@ -39,12 +39,15 @@ const PROPOSITION_VALIDE = {
   warnings: [],
 };
 
-describe("prompt de pré-correction", () => {
-  it("porte une version, exige du JSON et interdit le corrigé complet", () => {
-    expect(PROMPT_VERSION_CORRECTION).toBe("precorrection-reponse/v1");
+describe("prompt de correction", () => {
+  it("porte une version, exige du JSON, tranche et interdit le corrigé complet", () => {
+    expect(PROMPT_VERSION_CORRECTION).toBe("correction-reponse/v2");
     expect(SYSTEM_CORRECTION).toMatch(/JSON/);
     expect(SYSTEM_CORRECTION).toContain("Ne rédige JAMAIS la réponse complète attendue");
-    expect(SYSTEM_CORRECTION).toContain("formateur humain");
+    // Lot 27 bis : la correction décide, sans relecture ; « incertain » n'est plus proposé.
+    expect(SYSTEM_CORRECTION).toContain("transmis directement");
+    expect(SYSTEM_CORRECTION).toContain('"verdict": "acquise" | "non_acquise"');
+    expect(SYSTEM_CORRECTION).not.toContain('"incertain"');
     for (const t of ["notion_non_comprise", "confusion", "mauvaise_lecture", "raisonnement_incomplet", "difficulte_application"]) {
       expect(SYSTEM_CORRECTION).toContain(t);
     }

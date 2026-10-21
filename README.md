@@ -130,3 +130,4 @@ docs/               Documentation des lots livrés
 - [Lot 25 – DeepSeek, moteur IA : modèles V4, un modèle par tâche, prompt v2, contrôles pédagogiques, banc d'essai](docs/lot-25-moteur-ia-deepseek.md)
 - [Lot 26 – Activités rédigées : exercices, études de cas, simulations, pré-correction IA validée par le formateur](docs/lot-26-activites-redigees.md)
 - [Lot 27 – Correction automatique des réponses rédigées, relecture et révision par le formateur](docs/lot-27-correction-automatique.md)
+- [Lot 27 bis – Correction entièrement automatique, sans formateur : plus de seuil, relance d'elle-même](docs/lot-27bis-correction-sans-formateur.md)

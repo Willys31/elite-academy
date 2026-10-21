@@ -649,15 +649,8 @@ export default async function EditeurFormationPage({
                                       </div>
                                       <div>
                                         <Label htmlFor={`criteres-ar-${l.id}`}>Critères d'évaluation (obligatoire)</Label>
-                                        <Textarea id={`criteres-ar-${l.id}`} name="evaluation" rows={3} required placeholder="Critères observables ; l'IA pré-corrige et le formateur valide sur cette base." />
+                                        <Textarea id={`criteres-ar-${l.id}`} name="evaluation" rows={3} required placeholder="Critères observables : la correction automatique s'appuie sur eux." />
                                       </div>
-                                      <label className="flex items-start gap-2 text-xs text-slate-600">
-                                        <input type="checkbox" name="correction_humaine" className="mt-0.5 size-4 accent-brand-700" />
-                                        <span>
-                                          <span className="font-medium text-ink-900">Correction humaine obligatoire</span>
-                                          {" "}— un formateur notera chaque réponse (contenu certifiant, réglementaire ou sensible).
-                                        </span>
-                                      </label>
                                       <div>
                                         <Label htmlFor={`comp-ar-${l.id}`}>Compétence évaluée</Label>
                                         <Select id={`comp-ar-${l.id}`} name="competency_id" defaultValue="">

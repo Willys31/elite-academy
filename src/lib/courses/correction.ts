@@ -11,9 +11,9 @@ import type { DecisionCopie } from "@/lib/courses/correction-auto";
 
 /**
  * Enregistrement d'une correction de réponses rédigées — commun à la
- * décision d'un formateur (`noterTentative`), à la correction
- * automatique (`precorrigerTentative`, lot 27) et à la révision d'une
- * copie déjà notée (`reviserTentative`).
+ * correction automatique (`corrigerTentativeAutomatiquement`, lot 27),
+ * à la décision d'un formateur sur une copie en repli (`noterTentative`)
+ * et à la révision d'une copie déjà notée (`reviserTentative`).
  *
  * Écrit via le client d'administration : `attempts` n'a aucune politique
  * d'UPDATE. L'appelant a vérifié les droits avant d'arriver ici.
@@ -53,11 +53,7 @@ export async function enregistrerNotes(p: ParametresEnregistrement): Promise<Res
   const maintenant = new Date().toISOString();
   const decisionPrecedente = (tentative.feedback as { decision?: DecisionCopie }).decision;
   const decision: DecisionCopie = revision
-    ? {
-        ...(decisionPrecedente ?? { mode: "humaine", le: maintenant }),
-        revisee_le: maintenant,
-        relecture: decisionPrecedente?.relecture ? { ...decisionPrecedente.relecture, traitee_le: maintenant } : undefined,
-      }
+    ? { ...(decisionPrecedente ?? { mode: "humaine", le: maintenant }), revisee_le: maintenant }
     : { mode: decidePar ? "humaine" : "automatique", le: maintenant };
 
   const requete = admin

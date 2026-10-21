@@ -234,7 +234,7 @@ export function simulerPrecorrection(reponse: string, criteres: string): string 
     points_forts: ["[DÉMO] La réponse est rédigée et structurée."],
     a_travailler: longue ? [] : ["[DÉMO] Développer davantage chaque critère de la consigne."],
     feedback_apprenant:
-      "[DÉMO] Ceci est un feedback de démonstration produit sans IA. Votre réponse a été enregistrée. Un formateur la lira et décidera. En mode réel, vous recevriez ici des observations précises sur chaque critère, ce qui est réussi et une piste pour progresser.",
+      "[DÉMO] Ceci est un feedback de démonstration produit sans IA. Votre réponse a été enregistrée et notée selon sa longueur seulement. En mode réel, vous recevriez ici des observations précises sur chaque critère, ce qui est réussi et une piste pour progresser.",
     commentaire_formateur: "[DÉMO] Proposition générée en mode simulation : à vérifier entièrement.",
     warnings: ["Mode simulation : aucune analyse réelle de la réponse."],
   });
