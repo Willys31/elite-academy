@@ -23,6 +23,7 @@ import {
   type TypeExercice,
   type CompetenceSuivie,
 } from "@/lib/tutorat/blocage";
+import { LIBELLE_AIDE_PASSAGE, TYPE_AIDE_PASSAGE } from "@/lib/tutorat/passage";
 import { generationsDuJour } from "@/lib/tutorat/moteur";
 import { genererExercices } from "@/app/(app)/tutorat/actions";
 import { AuthForm } from "@/components/ui/AuthForm";
@@ -84,7 +85,7 @@ export default async function TutoratPage({
     supabase.from("competency_blocking_scores").select("competency_id, score, band, blocking_types, history, nb_tentatives, nb_aides, nb_reformulations").eq("user_id", user.id).eq("course_id", formation.id),
     supabase.from("progress_records").select("competency_id, mastery_level, score").eq("user_id", user.id).eq("course_id", formation.id).not("competency_id", "is", null),
     supabase.from("personalized_exercises").select("id, competency_id, exercise_type, difficulty, content, status, score, created_at, completed_at").eq("user_id", user.id).eq("course_id", formation.id).order("created_at", { ascending: false }),
-    supabase.from("tutor_help_events").select("id, help_type, response_text, created_at, activity:activities(id, title), competency:competencies(name)").eq("user_id", user.id).eq("course_id", formation.id).order("created_at", { ascending: false }).limit(20),
+    supabase.from("tutor_help_events").select("id, help_type, passage, response_text, created_at, activity:activities(id, title), lesson:lessons(id, title), competency:competencies(name)").eq("user_id", user.id).eq("course_id", formation.id).order("created_at", { ascending: false }).limit(20),
     generationsDuJour(user.id, ["tutor_exercises"]),
   ]);
 
@@ -247,12 +248,15 @@ export default async function TutoratPage({
                 <ul className="divide-y divide-sand-100">
                   {(aides ?? []).map((a) => {
                     const activite = premier(a.activity);
+                    const lecon = premier(a.lesson);
                     const comp = premier(a.competency);
                     return (
                       <li key={a.id} className="px-5 py-3 text-sm">
                         <p className="text-xs font-medium text-slate-500">
-                          {TYPE_AIDE_LABELS[a.help_type as TypeAide] ?? a.help_type}
-                          {activite?.title ? ` · ${activite.title}` : ""}
+                          {a.help_type === TYPE_AIDE_PASSAGE
+                            ? `${LIBELLE_AIDE_PASSAGE}${a.passage ? ` « ${a.passage} »` : ""}`
+                            : (TYPE_AIDE_LABELS[a.help_type as TypeAide] ?? a.help_type)}
+                          {activite?.title ? ` · ${activite.title}` : lecon?.title ? ` · ${lecon.title}` : ""}
                           {comp?.name ? ` · ${comp.name}` : ""} ·{" "}
                           {new Date(a.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
                         </p>

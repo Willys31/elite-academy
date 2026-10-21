@@ -32,7 +32,9 @@
       "Bash(node sb.mjs GET \"ai_generations?select=id,generation_type,status,created_at&order=created_at.desc&limit=4\")",
       "Bash(node -e \"const t=Date.now\\(\\); fetch\\(process.env.U||'https://example.com'\\).then\\(\\(\\)=>console.log\\('ok'\\)\\)\")",
       "Bash(npx tsc *)",
-      "Bash(echo \"TSC_EXIT=$?\")"
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(node sb.mjs GET \"tutor_help_events?select=id,help_type,passage,lesson_id,activity_id,competency_id,created_at&order=created_at.desc&limit=2\")",
+      "Bash(node sb.mjs GET \"ai_generations?select=id,generation_type,status,prompt_version,brief,context&created_at=gte.2026-10-21T12:00:00Z&order=created_at.desc&limit=2\")"
     ]
   }
 }

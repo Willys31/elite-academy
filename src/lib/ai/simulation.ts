@@ -174,6 +174,15 @@ export function simulerAide(type: string, enonce: string): string {
   return textes[type] ?? textes.hint;
 }
 
+/** Explication d'un passage de leçon en mode simulation (lot 28), sans appel au LLM. */
+export function simulerExplicationPassage(passage: string, titreLecon: string, trouve: boolean): string {
+  const marque = "[DÉMO — tuteur en mode simulation, sans IA]";
+  const p = passage.slice(0, 80);
+  return trouve
+    ? `${marque} Dans la leçon « ${titreLecon} », « ${p} » désigne une notion que le texte présente autour de ce passage. Relisez la phrase qui précède et celle qui suit : la première pose le cadre, la seconde donne l'application. En situation professionnelle, c'est ce qui permet de prendre une décision concrète plutôt qu'intuitive. En mode réel, le tuteur vous donnerait ici une définition simple et un exemple de votre secteur.`
+    : `${marque} « ${p} » n'apparaît pas tel quel dans la leçon « ${titreLecon} ». En mode réel, le tuteur l'expliquerait dans le cadre de cette formation et vous signalerait que la leçon ne le développe pas.`;
+}
+
 /** Exercices de démonstration (lot 18), sans appel au LLM. */
 export function simulerExercices(competence: string, typeExercice: string, nb: number): string {
   const marque = "[DÉMO]";

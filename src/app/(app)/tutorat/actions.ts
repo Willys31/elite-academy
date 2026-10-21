@@ -15,7 +15,9 @@ import {
   SYSTEM_TUTEUR,
 } from "@/lib/ai/prompts";
 import { extraireJson } from "@/lib/ai/schema";
-import { simulerAide, simulerExercices } from "@/lib/ai/simulation";
+import { construirePromptPassage, PROMPT_VERSION_PASSAGE, SYSTEM_TUTEUR_PASSAGE } from "@/lib/ai/prompts-passage";
+import { simulerAide, simulerExercices, simulerExplicationPassage } from "@/lib/ai/simulation";
+import { extraireContexte, nettoyerPassage, passageValide, TYPE_AIDE_PASSAGE } from "@/lib/tutorat/passage";
 import type { ResultatCorrection } from "@/lib/courses/progression";
 import {
   aideAutorisee,
@@ -533,4 +535,136 @@ export async function marquerRecommandationFaite(
   }
   revalidatePath("/tutorat");
   return { success: "Recommandation marquée comme faite." };
+}
+
+// ------------------------------------------------------------
+// « Expliquer ce passage » (lot 28) : un mot ou une expression d'une
+// leçon, expliqué dans le contexte de la leçon.
+// ------------------------------------------------------------
+
+/**
+ * Même quota que les aides du tuteur (30 par jour, `tutor_help`), même
+ * trace, même table d'événements (type `explain_passage`, rattaché à la
+ * leçon). Aucune compétence n'est associée : le score de blocage n'en
+ * tient pas compte (brief lot 28, H3). Le modèle reçoit la formation, la
+ * leçon, le passage et son extrait ; jamais l'identité de l'apprenant.
+ */
+export async function expliquerPassage(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Vous devez être connecté." };
+
+  const lessonId = String(formData.get("lesson_id") ?? "");
+  const passage = nettoyerPassage(formData.get("passage"));
+  const validation = passageValide(passage);
+  if (!validation.ok) return { error: validation.erreur };
+  if (!lessonId) return { error: "Leçon introuvable." };
+  if (!iaConfiguree("tuteur") && !modeSimulation()) {
+    return { error: "Le tuteur n'est pas disponible sur cette installation." };
+  }
+
+  const dejaAujourdhui = await generationsDuJour(user.id, ["tutor_help"]);
+  if (!peutDemanderAide(dejaAujourdhui)) {
+    return { error: "Vous avez atteint la limite de 30 aides par jour. Revenez demain, ou partagez votre question dans l'Entraide." };
+  }
+
+  // Leçon lue sous RLS : inscrit à la formation, ou membre de l'encadrement.
+  const supabase = await createClient();
+  const { data: lecon } = await supabase
+    .from("lessons")
+    .select(
+      "id, title, content, module:modules(version:course_versions(course:courses!course_versions_course_id_fkey(id, title, organization_id, sector)))"
+    )
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!lecon) return { error: "Leçon introuvable." };
+  const course = premier(premier(premier(lecon.module)?.version)?.course) as
+    | { id: string; title: string; organization_id: string; sector: string | null }
+    | null;
+  if (!course) return { error: "Leçon introuvable." };
+
+  const texteLecon = ((lecon.content ?? {}) as { text?: string }).text ?? "";
+  const contexte = extraireContexte(texteLecon, passage);
+
+  const { data: generation } = await supabase
+    .from("ai_generations")
+    .insert({
+      organization_id: course.organization_id,
+      requested_by: user.id,
+      generation_type: "tutor_help",
+      brief: { help_type: TYPE_AIDE_PASSAGE, lesson_id: lessonId, passage },
+      context: { course_id: course.id, passage_trouve: contexte.trouve, ia: traceIa("tuteur") },
+      prompt_version: PROMPT_VERSION_PASSAGE,
+      model_name: modeleConfigure("tuteur"),
+      status: "running",
+    })
+    .select("id")
+    .single();
+
+  let texte: string;
+  try {
+    if (modeSimulation()) {
+      texte = simulerExplicationPassage(passage, lecon.title as string, contexte.trouve);
+    } else {
+      const reponse = await appelerLlm(
+        SYSTEM_TUTEUR_PASSAGE,
+        construirePromptPassage({
+          formation: course.title,
+          secteur: course.sector,
+          lecon: lecon.title as string,
+          passage,
+          extrait: contexte.extrait,
+          trouve: contexte.trouve,
+        }),
+        { tache: "tuteur" }
+      );
+      texte = reponse.texte.trim();
+      if (generation) {
+        await supabase
+          .from("ai_generations")
+          .update({ model_name: reponse.modele, input_tokens: reponse.inputTokens, output_tokens: reponse.outputTokens })
+          .eq("id", generation.id);
+      }
+    }
+  } catch (erreur) {
+    loguer("explication de passage", erreur);
+    if (generation) {
+      await supabase
+        .from("ai_generations")
+        .update({ status: "failed", error_message: erreur instanceof Error ? erreur.message : "échec", completed_at: new Date().toISOString() })
+        .eq("id", generation.id);
+    }
+    return { error: "Le tuteur n'a pas pu répondre. Réessayez dans quelques instants." };
+  }
+  if (!texte) return { error: "Le tuteur n'a rien renvoyé. Réessayez." };
+
+  if (generation) {
+    await supabase
+      .from("ai_generations")
+      .update({ status: "succeeded", result: { texte }, completed_at: new Date().toISOString() })
+      .eq("id", generation.id);
+  }
+
+  try {
+    await createAdminClient().from("tutor_help_events").insert({
+      user_id: user.id,
+      organization_id: course.organization_id,
+      course_id: course.id,
+      lesson_id: lessonId,
+      activity_id: null,
+      question_id: null,
+      competency_id: null,
+      help_type: TYPE_AIDE_PASSAGE,
+      passage,
+      generation_id: generation?.id ?? null,
+      response_text: texte.slice(0, 2000),
+    });
+  } catch (erreur) {
+    loguer("événement d'explication", erreur);
+  }
+
+  revalidatePath(`/formations/${course.id}/lecon/${lessonId}`);
+  return { success: texte };
 }

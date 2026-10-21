@@ -10,6 +10,11 @@ import { marquerLeconTerminee } from "@/app/(app)/formations/actions";
 import { obtenirUrlLecture, type UrlLecture } from "@/lib/stockage/fournisseur";
 import { formaterTaille, nomSur } from "@/lib/stockage/limites";
 import { libelleIntervalle, type Intervalle } from "@/lib/import/decoupage";
+import { iaConfiguree, modeSimulation } from "@/lib/ai/client";
+import { MAX_AIDES_PAR_JOUR } from "@/lib/tutorat/blocage";
+import { generationsDuJour } from "@/lib/tutorat/moteur";
+import { TYPE_AIDE_PASSAGE } from "@/lib/tutorat/passage";
+import { ExpliquerPassage } from "@/components/tutorat/ExpliquerPassage";
 import { AuthForm } from "@/components/ui/AuthForm";
 import { Badge, Card, PageTitle } from "@/components/ui";
 
@@ -17,7 +22,9 @@ export const metadata: Metadata = { title: "Leçon" };
 
 /**
  * Lecteur de leçon (UX/UI §3.4) : contenu, activités (QCM),
- * marquage terminé, navigation précédent/suivant.
+ * marquage terminé, navigation précédent/suivant. Depuis le lot 28, le
+ * texte est rendu par `ExpliquerPassage` : l'apprenant sélectionne un
+ * mot ou une expression et le tuteur l'explique dans le sens de la leçon.
  */
 export default async function LeconPage({
   params,
@@ -86,6 +93,21 @@ export default async function LeconPage({
 
   const contenu = (lecon.content ?? {}) as { text?: string };
   const terminee = Boolean(progres);
+
+  // Tuteur (lot 28) : explications déjà demandées sur cette leçon (RLS :
+  // les siennes) et quota du jour, commun aux aides du tuteur.
+  const tuteurDisponible = iaConfiguree("tuteur") || modeSimulation();
+  const [{ data: explications }, aidesDuJour] = await Promise.all([
+    supabase
+      .from("tutor_help_events")
+      .select("id, passage, response_text, created_at")
+      .eq("user_id", user.id)
+      .eq("lesson_id", lecon.id)
+      .eq("help_type", TYPE_AIDE_PASSAGE)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    tuteurDisponible ? generationsDuJour(user.id, ["tutor_help"]) : Promise.resolve(0),
+  ]);
 
   // Supports de la leçon : URL signées (1 h), accès contrôlé par
   // les politiques Storage de l'organisation. `obtenirUrlLecture`
@@ -160,17 +182,26 @@ export default async function LeconPage({
         {lecon.title}
       </PageTitle>
 
-      <Card>
-        {contenu.text ? (
-          <div className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">
-            {contenu.text}
-          </div>
-        ) : (
+      {contenu.text ? (
+        <ExpliquerPassage
+          lessonId={lecon.id}
+          texte={contenu.text}
+          disponible={tuteurDisponible}
+          restantes={Math.max(0, MAX_AIDES_PAR_JOUR - aidesDuJour)}
+          precedentes={(explications ?? []).map((e) => ({
+            id: e.id as string,
+            passage: (e.passage as string | null) ?? null,
+            texte: (e.response_text as string | null) ?? null,
+            date: e.created_at as string,
+          }))}
+        />
+      ) : (
+        <Card>
           <p className="text-sm text-slate-500">
             Cette leçon n&apos;a pas encore de contenu rédigé.
           </p>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {supports.length > 0 ? (
         <section aria-label="Supports de cours" className="mt-6 space-y-4">
